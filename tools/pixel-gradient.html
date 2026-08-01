@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Gradient Studio</title>
+<style>
+  :root{
+    --app-bg:#111111;--panel-bg:#1f1f1f;--input-bg:#2b2b2b;--border:#3a3a3a;
+    --text:#eeeeee;--subtext:#aaaaaa;--accent:#4f5cff;--danger:#ff5c5c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--app-bg);color:var(--text);font-size:13px;
+    font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;-webkit-font-smoothing:antialiased;}
+  #app{display:flex;width:100vw;height:100vh;overflow:hidden;}
+
+  /* ---- 左：プレビュー ---- */
+  #previewPane{flex:1 1 auto;position:relative;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;min-width:0;padding:36px;}
+  #canvasWrap{position:relative;box-shadow:0 12px 60px rgba(0,0,0,.55);}
+  #view{display:block;image-rendering:pixelated;}
+  /* カラーポイントのハンドル */
+  .handle{position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);
+    border:2px solid #fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.65), 0 2px 8px rgba(0,0,0,.5);
+    cursor:grab;touch-action:none;}
+  .handle.sel{outline:2px solid var(--accent);outline-offset:2px;}
+  .handle.line-end{border-radius:4px;}
+  .handle:active{cursor:grabbing;}
+  .stop-handle{position:absolute;width:14px;height:14px;transform:translate(-50%,-50%) rotate(45deg);
+    border:2px solid #fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.65);cursor:grab;touch-action:none;}
+  .stop-handle.sel{outline:2px solid var(--accent);outline-offset:2px;}
+  #axisLine{position:absolute;height:0;border-top:1.5px dashed rgba(255,255,255,.55);
+    transform-origin:0 50%;pointer-events:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.8));}
+  #hint{position:absolute;left:16px;bottom:14px;font:11px monospace;color:var(--subtext);
+    background:rgba(0,0,0,.4);padding:4px 8px;border-radius:4px;pointer-events:none;}
+  #sizeTag{position:absolute;right:16px;bottom:14px;font:11px monospace;color:var(--subtext);opacity:.6;pointer-events:none;}
+
+  /* ---- 右：パネル ---- */
+  #propPane{flex:0 0 400px;width:400px;background:var(--panel-bg);border-left:1px solid var(--border);
+    overflow-y:auto;padding-bottom:60px;}
+  @media (max-width:900px){#app{flex-direction:column;}#previewPane{flex:0 0 44vh;}
+    #propPane{flex:1 1 auto;width:100%;border-left:none;border-top:1px solid var(--border);}}
+
+  .section{border-bottom:1px solid var(--border);}
+  .section>.head{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;user-select:none;}
+  .section>.head:hover{background:#262626;}
+  .section .head h2{margin:0;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  .section .head .chev{color:var(--subtext);font-size:11px;transition:transform .15s;}
+  .section.collapsed .chev{transform:rotate(-90deg);}
+  .section.collapsed .body{display:none;}
+  .section .body{padding:4px 16px 16px;}
+
+  .field{margin:11px 0;}
+  .field label{display:block;font-size:11px;color:var(--subtext);margin-bottom:5px;}
+  .field .hint{font-size:10px;color:var(--subtext);margin-top:4px;opacity:.8;line-height:1.45;}
+  input[type=text],input[type=number],select{width:100%;background:var(--input-bg);border:1px solid var(--border);
+    color:var(--text);border-radius:6px;padding:7px 9px;font-size:13px;font-family:inherit;outline:none;}
+  input:focus,select:focus{border-color:var(--accent);}
+  input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);cursor:pointer;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .slider-row{display:flex;align-items:center;gap:8px;}
+  .slider-row input[type=range]{flex:1;}
+  .slider-row input[type=number]{flex:0 0 62px;width:62px;text-align:right;}
+  .row2{display:flex;gap:10px;}.row2>*{flex:1;min-width:0;}
+  .check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;}
+  .check input{accent-color:var(--accent);width:auto;}
+
+  button.btn{background:var(--input-bg);border:1px solid var(--border);color:var(--text);border-radius:6px;
+    padding:7px 11px;font-size:12px;cursor:pointer;font-family:inherit;}
+  button.btn:hover{border-color:var(--accent);}
+  button.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.btn.accent:hover{filter:brightness(1.1);}
+  button.btn.danger{color:var(--danger);}
+  button.btn.sm{padding:5px 9px;font-size:11px;}
+  button.btn.full{width:100%;padding:9px;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .btn-row.tight{gap:6px;}
+
+  .seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .seg button{flex:1;background:var(--input-bg);border:none;color:var(--subtext);padding:7px 4px;font-size:11px;
+    cursor:pointer;border-right:1px solid var(--border);font-family:inherit;}
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent);color:#fff;}
+
+  /* カラーリスト */
+  .color-card{display:flex;align-items:center;gap:9px;background:var(--input-bg);border:1px solid var(--border);
+    border-radius:8px;padding:7px 9px;margin-bottom:6px;}
+  .color-card.sel{border-color:var(--accent);}
+  .color-card .cc-pos{flex:1;display:flex;align-items:center;gap:6px;font:10px monospace;color:var(--subtext);}
+  .color-card .cc-pos input[type=range]{flex:1;}
+  .color-card .cc-hex{width:70px;font:11px monospace;background:transparent;border:none;color:var(--text);outline:none;}
+  .color-card button{flex:0 0 auto;}
+
+  /* バリエーション グリッド */
+  #varGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
+  .var-thumb{aspect-ratio:16/10;border:1px solid var(--border);border-radius:7px;overflow:hidden;cursor:pointer;
+    background:#000;padding:0;}
+  .var-thumb:hover{border-color:var(--accent);}
+  .var-thumb canvas{width:100%;height:100%;display:block;image-rendering:pixelated;}
+
+  .note{font-size:10px;color:var(--subtext);background:#1a2030;border:1px solid #2a3550;border-radius:6px;
+    padding:7px 9px;margin-top:8px;line-height:1.5;}
+  .small-label{font-size:10px;color:var(--subtext);margin:10px 0 4px;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--accent);color:#fff;
+    padding:9px 16px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .2s,transform .2s;
+    pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
+ onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+
+<div id="app">
+  <!-- 左：プレビュー -->
+  <div id="previewPane">
+    <div id="canvasWrap">
+      <canvas id="view"></canvas>
+      <div id="handles"></div>
+      <div id="axisLine" style="display:none;"></div>
+    </div>
+    <div id="hint">ダブルクリックで色を追加 / ドラッグで移動 / 選択してDeleteで削除</div>
+    <div id="sizeTag"></div>
+  </div>
+
+  <!-- 右：パネル -->
+  <div id="propPane">
+    <div class="section">
+      <div class="body" style="padding-top:14px;">
+        <div style="font-size:12px;font-weight:700;">Pixel Gradient Studio</div>
+        <div style="font-size:10px;color:var(--subtext);margin-bottom:10px;">ピクセルグラデーション生成ツール</div>
+        <div class="btn-row tight">
+          <button class="btn sm accent" id="btnRandom">🎲 Randomize</button>
+          <button class="btn sm" id="btnSave">💾 Save</button>
+          <button class="btn sm" id="btnLoad">📂 Load</button>
+          <button class="btn sm danger" id="btnReset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- グラデーション種類 -->
+    <div class="section" data-sec="type">
+      <div class="head"><h2>Gradient Type</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="seg" id="typeSeg">
+          <button data-val="mesh" class="active">Mesh</button>
+          <button data-val="linear">Linear</button>
+          <button data-val="radial">Radial</button>
+          <button data-val="conic">Conic</button>
+        </div>
+        <div class="hint" id="typeHint">Mesh: 色の点を自由に配置。点の位置で色が混ざります。</div>
+        <div class="field" id="meshPowerField">
+          <label>Mesh のなじみ（ブレンドの鋭さ）</label>
+          <div class="slider-row">
+            <input type="range" id="meshPowR" min="1" max="6" step="0.1" value="2.4">
+            <input type="number" id="meshPowN" step="0.1" value="2.4">
+          </div>
+          <div class="hint">小さいほどふんわり混ざり、大きいほど各色の領域がはっきりします。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- カラー -->
+    <div class="section" data-sec="colors">
+      <div class="head"><h2>Colors</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="hint" style="margin-bottom:8px;">プレビュー上のハンドルをドラッグで移動、ダブルクリックで追加。下のリストからも編集できます。</div>
+        <div id="colorList"></div>
+        <div class="btn-row tight">
+          <button class="btn sm accent" id="btnAddColor">＋ 色を追加</button>
+          <button class="btn sm" id="btnShufflePal">パレットを入れ替え</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- バリエーション -->
+    <div class="section" data-sec="variations">
+      <div class="head"><h2>Variations</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="hint" style="margin-bottom:8px;">今のパレットで配置・角度をランダムに変えた案を生成します。クリックで適用。</div>
+        <div id="varGrid"></div>
+        <div class="btn-row tight">
+          <button class="btn sm accent" id="btnGenVars">↻ バリエーション生成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ピクセル -->
+    <div class="section" data-sec="pixel">
+      <div class="head"><h2>Pixel / Texture</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="field">
+          <label>ピクセルサイズ（px）</label>
+          <div class="slider-row">
+            <input type="range" id="pxR" min="1" max="80" step="1" value="24">
+            <input type="number" id="pxN" step="1" value="24">
+          </div>
+          <div class="hint">1で滑らか、大きいほどモザイク状のブロックになります。</div>
+        </div>
+        <div class="field">
+          <label>ポスタライズ（色数の段階 / 0=オフ）</label>
+          <div class="slider-row">
+            <input type="range" id="postR" min="0" max="24" step="1" value="0">
+            <input type="number" id="postN" step="1" value="0">
+          </div>
+          <div class="hint">色の階調を制限して、バンド状の段差を作ります。</div>
+        </div>
+        <div class="field">
+          <label>ディザ（網点パターン）</label>
+          <div class="seg" id="ditherSeg">
+            <button data-val="none" class="active">なし</button>
+            <button data-val="bayer2">粗</button>
+            <button data-val="bayer4">中</button>
+            <button data-val="bayer8">細</button>
+          </div>
+          <div class="hint">ポスタライズと併用すると、段差の境目にドットの霧が生まれます（参考画像1の質感）。</div>
+        </div>
+        <div class="field" id="dither2Field">
+          <label class="check"><input type="checkbox" id="twoColor"> 2色ドットモード（最初と最後の色だけで描く）</label>
+          <div class="hint">参考画像4のような、2色のディザドット表現になります。</div>
+        </div>
+        <div class="field">
+          <label>グレイン（粒状ノイズ）</label>
+          <div class="slider-row">
+            <input type="range" id="grainR" min="0" max="60" step="1" value="0">
+            <input type="number" id="grainN" step="1" value="0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- キャンバス -->
+    <div class="section" data-sec="canvas">
+      <div class="head"><h2>Canvas</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="field">
+          <label>アスペクト比</label>
+          <div class="seg" id="aspectSeg">
+            <button data-val="1920x1080" class="active">16:9</button>
+            <button data-val="1080x1080">1:1</button>
+            <button data-val="1080x1920">9:16</button>
+            <button data-val="2400x960">2.5:1</button>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>幅（px）</label><input type="number" id="resW" value="1920" step="10"></div>
+          <div class="field"><label>高さ（px）</label><input type="number" id="resH" value="1080" step="10"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 出力 -->
+    <div class="section" data-sec="export">
+      <div class="head"><h2>Export</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="small-label">PNG 書き出し</div>
+        <div class="btn-row tight">
+          <button class="btn sm accent" id="btnPNG1">PNG ×1</button>
+          <button class="btn sm accent" id="btnPNG2">PNG ×2</button>
+          <button class="btn sm" id="btnPNG4">PNG ×4</button>
+        </div>
+        <div class="small-label" style="margin-top:10px;">設定</div>
+        <div class="btn-row tight">
+          <button class="btn sm" id="btnCopyJSON">Copy 設定JSON</button>
+        </div>
+        <div class="note">PNGは指定解像度の実寸で書き出します。×2/×4はさらに高解像度（ピクセルの角はシャープなまま）。</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),1700);}
+
+/* ================================================================
+   状態
+   ================================================================ */
+function defaultState(){
+  return {
+    type:'mesh',                       // mesh | linear | radial | conic
+    meshPower:2.4,
+    // メッシュ: 自由配置の色点（x,y は 0..1）
+    meshPoints:[
+      {x:0.15,y:0.20,color:'#ff8ad4'},
+      {x:0.85,y:0.15,color:'#8f9dff'},
+      {x:0.30,y:0.85,color:'#4f5cff'},
+      {x:0.80,y:0.75,color:'#e8f5c8'},
+    ],
+    // linear/radial/conic: カラーストップ（t は 0..1）
+    stops:[
+      {t:0.0,color:'#ff8ad4'},
+      {t:0.5,color:'#8f9dff'},
+      {t:1.0,color:'#4f5cff'},
+    ],
+    linear:{x1:0.1,y1:0.2,x2:0.9,y2:0.8},   // 軸の両端（ドラッグ可能）
+    radial:{cx:0.5,cy:0.5,r:0.6},
+    conic:{cx:0.5,cy:0.5,angle:0},
+    pixel:{size:24,posterize:0,dither:'none',twoColor:false,grain:0},
+    res:{w:1920,h:1080},
+    selected:{kind:null,index:-1},           // 選択中: {kind:'mesh'|'stop'|'axis1'|'axis2'|'center'|'radius', index}
+  };
+}
+let state=defaultState();
+
+/* ================================================================
+   ユーティリティ
+   ================================================================ */
+function hexToRgb(h){const m=h.replace('#','');const v=parseInt(m.length===3?m.split('').map(c=>c+c).join(''):m,16);
+  return [(v>>16)&255,(v>>8)&255,v&255];}
+function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
+function lerp(a,b,t){return a+(b-a)*t;}
+function clamp01(t){return t<0?0:t>1?1:t;}
+function rand(a,b){return a+Math.random()*(b-a);}
+function shuffled(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* Bayer 行列（0..1 に正規化して返す） */
+const BAYER={
+  bayer2:[[0,2],[3,1]].map(r=>r.map(v=>(v+0.5)/4)),
+  bayer4:[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]].map(r=>r.map(v=>(v+0.5)/16)),
+  bayer8:(()=>{ // 8x8 は 4x4 から再帰生成
+    const m4=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+    const m=[];
+    for(let y=0;y<8;y++){m.push([]);for(let x=0;x<8;x++){
+      m[y][x]=(m4[y%4][x%4]*4 + [[0,2],[3,1]][Math.floor(y/4)][Math.floor(x/4)] + 0.5)/64;
+    }}
+    return m;})(),
+};
+
+/* ストップ配列から t で色をサンプリング */
+function sampleStops(stops,t){
+  const s=stops.slice().sort((a,b)=>a.t-b.t);
+  if(t<=s[0].t) return hexToRgb(s[0].color);
+  if(t>=s[s.length-1].t) return hexToRgb(s[s.length-1].color);
+  for(let i=0;i<s.length-1;i++){
+    if(t>=s[i].t && t<=s[i+1].t){
+      const k=(t-s[i].t)/Math.max(1e-6,(s[i+1].t-s[i].t));
+      const a=hexToRgb(s[i].color), b=hexToRgb(s[i+1].color);
+      return [lerp(a[0],b[0],k),lerp(a[1],b[1],k),lerp(a[2],b[2],k)];
+    }
+  }
+  return hexToRgb(s[0].color);
+}
+
+/* ================================================================
+   グラデーション計算（低解像度グリッドへレンダリング）
+   ================================================================ */
+function renderToGrid(st, gw, gh){
+  const img=new Uint8ClampedArray(gw*gh*4);
+  const type=st.type;
+  const pts=st.meshPoints.map(p=>({x:p.x,y:p.y,c:hexToRgb(p.color)}));
+  const pow=st.meshPower;
+  const L=st.linear, R=st.radial, C=st.conic;
+  const dx=L.x2-L.x1, dy=L.y2-L.y1;
+  const len2=Math.max(1e-6, dx*dx+dy*dy);
+  const post=st.pixel.posterize;
+  const dm=st.pixel.dither!=='none' ? BAYER[st.pixel.dither] : null;
+  const dn=dm?dm.length:1;
+  const two=st.pixel.twoColor && dm;
+  // 2色モード用: 最初と最後の色
+  let cA=null,cB=null;
+  if(two){
+    const cols = type==='mesh' ? st.meshPoints.map(p=>p.color) : st.stops.slice().sort((a,b)=>a.t-b.t).map(s=>s.color);
+    cA=hexToRgb(cols[0]); cB=hexToRgb(cols[cols.length-1]);
+  }
+  const grain=st.pixel.grain;
+
+  for(let y=0;y<gh;y++){
+    const v=(y+0.5)/gh;
+    for(let x=0;x<gw;x++){
+      const u=(x+0.5)/gw;
+      let r,g,b;
+      if(type==='mesh'){
+        // 逆距離加重（IDW）: 近い点の色ほど強く効く
+        let wr=0,wg=0,wb=0,wsum=0;
+        for(const p of pts){
+          const ddx=u-p.x, ddy=v-p.y;
+          const d=Math.pow(ddx*ddx+ddy*ddy, pow*0.5)+1e-6;
+          const w=1/d;
+          wr+=p.c[0]*w; wg+=p.c[1]*w; wb+=p.c[2]*w; wsum+=w;
+        }
+        r=wr/wsum; g=wg/wsum; b=wb/wsum;
+      }else{
+        let t;
+        if(type==='linear'){ t=clamp01(((u-L.x1)*dx+(v-L.y1)*dy)/len2); }
+        else if(type==='radial'){ t=clamp01(Math.hypot(u-R.cx,(v-R.cy))/Math.max(1e-6,R.r)); }
+        else { let a=Math.atan2(v-C.cy,u-C.cx)-C.angle; a=((a/(Math.PI*2))%1+1)%1; t=a; }
+        [r,g,b]=sampleStops(st.stops,t);
+      }
+
+      // 2色ディザ: 明度をしきい値化して2色に割り当て
+      const i=(y*gw+x)*4;
+      if(two){
+        const lum=(0.299*r+0.587*g+0.114*b)/255;
+        const th=dm[y%dn][x%dn];
+        const c=lum>th?cA:cB;   // 明るい側=cA
+        img[i]=c[0];img[i+1]=c[1];img[i+2]=c[2];img[i+3]=255;
+        continue;
+      }
+      // ディザ + ポスタライズ（順序ディザ量子化）
+      if(post>=2){
+        const Lv=post;
+        const bay=dm?dm[y%dn][x%dn]:0.5;
+        r=Math.floor(clamp01(r/255*(Lv-1)/(Lv-1) + 0)*0+quant(r,Lv,bay));
+        g=quant(g,Lv,bay); b=quant(b,Lv,bay);
+        r=quant2(r,Lv); // r は quant 済みなのでそのまま
+      }
+      // グレイン
+      if(grain>0){ const n=(Math.random()-0.5)*grain; r+=n;g+=n;b+=n; }
+      img[i]=r;img[i+1]=g;img[i+2]=b;img[i+3]=255;
+    }
+  }
+  return new ImageData(img,gw,gh);
+
+  function quant(c,Lv,bay){ // 順序ディザつき量子化
+    const t=c/255*(Lv-1);
+    return Math.round((Math.floor(t+bay))/(Lv-1)*255);
+  }
+  function quant2(c){return c;}
+}
+
+/* ================================================================
+   描画（低解像度→ニアレストで拡大）
+   ================================================================ */
+const view=$('#view');
+let displayW=0, displayH=0;
+function fitCanvas(){
+  const pane=$('#previewPane');
+  const pw=pane.clientWidth-72, ph=pane.clientHeight-72;
+  const ar=state.res.w/state.res.h;
+  let w=pw, h=w/ar;
+  if(h>ph){h=ph;w=h*ar;}
+  displayW=Math.round(w); displayH=Math.round(h);
+  view.style.width=displayW+'px'; view.style.height=displayH+'px';
+  $('#sizeTag').textContent=`${state.res.w} × ${state.res.h}`;
+}
+function render(){
+  fitCanvas();
+  const px=Math.max(1,state.pixel.size);
+  const gw=Math.max(2,Math.ceil(state.res.w/px));
+  const gh=Math.max(2,Math.ceil(state.res.h/px));
+  const small=document.createElement('canvas'); small.width=gw; small.height=gh;
+  small.getContext('2d').putImageData(renderToGrid(state,gw,gh),0,0);
+  view.width=gw; view.height=gh;              // 実バッファは低解像度
+  const ctx=view.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(small,0,0);
+  renderHandles();
+}
+
+/* ================================================================
+   ハンドル（プレビュー上の直感操作）
+   ================================================================ */
+const handlesEl=$('#handles');
+function renderHandles(){
+  handlesEl.innerHTML='';
+  handlesEl.style.width=displayW+'px'; handlesEl.style.height=displayH+'px';
+  handlesEl.style.position='absolute'; handlesEl.style.left='0'; handlesEl.style.top='0';
+  const axis=$('#axisLine');
+  axis.style.display='none';
+
+  const mk=(x,y,color,cls,kind,index)=>{
+    const h=document.createElement('div');
+    h.className='handle '+(cls||'');
+    if(state.selected.kind===kind && state.selected.index===index) h.classList.add('sel');
+    h.style.left=(x*displayW)+'px'; h.style.top=(y*displayH)+'px';
+    h.style.background=color||'#888';
+    h.dataset.kind=kind; h.dataset.index=index;
+    handlesEl.appendChild(h);
+    return h;
+  };
+
+  if(state.type==='mesh'){
+    state.meshPoints.forEach((p,i)=>mk(p.x,p.y,p.color,'',
+      'mesh',i));
+  }else if(state.type==='linear'){
+    const L=state.linear;
+    // 軸線
+    const x1=L.x1*displayW,y1=L.y1*displayH,x2=L.x2*displayW,y2=L.y2*displayH;
+    const len=Math.hypot(x2-x1,y2-y1), ang=Math.atan2(y2-y1,x2-x1);
+    axis.style.display='block'; axis.style.left=x1+'px'; axis.style.top=y1+'px';
+    axis.style.width=len+'px'; axis.style.transform=`rotate(${ang}rad)`;
+    // 端点
+    mk(L.x1,L.y1,'#222','line-end','axis1',0);
+    mk(L.x2,L.y2,'#222','line-end','axis2',0);
+    // ストップ（軸上に菱形）
+    state.stops.forEach((s,i)=>{
+      const sx=lerp(L.x1,L.x2,s.t), sy=lerp(L.y1,L.y2,s.t);
+      const d=document.createElement('div');
+      d.className='stop-handle'+(state.selected.kind==='stop'&&state.selected.index===i?' sel':'');
+      d.style.left=(sx*displayW)+'px'; d.style.top=(sy*displayH)+'px';
+      d.style.background=s.color; d.dataset.kind='stop'; d.dataset.index=i;
+      handlesEl.appendChild(d);
+    });
+  }else if(state.type==='radial'){
+    const R=state.radial;
+    mk(R.cx,R.cy,'#222','line-end','center',0);
+    // 半径ハンドル（右方向）
+    mk(clamp01(R.cx+R.r),R.cy,'#555','','radius',0);
+    state.stops.forEach((s,i)=>{
+      const sx=R.cx+R.r*s.t, sy=R.cy;
+      const d=document.createElement('div');
+      d.className='stop-handle'+(state.selected.kind==='stop'&&state.selected.index===i?' sel':'');
+      d.style.left=(clamp01(sx)*displayW)+'px'; d.style.top=(sy*displayH)+'px';
+      d.style.background=s.color; d.dataset.kind='stop'; d.dataset.index=i;
+      handlesEl.appendChild(d);
+    });
+  }else{ // conic
+    const C=state.conic;
+    mk(C.cx,C.cy,'#222','line-end','center',0);
+    // 角度ハンドル
+    mk(clamp01(C.cx+0.25*Math.cos(C.angle)),clamp01(C.cy+0.25*Math.sin(C.angle)),'#555','','angle',0);
+    state.stops.forEach((s,i)=>{
+      const a=C.angle+s.t*Math.PI*2;
+      const sx=C.cx+0.3*Math.cos(a), sy=C.cy+0.3*Math.sin(a);
+      const d=document.createElement('div');
+      d.className='stop-handle'+(state.selected.kind==='stop'&&state.selected.index===i?' sel':'');
+      d.style.left=(clamp01(sx)*displayW)+'px'; d.style.top=(clamp01(sy)*displayH)+'px';
+      d.style.background=s.color; d.dataset.kind='stop'; d.dataset.index=i;
+      handlesEl.appendChild(d);
+    });
+  }
+}
+
+/* ドラッグ処理 */
+let drag=null;
+handlesEl.addEventListener('pointerdown',e=>{
+  const t=e.target;
+  if(!t.dataset || !t.dataset.kind) return;
+  const kind=t.dataset.kind, index=+t.dataset.index;
+  state.selected={kind,index};
+  drag={kind,index,pointerId:e.pointerId};
+  handlesEl.setPointerCapture(e.pointerId);
+  renderHandles(); renderColorList();
+  e.preventDefault();
+});
+handlesEl.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  const rect=handlesEl.getBoundingClientRect();
+  const u=clamp01((e.clientX-rect.left)/rect.width);
+  const v=clamp01((e.clientY-rect.top)/rect.height);
+  applyDrag(drag.kind,drag.index,u,v);
+  render(); // ライブ更新（低解像度なので軽い）
+});
+function endDrag(e){ if(!drag)return; try{handlesEl.releasePointerCapture(drag.pointerId);}catch(_){} drag=null; }
+handlesEl.addEventListener('pointerup',endDrag);
+handlesEl.addEventListener('pointercancel',endDrag);
+
+function applyDrag(kind,index,u,v){
+  if(kind==='mesh'){ const p=state.meshPoints[index]; if(p){p.x=u;p.y=v;} }
+  else if(kind==='axis1'){ state.linear.x1=u; state.linear.y1=v; }
+  else if(kind==='axis2'){ state.linear.x2=u; state.linear.y2=v; }
+  else if(kind==='center'){ if(state.type==='radial'){state.radial.cx=u;state.radial.cy=v;} else {state.conic.cx=u;state.conic.cy=v;} }
+  else if(kind==='radius'){ state.radial.r=Math.max(0.05,Math.hypot(u-state.radial.cx,v-state.radial.cy)); }
+  else if(kind==='angle'){ state.conic.angle=Math.atan2(v-state.conic.cy,u-state.conic.cx); }
+  else if(kind==='stop'){
+    const s=state.stops[index]; if(!s)return;
+    if(state.type==='linear'){
+      const L=state.linear, dx=L.x2-L.x1, dy=L.y2-L.y1;
+      s.t=clamp01(((u-L.x1)*dx+(v-L.y1)*dy)/Math.max(1e-6,dx*dx+dy*dy));
+    }else if(state.type==='radial'){
+      s.t=clamp01(Math.hypot(u-state.radial.cx,v-state.radial.cy)/Math.max(1e-6,state.radial.r));
+    }else{
+      let a=Math.atan2(v-state.conic.cy,u-state.conic.cx)-state.conic.angle;
+      s.t=((a/(Math.PI*2))%1+1)%1;
+    }
+  }
+}
+
+/* ダブルクリックで色追加（クリック位置の色を初期値に） */
+handlesEl.addEventListener('dblclick',e=>{
+  const rect=handlesEl.getBoundingClientRect();
+  const u=clamp01((e.clientX-rect.left)/rect.width);
+  const v=clamp01((e.clientY-rect.top)/rect.height);
+  addColorAt(u,v);
+});
+function addColorAt(u,v){
+  // 現在のグラデからその位置の色を拾って初期色にする
+  const gw=view.width, gh=view.height;
+  const d=view.getContext('2d').getImageData(Math.min(gw-1,Math.floor(u*gw)),Math.min(gh-1,Math.floor(v*gh)),1,1).data;
+  const col=rgbToHex(d[0],d[1],d[2]);
+  if(state.type==='mesh'){
+    state.meshPoints.push({x:u,y:v,color:col});
+    state.selected={kind:'mesh',index:state.meshPoints.length-1};
+  }else{
+    // 軸上の t に変換して追加
+    let t=0.5;
+    if(state.type==='linear'){ const L=state.linear,dx=L.x2-L.x1,dy=L.y2-L.y1;
+      t=clamp01(((u-L.x1)*dx+(v-L.y1)*dy)/Math.max(1e-6,dx*dx+dy*dy)); }
+    else if(state.type==='radial'){ t=clamp01(Math.hypot(u-state.radial.cx,v-state.radial.cy)/Math.max(1e-6,state.radial.r)); }
+    else { let a=Math.atan2(v-state.conic.cy,u-state.conic.cx)-state.conic.angle; t=((a/(Math.PI*2))%1+1)%1; }
+    state.stops.push({t,color:col});
+    state.selected={kind:'stop',index:state.stops.length-1};
+  }
+  render(); renderColorList();
+  toast('色を追加しました');
+}
+
+/* Delete キーで選択中の色を削除 */
+window.addEventListener('keydown',e=>{
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='select'||tag==='textarea') return;
+  if(e.key==='Delete'||e.key==='Backspace'){ deleteSelected(); }
+});
+function deleteSelected(){
+  const s=state.selected;
+  if(s.kind==='mesh' && state.meshPoints.length>2){ state.meshPoints.splice(s.index,1); }
+  else if(s.kind==='stop' && state.stops.length>2){ state.stops.splice(s.index,1); }
+  else { toast('色は最低2つ必要です'); return; }
+  state.selected={kind:null,index:-1};
+  render(); renderColorList();
+  toast('削除しました');
+}
+
+/* ================================================================
+   カラーリスト（パネル側）
+   ================================================================ */
+function currentColors(){ return state.type==='mesh'?state.meshPoints:state.stops; }
+function renderColorList(){
+  const wrap=$('#colorList'); wrap.innerHTML='';
+  const isMesh=state.type==='mesh';
+  const arr=currentColors();
+  arr.forEach((c,i)=>{
+    const card=document.createElement('div');
+    const selKind=isMesh?'mesh':'stop';
+    card.className='color-card'+(state.selected.kind===selKind&&state.selected.index===i?' sel':'');
+    const posHtml = isMesh
+      ? `<span>x</span><input type="range" min="0" max="1" step="0.01" value="${c.x}" data-k="x">
+         <span>y</span><input type="range" min="0" max="1" step="0.01" value="${c.y}" data-k="y">`
+      : `<span>pos</span><input type="range" min="0" max="1" step="0.01" value="${c.t}" data-k="t">`;
+    card.innerHTML=`
+      <input type="color" value="${c.color}">
+      <input class="cc-hex" type="text" value="${c.color}" spellcheck="false">
+      <div class="cc-pos">${posHtml}</div>
+      <button class="btn sm danger">✕</button>`;
+    const [colorInput,hexInput]=card.querySelectorAll('input[type=color],.cc-hex');
+    colorInput.oninput=()=>{ c.color=colorInput.value; hexInput.value=c.color; render(); };
+    hexInput.oninput=()=>{ if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hexInput.value)){ c.color=hexInput.value; colorInput.value=c.color; render(); } };
+    card.querySelectorAll('.cc-pos input').forEach(r=>{
+      r.oninput=()=>{ c[r.dataset.k]=parseFloat(r.value); render(); };
+    });
+    card.querySelector('button').onclick=()=>{
+      if(arr.length<=2){ toast('色は最低2つ必要です'); return; }
+      arr.splice(i,1); state.selected={kind:null,index:-1}; render(); renderColorList();
+    };
+    card.onclick=e=>{ if(e.target.tagName==='BUTTON')return;
+      state.selected={kind:selKind,index:i}; renderHandles();
+      wrap.querySelectorAll('.color-card').forEach(x=>x.classList.remove('sel')); card.classList.add('sel'); };
+    wrap.appendChild(card);
+  });
+}
+$('#btnAddColor').onclick=()=>{ addColorAt(rand(0.2,0.8),rand(0.2,0.8)); };
+$('#btnShufflePal').onclick=()=>{
+  const arr=currentColors();
+  const cols=shuffled(arr.map(c=>c.color));
+  arr.forEach((c,i)=>c.color=cols[i]);
+  render(); renderColorList(); toast('色の割り当てを入れ替えました');
+};
+
+/* ================================================================
+   ランダマイズ & バリエーション
+   ================================================================ */
+function randomizeLayout(st){
+  // パレット（色）は保ったまま、配置・角度・軸をランダムに
+  if(st.type==='mesh'){
+    st.meshPoints.forEach(p=>{ p.x=rand(0.05,0.95); p.y=rand(0.05,0.95); });
+  }else if(st.type==='linear'){
+    const a=rand(0,Math.PI*2), cx=rand(0.35,0.65), cy=rand(0.35,0.65), r=rand(0.35,0.6);
+    st.linear={x1:clamp01(cx-Math.cos(a)*r),y1:clamp01(cy-Math.sin(a)*r),
+               x2:clamp01(cx+Math.cos(a)*r),y2:clamp01(cy+Math.sin(a)*r)};
+    st.stops.forEach((s,i)=>{ s.t = i/(st.stops.length-1) + rand(-0.08,0.08); s.t=clamp01(s.t); });
+  }else if(st.type==='radial'){
+    st.radial={cx:rand(0.2,0.8),cy:rand(0.2,0.8),r:rand(0.35,0.85)};
+  }else{
+    st.conic={cx:rand(0.25,0.75),cy:rand(0.25,0.75),angle:rand(0,Math.PI*2)};
+  }
+}
+$('#btnRandom').onclick=()=>{
+  randomizeLayout(state);
+  // 順番も混ぜる
+  const arr=currentColors(); const cols=shuffled(arr.map(c=>c.color)); arr.forEach((c,i)=>c.color=cols[i]);
+  render(); renderColorList(); toast('ランダム化しました');
+};
+
+/* バリエーション: 現在のパレットで6案を生成 */
+function genVariations(){
+  const grid=$('#varGrid'); grid.innerHTML='';
+  for(let i=0;i<6;i++){
+    const st=JSON.parse(JSON.stringify(state));
+    randomizeLayout(st);
+    const arr=(st.type==='mesh'?st.meshPoints:st.stops);
+    const cols=shuffled(arr.map(c=>c.color)); arr.forEach((c,j)=>c.color=cols[j]);
+    const btn=document.createElement('button'); btn.className='var-thumb';
+    const cv=document.createElement('canvas');
+    const tw=96, th=Math.round(96*st.res.h/st.res.w);
+    cv.width=tw; cv.height=th;
+    // サムネはピクセルサイズを縮小比率に合わせて描く
+    const scale=st.res.w/tw;
+    const gw=Math.max(2,Math.ceil(st.res.w/Math.max(1,st.pixel.size)));
+    const gh=Math.max(2,Math.ceil(st.res.h/Math.max(1,st.pixel.size)));
+    const sm=document.createElement('canvas'); sm.width=gw;sm.height=gh;
+    sm.getContext('2d').putImageData(renderToGrid(st,gw,gh),0,0);
+    const cx2=cv.getContext('2d'); cx2.imageSmoothingEnabled=false; cx2.drawImage(sm,0,0,tw,th);
+    btn.appendChild(cv);
+    btn.onclick=()=>{
+      // 適用（selected はリセット）
+      st.selected={kind:null,index:-1};
+      state=st; syncUI(); render(); renderColorList();
+      toast('バリエーションを適用しました');
+    };
+    grid.appendChild(btn);
+  }
+}
+$('#btnGenVars').onclick=genVariations;
+
+/* ================================================================
+   UIバインド
+   ================================================================ */
+function bindSeg(id,apply){
+  const c=$(id);
+  c.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    c.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); apply(b.dataset.val);
+  });
+}
+bindSeg('#typeSeg',v=>{
+  state.type=v; state.selected={kind:null,index:-1};
+  $('#meshPowerField').style.display = v==='mesh'?'block':'none';
+  const hints={mesh:'Mesh: 色の点を自由に配置。点の位置で色が混ざります。',
+    linear:'Linear: 軸の両端（四角ハンドル）で向きを、菱形で色の位置を調整。',
+    radial:'Radial: 中心と半径ハンドルで広がりを調整。',
+    conic:'Conic: 中心の周りを一周するグラデーション。'};
+  $('#typeHint').textContent=hints[v];
+  render(); renderColorList();
+});
+function bindPair(rId,nId,apply){
+  const r=$(rId),n=$(nId);
+  r.oninput=()=>{ n.value=r.value; apply(parseFloat(r.value)); render(); };
+  n.oninput=()=>{ r.value=n.value; apply(parseFloat(n.value)); render(); };
+}
+bindPair('#meshPowR','#meshPowN',v=>state.meshPower=v);
+bindPair('#pxR','#pxN',v=>state.pixel.size=v);
+bindPair('#postR','#postN',v=>state.pixel.posterize=v);
+bindPair('#grainR','#grainN',v=>state.pixel.grain=v);
+bindSeg('#ditherSeg',v=>{ state.pixel.dither=v; render(); });
+$('#twoColor').onchange=e=>{ state.pixel.twoColor=e.target.checked;
+  if(e.target.checked && state.pixel.dither==='none'){ state.pixel.dither='bayer4';
+    $('#ditherSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val==='bayer4')); }
+  render(); };
+bindSeg('#aspectSeg',v=>{
+  const [w,h]=v.split('x').map(Number);
+  state.res={w,h}; $('#resW').value=w; $('#resH').value=h; render();
+});
+$('#resW').oninput=()=>{ const v=parseInt($('#resW').value)||state.res.w; state.res.w=Math.max(60,Math.min(4000,v)); render(); };
+$('#resH').oninput=()=>{ const v=parseInt($('#resH').value)||state.res.h; state.res.h=Math.max(60,Math.min(4000,v)); render(); };
+
+document.querySelectorAll('.section[data-sec] > .head').forEach(h=>{
+  h.onclick=()=>h.parentElement.classList.toggle('collapsed');
+});
+
+/* ================================================================
+   Save / Load / Reset / Export
+   ================================================================ */
+const LS='pixel_gradient_project';
+$('#btnSave').onclick=()=>{ localStorage.setItem(LS,JSON.stringify(state)); toast('保存しました'); };
+$('#btnLoad').onclick=()=>{
+  const raw=localStorage.getItem(LS); if(!raw){toast('保存データがありません');return;}
+  try{ state=Object.assign(defaultState(),JSON.parse(raw)); syncUI(); render(); renderColorList(); toast('読み込みました'); }
+  catch(e){ toast('読み込み失敗'); }
+};
+$('#btnReset').onclick=()=>{ if(!confirm('初期状態に戻しますか？'))return;
+  state=defaultState(); syncUI(); render(); renderColorList(); genVariations(); toast('リセットしました'); };
+
+function exportPNG(scale){
+  const W=state.res.w*scale, H=state.res.h*scale;
+  const px=Math.max(1,state.pixel.size);
+  const gw=Math.max(2,Math.ceil(state.res.w/px));
+  const gh=Math.max(2,Math.ceil(state.res.h/px));
+  const sm=document.createElement('canvas'); sm.width=gw;sm.height=gh;
+  sm.getContext('2d').putImageData(renderToGrid(state,gw,gh),0,0);
+  const out=document.createElement('canvas'); out.width=W; out.height=H;
+  const c=out.getContext('2d'); c.imageSmoothingEnabled=false; c.drawImage(sm,0,0,W,H);
+  out.toBlob(b=>{
+    const u=URL.createObjectURL(b); const a=document.createElement('a');
+    a.href=u; a.download=`pixel-gradient_${W}x${H}.png`; a.click();
+    setTimeout(()=>URL.revokeObjectURL(u),1000);
+    toast(`PNG (${W}×${H}) を書き出しました`);
+  },'image/png');
+}
+$('#btnPNG1').onclick=()=>exportPNG(1);
+$('#btnPNG2').onclick=()=>exportPNG(2);
+$('#btnPNG4').onclick=()=>exportPNG(4);
+$('#btnCopyJSON').onclick=()=>{
+  navigator.clipboard.writeText(JSON.stringify(state,null,2)).then(()=>toast('設定JSONをコピーしました'))
+    .catch(()=>toast('コピーに失敗しました'));
+};
+
+/* ================================================================
+   state → UI 同期 / 初期化
+   ================================================================ */
+function syncUI(){
+  $('#typeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===state.type));
+  $('#meshPowerField').style.display = state.type==='mesh'?'block':'none';
+  $('#meshPowR').value=$('#meshPowN').value=state.meshPower;
+  $('#pxR').value=$('#pxN').value=state.pixel.size;
+  $('#postR').value=$('#postN').value=state.pixel.posterize;
+  $('#grainR').value=$('#grainN').value=state.pixel.grain;
+  $('#ditherSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===state.pixel.dither));
+  $('#twoColor').checked=state.pixel.twoColor;
+  $('#resW').value=state.res.w; $('#resH').value=state.res.h;
+  const key=`${state.res.w}x${state.res.h}`;
+  $('#aspectSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===key));
+}
+
+window.addEventListener('resize',()=>{ render(); });
+
+syncUI();
+render();
+renderColorList();
+genVariations();
+</script>
+</body>
+</html>

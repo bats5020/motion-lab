@@ -1,0 +1,22 @@
+/* MOTION LAB — 共通デザイントークン
+   新しいツール／ページはこのファイルを読み込むか、値をコピーして使う。 */
+:root{
+  /* surface */
+  --bg:#0a0a0b;
+  --panel:#141417;
+  --panel2:#1c1c21;
+  --line:#2a2a31;
+  --line-hover:#3d3d46;
+
+  /* text */
+  --text:#e6e6ef;
+  --subtext:#9a9aa6;
+  --faint:#6a6a74;
+
+  /* accent */
+  --accent:#4f5cff;
+  --accent-soft:rgba(79,92,255,.14);
+
+  /* type */
+  --font-mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+}

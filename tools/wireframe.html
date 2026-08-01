@@ -1,0 +1,2603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wireframe Studio — geometric motion graphics</title>
+<style>
+  /* ============================================================
+     Wireframe Studio — design tokens
+     Palette: ink-black stage, graphite chrome UI, single signal accent
+     ============================================================ */
+  :root {
+    --stage: #000000;          /* the preview black — the hero */
+    --line: #ffffff;           /* default wireframe color */
+    --chrome-0: #0c0d10;       /* app background */
+    --chrome-1: #131519;       /* panel background */
+    --chrome-2: #1b1e24;       /* raised surface */
+    --chrome-3: #262a32;       /* control surface */
+    --hair: #2c313a;           /* hairline borders */
+    --hair-soft: #20242b;
+    --txt: #e7eaee;            /* primary text */
+    --txt-dim: #8b929d;        /* secondary text */
+    --txt-faint: #5a616c;      /* tertiary */
+    --signal: #6cf0c2;         /* single accent — mint signal */
+    --signal-dim: #2c5d51;
+    --danger: #ef6f6f;
+    --radius: 7px;
+    --mono: "SF Mono", "JetBrains Mono", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--chrome-0);
+    color: var(--txt);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- App shell ---------- */
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 332px;
+    grid-template-rows: 44px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "stage  panel";
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ---------- Top bar ---------- */
+  #topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 16px;
+    background: var(--chrome-1);
+    border-bottom: 1px solid var(--hair);
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 9px;
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+  .brand .mark {
+    width: 13px; height: 13px;
+    border: 1.5px solid var(--signal);
+    transform: rotate(45deg);
+    position: relative; top: 1px;
+  }
+  .brand .name { font-weight: 600; font-size: 13px; color: var(--txt); }
+  .brand .sub { font-size: 11px; color: var(--txt-faint); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .topbar-spacer { flex: 1; }
+
+  .scene-switch { display: flex; gap: 2px; background: var(--chrome-2); border: 1px solid var(--hair); border-radius: var(--radius); padding: 2px; }
+  .scene-switch button {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em;
+    color: var(--txt-dim); background: transparent; border: 0;
+    padding: 5px 12px; border-radius: 5px; cursor: pointer; transition: 0.12s;
+  }
+  .scene-switch button:hover { color: var(--txt); }
+  .scene-switch button.active { background: var(--chrome-3); color: var(--signal); }
+
+  .topbar-btn {
+    font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+    background: var(--chrome-2); border: 1px solid var(--hair);
+    padding: 6px 11px; border-radius: var(--radius); cursor: pointer; transition: 0.12s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .topbar-btn:hover { color: var(--txt); border-color: var(--hair); background: var(--chrome-3); }
+
+  /* ---------- Stage ---------- */
+  #stage {
+    grid-area: stage;
+    position: relative;
+    background:
+      radial-gradient(ellipse at center, #141414 0%, #050505 70%, #000 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    min-height: 0;
+  }
+  #canvas-frame {
+    position: relative;
+    background: var(--stage);
+    box-shadow: 0 0 0 1px var(--hair-soft), 0 30px 80px -20px rgba(0,0,0,0.9);
+    max-width: 100%;
+    max-height: 100%;
+  }
+  #three-canvas { display: block; width: 100%; height: 100%; }
+
+  .res-tag {
+    position: absolute; top: 8px; left: 10px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.05em;
+    color: var(--txt-faint); pointer-events: none; user-select: none;
+    background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 3px;
+  }
+
+  /* ---------- Transport ---------- */
+  #transport {
+    height: 52px;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 20px;
+    background: var(--chrome-1);
+    border-top: 1px solid var(--hair);
+  }
+  .play-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--signal); border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #04130e; transition: 0.12s; flex-shrink: 0;
+  }
+  .play-btn:hover { filter: brightness(1.08); }
+  .play-btn svg { display: block; }
+
+  .scrub { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .scrub input[type=range] { flex: 1; }
+  .time-read {
+    font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+    white-space: nowrap; letter-spacing: 0.02em;
+  }
+  .time-read b { color: var(--txt); font-weight: 500; }
+
+  .loop-pill {
+    font-family: var(--mono); font-size: 10px; color: var(--signal);
+    border: 1px solid var(--signal-dim); border-radius: 20px;
+    padding: 3px 9px; letter-spacing: 0.05em;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .loop-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--signal); }
+
+  /* ---------- Range slider styling ---------- */
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--hair); border-radius: 3px; outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--txt); border: 2px solid var(--chrome-1);
+    box-shadow: 0 0 0 1px var(--hair); transition: 0.1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { background: var(--signal); }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--chrome-1);
+    background: var(--txt); cursor: pointer;
+  }
+
+  /* ---------- Property panel ---------- */
+  #panel {
+    grid-area: panel;
+    background: var(--chrome-1);
+    border-left: 1px solid var(--hair);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  #panel::-webkit-scrollbar { width: 10px; }
+  #panel::-webkit-scrollbar-track { background: var(--chrome-1); }
+  #panel::-webkit-scrollbar-thumb { background: var(--chrome-3); border-radius: 6px; border: 3px solid var(--chrome-1); }
+
+  .section { border-bottom: 1px solid var(--hair-soft); }
+  .section-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    transition: 0.12s;
+  }
+  .section-head:hover { background: var(--chrome-2); }
+  .section-head .chev {
+    width: 8px; height: 8px; border-right: 1.5px solid var(--txt-faint);
+    border-bottom: 1.5px solid var(--txt-faint); transform: rotate(45deg);
+    transition: transform 0.18s; flex-shrink: 0;
+  }
+  .section.collapsed .chev { transform: rotate(-45deg); }
+  .section-head .label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--txt-dim); flex: 1;
+  }
+  .section-head .idx { font-family: var(--mono); font-size: 10px; color: var(--txt-faint); }
+  .section-body { padding: 4px 16px 16px; }
+  .section.collapsed .section-body { display: none; }
+
+  .ctrl { margin: 12px 0; }
+  .ctrl:first-child { margin-top: 6px; }
+  .ctrl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .ctrl-label { font-size: 12px; color: var(--txt); }
+  .ctrl-val {
+    font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+    background: var(--chrome-2); border: 1px solid var(--hair-soft);
+    padding: 2px 7px; border-radius: 4px; min-width: 48px; text-align: right;
+  }
+  .ctrl-val:focus { outline: none; border-color: var(--signal-dim); color: var(--txt); }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* color control */
+  .color-ctrl { display: flex; align-items: center; gap: 10px; }
+  .color-ctrl input[type=color] {
+    -webkit-appearance: none; appearance: none;
+    width: 30px; height: 24px; border: 1px solid var(--hair); border-radius: 5px;
+    background: none; cursor: pointer; padding: 0;
+  }
+  .color-ctrl input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .color-ctrl input[type=color]::-webkit-color-swatch { border: none; border-radius: 3px; }
+  .color-ctrl .hex {
+    font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+    background: var(--chrome-2); border: 1px solid var(--hair-soft);
+    padding: 4px 8px; border-radius: 4px; width: 78px; text-transform: uppercase;
+  }
+  .color-ctrl .hex:focus { outline: none; border-color: var(--signal-dim); color: var(--txt); }
+
+  /* toggle */
+  .toggle { position: relative; width: 34px; height: 19px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .track {
+    position: absolute; inset: 0; background: var(--chrome-3); border-radius: 20px;
+    transition: 0.16s; cursor: pointer;
+  }
+  .toggle .track::before {
+    content: ""; position: absolute; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--txt-dim); top: 3px; left: 3px; transition: 0.16s;
+  }
+  .toggle input:checked + .track { background: var(--signal-dim); }
+  .toggle input:checked + .track::before { background: var(--signal); transform: translateX(15px); }
+
+  /* select */
+  select {
+    width: 100%; font-family: var(--sans); font-size: 12px; color: var(--txt);
+    background: var(--chrome-2); border: 1px solid var(--hair); border-radius: 5px;
+    padding: 7px 10px; cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b929d' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  select:focus { outline: none; border-color: var(--signal-dim); }
+
+  /* buttons in panel */
+  .btn-row { display: flex; gap: 8px; }
+  .pbtn {
+    flex: 1; font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em;
+    color: var(--txt-dim); background: var(--chrome-2); border: 1px solid var(--hair);
+    padding: 9px; border-radius: var(--radius); cursor: pointer; transition: 0.12s;
+  }
+  .pbtn:hover { color: var(--txt); background: var(--chrome-3); }
+  .pbtn.accent { color: var(--signal); border-color: var(--signal-dim); }
+  .pbtn.accent:hover { background: var(--signal-dim); color: var(--txt); }
+  .pbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* export */
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+  .exp-card {
+    border: 1px solid var(--hair); border-radius: var(--radius);
+    padding: 10px; cursor: pointer; transition: 0.12s; background: var(--chrome-2);
+    text-align: left;
+  }
+  .exp-card:hover { border-color: var(--signal-dim); background: var(--chrome-3); }
+  .exp-card .ec-title { font-family: var(--mono); font-size: 12px; color: var(--txt); }
+  .exp-card .ec-sub { font-size: 10px; color: var(--txt-faint); margin-top: 2px; }
+  .exp-card:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .export-status {
+    margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--signal);
+    display: none;
+  }
+  .export-status.show { display: block; }
+  .progress { height: 4px; background: var(--chrome-3); border-radius: 4px; margin-top: 7px; overflow: hidden; }
+  .progress .bar { height: 100%; width: 0%; background: var(--signal); transition: width 0.1s; }
+
+  .hint { font-size: 11px; color: var(--txt-faint); line-height: 1.5; margin-top: 8px; }
+
+  .seg { display: flex; gap: 2px; background: var(--chrome-2); border: 1px solid var(--hair); border-radius: 5px; padding: 2px; }
+  .seg button {
+    flex: 1; font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+    background: transparent; border: 0; padding: 5px; border-radius: 4px; cursor: pointer; transition: 0.1s;
+  }
+  .seg button.active { background: var(--chrome-3); color: var(--signal); }
+
+  /* loading overlay */
+  #boot {
+    position: fixed; inset: 0; background: var(--chrome-0); z-index: 100;
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+  }
+  #boot .mark { width: 22px; height: 22px; border: 2px solid var(--signal); transform: rotate(45deg); animation: spin 1.4s linear infinite; }
+  #boot .txt { font-family: var(--mono); font-size: 12px; color: var(--txt-dim); letter-spacing: 0.1em; }
+  @keyframes spin { to { transform: rotate(405deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  /* ---------- Help / info button ---------- */
+  .info-dot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid var(--hair); color: var(--txt-faint);
+    font-size: 9px; font-family: var(--mono); cursor: help;
+    margin-left: 5px; flex-shrink: 0; transition: 0.12s; line-height: 1;
+  }
+  .info-dot:hover { border-color: var(--signal-dim); color: var(--signal); }
+
+  /* floating tooltip */
+  #tip {
+    position: fixed; z-index: 200; max-width: 230px;
+    background: #04050a; color: var(--txt); border: 1px solid var(--hair);
+    border-radius: 6px; padding: 8px 10px; font-size: 11.5px; line-height: 1.45;
+    box-shadow: 0 12px 30px -8px rgba(0,0,0,0.8); pointer-events: none;
+    opacity: 0; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s;
+  }
+  #tip.show { opacity: 1; transform: translateY(0); }
+  #tip .tip-accent { color: var(--signal); }
+
+  /* ---------- Presets (look gallery) ---------- */
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 4px; }
+  .preset-card {
+    position: relative; border: 1px solid var(--hair); border-radius: var(--radius);
+    background: #000; cursor: pointer; transition: 0.12s; overflow: hidden;
+    aspect-ratio: 16/9; display: flex; align-items: flex-end; padding: 7px;
+  }
+  .preset-card:hover { border-color: var(--signal-dim); transform: translateY(-1px); }
+  .preset-card.active { border-color: var(--signal); }
+  .preset-card svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
+  .preset-card .pc-name {
+    position: relative; font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em;
+    color: var(--txt); background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 3px;
+  }
+
+  /* ---------- Toast ---------- */
+  #toast-wrap {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .toast {
+    background: #04050a; border: 1px solid var(--hair); border-left: 2px solid var(--signal);
+    color: var(--txt); padding: 10px 16px; border-radius: 7px; font-size: 12.5px;
+    box-shadow: 0 14px 36px -10px rgba(0,0,0,0.85);
+    display: flex; align-items: center; gap: 10px;
+    animation: toastIn 0.25s ease; max-width: 360px;
+  }
+  .toast .tg { color: var(--signal); font-family: var(--mono); }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .toast.out { animation: toastOut 0.3s ease forwards; }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(10px); } }
+
+  /* ---------- Help overlay ---------- */
+  #help {
+    position: fixed; inset: 0; z-index: 250; background: rgba(4,5,8,0.78);
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px);
+  }
+  #help.show { display: flex; }
+  .help-card {
+    width: 440px; max-width: 90vw; max-height: 86vh; overflow-y: auto;
+    background: var(--chrome-1); border: 1px solid var(--hair); border-radius: 12px;
+    padding: 26px 28px;
+  }
+  .help-card h2 { font-family: var(--mono); font-size: 15px; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .help-card .h-sub { color: var(--txt-faint); font-size: 12px; margin-bottom: 20px; }
+  .help-card h3 {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--signal); margin: 18px 0 8px;
+  }
+  .help-card p, .help-card li { font-size: 13px; color: var(--txt-dim); line-height: 1.6; }
+  .help-card ul { list-style: none; }
+  .help-card li { display: flex; gap: 10px; padding: 3px 0; }
+  .kbd {
+    font-family: var(--mono); font-size: 11px; color: var(--txt);
+    background: var(--chrome-3); border: 1px solid var(--hair); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 7px; min-width: 20px; text-align: center; flex-shrink: 0;
+  }
+  .help-close {
+    margin-top: 22px; width: 100%; font-family: var(--mono); font-size: 12px;
+    color: var(--signal); background: transparent; border: 1px solid var(--signal-dim);
+    padding: 10px; border-radius: 7px; cursor: pointer; transition: 0.12s;
+  }
+  .help-close:hover { background: var(--signal-dim); color: var(--txt); }
+
+  /* lang toggle */
+  .lang-toggle {
+    display: flex; gap: 2px; background: var(--chrome-2); border: 1px solid var(--hair);
+    border-radius: 6px; padding: 2px;
+  }
+  .lang-toggle button {
+    font-family: var(--mono); font-size: 10px; color: var(--txt-dim);
+    background: transparent; border: 0; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+  }
+  .lang-toggle button.active { background: var(--chrome-3); color: var(--signal); }
+
+  /* onboarding coachmarks */
+  #coach { position: fixed; inset: 0; z-index: 240; display: none; }
+  #coach.show { display: block; }
+  .coach-spot {
+    position: absolute; border: 2px solid var(--signal); border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(4,5,8,0.72); transition: 0.3s;
+  }
+  .coach-bubble {
+    position: absolute; background: var(--chrome-1); border: 1px solid var(--hair);
+    border-radius: 9px; padding: 14px 16px; width: 260px;
+    box-shadow: 0 18px 40px -10px rgba(0,0,0,0.85);
+  }
+  .coach-bubble h4 { font-family: var(--mono); font-size: 12px; color: var(--signal); margin-bottom: 5px; letter-spacing: 0.03em; }
+  .coach-bubble p { font-size: 12.5px; color: var(--txt-dim); line-height: 1.55; }
+  .coach-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .coach-nav .dots { display: flex; gap: 5px; }
+  .coach-nav .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--chrome-3); }
+  .coach-nav .dots span.on { background: var(--signal); }
+  .coach-nav button {
+    font-family: var(--mono); font-size: 11px; color: var(--txt); background: var(--chrome-3);
+    border: 1px solid var(--hair); padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  }
+  .coach-nav button:hover { border-color: var(--signal-dim); }
+  .coach-skip {
+    position: absolute; top: 16px; right: 18px; font-family: var(--mono); font-size: 11px;
+    color: var(--txt-dim); background: none; border: 0; cursor: pointer;
+  }
+  .coach-skip:hover { color: var(--txt); }
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
+ onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+
+<div id="boot"><div class="mark"></div><div class="txt">LOADING ENGINE…</div></div>
+
+<div id="app">
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div class="brand">
+      <span class="mark"></span>
+      <span class="name">Wireframe Studio</span>
+      <span class="sub">motion lab</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="scene-switch" id="sceneSwitch">
+      <button data-scene="wave" class="active">Wave Grid</button>
+      <button data-scene="terrain">Terrain</button>
+      <button data-scene="tunnel">Tunnel</button>
+      <button data-scene="box">Box</button>
+      <button data-scene="cross">Cross</button>
+    </div>
+    <button class="topbar-btn" id="randomBtn">⤮ <span data-i18n="randomize">Randomize</span></button>
+    <button class="topbar-btn" id="resetBtn">↺ <span data-i18n="reset">Reset</span></button>
+    <div class="lang-toggle" id="langToggle">
+      <button data-lang="en" class="active">EN</button>
+      <button data-lang="ja">日本語</button>
+    </div>
+    <button class="topbar-btn" id="helpBtn" title="Help">?</button>
+  </div>
+
+  <!-- STAGE -->
+  <div id="stage">
+    <div id="canvas-wrap">
+      <div id="canvas-frame">
+        <canvas id="three-canvas"></canvas>
+        <div class="res-tag" id="resTag">1920 × 1080</div>
+      </div>
+    </div>
+    <div id="transport">
+      <button class="play-btn" id="playBtn" aria-label="Play / pause"></button>
+      <div class="scrub">
+        <input type="range" id="scrub" min="0" max="1000" value="0" />
+      </div>
+      <div class="time-read"><b id="curTime">0.00</b> / <span id="loopTime">20.00</span>s</div>
+      <div class="loop-pill">LOOP</div>
+    </div>
+  </div>
+
+  <!-- PROPERTY PANEL -->
+  <div id="panel"></div>
+</div>
+
+<!-- floating tooltip -->
+<div id="tip"></div>
+<!-- toast notifications -->
+<div id="toast-wrap"></div>
+
+<!-- help overlay -->
+<div id="help">
+  <div class="help-card">
+    <h2>Wireframe Studio</h2>
+    <div class="h-sub" data-i18n="helpSub">Build looping geometric motion — tweak, preview, export.</div>
+
+    <h3 data-i18n="helpFlow">Quick start</h3>
+    <p data-i18n="helpFlowBody">Pick a scene at the top, choose a Look to get a starting point, then shape it with the sliders on the right. The preview loops live. When it looks right, open Export and pick a format.</p>
+
+    <h3 data-i18n="helpKeys">Keyboard</h3>
+    <ul>
+      <li><span class="kbd">Space</span><span data-i18n="kSpace">Play / pause</span></li>
+      <li><span class="kbd">R</span><span data-i18n="kR">Randomize the current scene</span></li>
+      <li><span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span><span data-i18n="kNum">Switch scene</span></li>
+      <li><span class="kbd">←</span><span class="kbd">→</span><span data-i18n="kArrow">Step through the loop (when paused)</span></li>
+      <li><span class="kbd">?</span><span data-i18n="kHelp">Open this help</span></li>
+    </ul>
+
+    <h3 data-i18n="helpExport">About export</h3>
+    <p data-i18n="helpExportBody">Every format renders exactly one loop at your chosen resolution, so the result tiles seamlessly. WebM is the quickest for video; PNG sequence is best for editing software; GIF is for quick previews; HTML gives you a standalone player file.</p>
+
+    <button class="help-close" id="helpClose" data-i18n="gotIt">Got it</button>
+  </div>
+</div>
+
+<!-- onboarding coachmarks -->
+<div id="coach">
+  <button class="coach-skip" id="coachSkip" data-i18n="skipTour">Skip tour</button>
+  <div class="coach-spot" id="coachSpot"></div>
+  <div class="coach-bubble" id="coachBubble">
+    <h4 id="coachTitle"></h4>
+    <p id="coachText"></p>
+    <div class="coach-nav">
+      <div class="dots" id="coachDots"></div>
+      <button id="coachNext" data-i18n="next">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Three.js + export libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
+<script>
+"use strict";
+/* ============================================================================
+   WIREFRAME STUDIO
+   A single-file geometric motion-graphics tool built on Three.js.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   0. INTERNATIONALISATION (EN / JA)
+   Every visible string flows through t(key). data-i18n attributes are swapped
+   on language change; control names + tooltips are looked up live.
+---------------------------------------------------------------------------- */
+let LANG = "en";
+const I18N = {
+  en: {
+    randomize: "Randomize", reset: "Reset", gotIt: "Got it", next: "Next",
+    skipTour: "Skip tour", done: "Done",
+    helpSub: "Build looping geometric motion — tweak, preview, export.",
+    helpFlow: "Quick start",
+    helpFlowBody: "Pick a scene at the top, choose a Look to get a starting point, then shape it with the sliders on the right. The preview loops live. When it looks right, open Export and pick a format.",
+    helpKeys: "Keyboard",
+    kSpace: "Play / pause", kR: "Randomize the current scene", kNum: "Switch scene",
+    kArrow: "Step through the loop (when paused)", kHelp: "Open this help",
+    helpExport: "About export",
+    helpExportBody: "Every format renders exactly one loop at your chosen resolution, so the result tiles seamlessly. WebM is the quickest for video; PNG sequence is best for editing software; GIF is for quick previews; HTML gives you a standalone player file.",
+    // sections
+    secGlobal: "Global", secCamera: "Camera", secPost: "Look & feel", secExport: "Export",
+    secGeomWave: "Shape · Wave grid", secGeomTerrain: "Shape · Terrain", secGeomTunnel: "Shape · Tunnel",
+    secGeomBox: "Shape · Perspective box",
+    looks: "Looks", frameRate: "Frame rate", resetDefault: "Reset to default",
+    // scene tab labels
+    tabWave: "Wave Grid", tabTerrain: "Terrain", tabTunnel: "Tunnel", tabBox: "Box", tabCross: "Cross",
+    boxW: "Width", boxH: "Height", boxDepth: "Depth",
+    boxGridX: "Grid · horizontal", boxGridY: "Grid · vertical", boxGridZ: "Depth lines",
+    perspExp: "Perspective curve", depthFade: "Depth fade",
+    flySpeed: "Fly forward",
+    walls: "Grid surfaces", wallsAll: "All walls", wallsFC: "Floor + ceiling", wallsLR: "Left + right",
+    backWall: "Back wall grid",
+    secGeomCross: "Shape · Cross",
+    crossRings: "Ring count", growth: "Spread growth", armRatio: "Arm thickness",
+    aspect: "Width / height", corner: "Corner round", coreSize: "Core size",
+    pulse: "Pulse amount", pulseMode: "Pulse direction", fillFalloff: "Outer fade",
+    animMode: "Animation", animSpeed: "Animation speed",
+    amZoomIn: "Zoom in (fly inward)", amZoomOut: "Zoom out", amPulse: "Pulse", amRotate: "Rotate",
+    tip_animMode: "How the cross moves. Zoom in makes rings grow and rush past you for an endless-tunnel illusion.",
+    tip_animSpeed: "Speed of the zoom or rotation. For zoom, it's how many rings pass per loop.",
+    pmOutward: "Outward", pmInward: "Inward", pmBreathe: "Breathe",
+    tip_crossRings: "How many nested cross rings. Raise it to extend the pattern further out.",
+    tip_growth: "How fast rings spread apart outward. Lower = tightly packed centre, looser edge.",
+    tip_armRatio: "Thickness of the cross arms relative to each ring's width.",
+    tip_aspect: "Overall proportion of each cross. 0.47 matches the reference; 1 is a square cross.",
+    tip_corner: "Roundness of every corner. 0 = sharp, 1 = fully rounded.",
+    tip_coreSize: "Size of the smallest cross at the very centre.",
+    tip_pulse: "Strength of the animated ripple flowing through the rings. 0 = static.",
+    tip_pulseMode: "Direction the ripple travels: outward, inward, or a synced breathe.",
+    tip_fillFalloff: "Fades the outer rings so the centre stands out.",
+    // export cards
+    expWebmT: "WebM", expWebmS: "video · 1 loop",
+    expPngT: "PNG seq", expPngS: "frames .zip",
+    expGifT: "GIF", expGifS: "animated loop",
+    expHtmlT: "HTML", expHtmlS: "standalone",
+    expSvgT: "SVG", expSvgS: "this frame, vector",
+    exportHint: "Exports render one full loop at the resolution above, so output tiles seamlessly.",
+    // toasts
+    tWebmDone: "WebM saved", tPngDone: "PNG sequence saved", tGifDone: "GIF saved",
+    tHtmlDone: "Standalone HTML saved", tSvgDone: "SVG frame saved", tReset: "Reset to defaults", tRandom: "Randomized",
+    tPreset: "Look applied", tFail: "Export failed",
+    // control names
+    bgColor: "Background", lineColor: "Line color", opacity: "Line opacity",
+    loopLength: "Loop length (s)", speed: "Speed", resolution: "Resolution",
+    fov: "Field of view", distance: "Distance", height: "Height",
+    autoMotion: "Drifting camera", motionAmt: "Drift amount",
+    vignette: "Vignette", grain: "Grain", fade: "Fade in / out",
+    columns: "Columns", rows: "Rows", spread: "Spread",
+    ampA: "Wave A height", lenA: "Wave A length", ampB: "Wave B height", lenB: "Wave B length",
+    waveSpeed: "Wave speed", fisheye: "Fisheye bulge", showNodes: "Show dots", nodeSize: "Dot size",
+    widthSeg: "Width detail", depthSeg: "Depth detail", fieldSize: "Field size",
+    heightA: "Hills height A", lengthA: "Hills length A", heightB: "Hills height B", lengthB: "Hills length B",
+    scrollSpeed: "Scroll speed",
+    rings: "Ring count", ringGap: "Ring spacing", ringScale: "Ring size", twist: "Twist",
+    travelSpeed: "Fly speed", stars: "Star count", starBright: "Star brightness",
+    // tooltips
+    tip_bgColor: "Stage colour behind the wireframe. Classic look is pure black.",
+    tip_lineColor: "Colour of every line and dot in the scene.",
+    tip_opacity: "How solid the lines look. Lower it for a faint, ghostly grid.",
+    tip_loopLength: "Seconds before the animation repeats. The whole loop is what gets exported.",
+    tip_speed: "Overall playback speed multiplier. Doesn't change the loop length.",
+    tip_resolution: "Output size in pixels. Presets cover common social ratios.",
+    tip_fov: "Lens width. Low = telephoto and flat, high = wide and dramatic.",
+    tip_distance: "How far the camera sits from the shape.",
+    tip_height: "Camera up/down position — raises or lowers the horizon.",
+    tip_autoMotion: "Adds a gentle side-to-side camera sway for life.",
+    tip_motionAmt: "Strength of that camera sway.",
+    tip_vignette: "Darkens the edges to focus the eye on the centre.",
+    tip_grain: "Adds film-like noise. A little hides banding on dark gradients.",
+    tip_fade: "Fades to black at the start and end of the loop.",
+    tip_columns: "Vertical grid lines. More = denser, finer mesh (and heavier).",
+    tip_rows: "Horizontal grid lines.",
+    tip_spread: "Physical size of the grid in the scene.",
+    tip_ampA: "Height of the main wave. 0 = flat.",
+    tip_lenA: "Distance between wave crests. Small = ripples, large = swells.",
+    tip_ampB: "A second wave layered on top for organic motion.",
+    tip_lenB: "Crest spacing of the second wave.",
+    tip_waveSpeed: "How fast the waves travel. Whole numbers keep the loop seamless.",
+    tip_fisheye: "Bulges the grid toward the camera like a fisheye lens.",
+    tip_showNodes: "Adds a dot at every grid intersection.",
+    tip_nodeSize: "Size of those dots.",
+    tip_widthSeg: "Detail across the terrain. Higher = finer.",
+    tip_depthSeg: "Detail into the distance.",
+    tip_fieldSize: "How large the ground plane is.",
+    tip_heightA: "Hill height of the main terrain wave.",
+    tip_lengthA: "Spacing of the main hills.",
+    tip_heightB: "Secondary hill height for variation.",
+    tip_lengthB: "Spacing of the secondary hills.",
+    tip_scrollSpeed: "How fast the terrain flows toward you.",
+    tip_rings: "Number of square rings making the tunnel. More = longer tunnel.",
+    tip_boxW: "Width of the room opening. With height, sets the aspect of the box.",
+    tip_boxH: "Height of the room opening. The camera auto-fits so the opening always fills the frame.",
+    tip_boxDepth: "How far the room recedes into the screen.",
+    tip_boxGridX: "Number of vertical grid divisions across the width (floor & ceiling lines).",
+    tip_boxGridY: "Number of horizontal grid divisions across the height (left & right wall lines).",
+    tip_boxGridZ: "Number of receding rectangles along the depth.",
+    tip_perspExp: "How the depth lines bunch toward the back. Higher = stronger perspective compression.",
+    tip_flySpeed: "Fly forward through the grid (dolly-in). 0 = still. The motion loops seamlessly.",
+    tip_depthFade: "Fades the grid into the background toward the far end. 0 = no fade.",
+    tip_walls: "Which inner surfaces get grid lines.",
+    tip_backWall: "Draw a grid on the far wall (the centre rectangle).",
+    tip_ringGap: "Distance between rings.",
+    tip_ringScale: "Width of the tunnel.",
+    tip_twist: "Rotates each ring progressively for a spiral.",
+    tip_travelSpeed: "How fast you fly through the tunnel.",
+    tip_stars: "Number of background stars. 0 turns them off.",
+    tip_starBright: "Brightness of the stars.",
+  },
+  ja: {
+    randomize: "ランダム", reset: "リセット", gotIt: "閉じる", next: "次へ",
+    skipTour: "スキップ", done: "完了",
+    helpSub: "ループする幾何アニメを作る — 調整・プレビュー・書き出し。",
+    helpFlow: "はじめ方",
+    helpFlowBody: "上でシーンを選び、Looks から出発点を選んだら、右のスライダーで形を整えます。プレビューは常にループ再生されます。仕上がったら Export を開いて形式を選んでください。",
+    helpKeys: "キーボード",
+    kSpace: "再生 / 一時停止", kR: "現在のシーンをランダム化", kNum: "シーン切替",
+    kArrow: "ループを1コマずつ送る（停止中）", kHelp: "このヘルプを開く",
+    helpExport: "書き出しについて",
+    helpExportBody: "どの形式も指定解像度でループ1周ぴったりを書き出すので、継ぎ目なくループします。動画は WebM が最速、PNG連番は編集ソフト向き、GIF は簡易プレビュー用、HTML は単体で動くプレーヤーです。",
+    secGlobal: "全体", secCamera: "カメラ", secPost: "質感・演出", secExport: "書き出し",
+    secGeomWave: "形状 · ウェーブグリッド", secGeomTerrain: "形状 · 地形", secGeomTunnel: "形状 · トンネル",
+    secGeomBox: "形状 · 遠近ボックス",
+    looks: "見た目プリセット", frameRate: "フレームレート", resetDefault: "初期値に戻す",
+    tabWave: "ウェーブ", tabTerrain: "地形", tabTunnel: "トンネル", tabBox: "ボックス", tabCross: "クロス",
+    boxW: "横幅", boxH: "高さ", boxDepth: "奥行き",
+    boxGridX: "グリッド · 横", boxGridY: "グリッド · 縦", boxGridZ: "奥行きの線数",
+    perspExp: "遠近の強さ", depthFade: "奥のフェード",
+    flySpeed: "前進スピード",
+    walls: "グリッド面", wallsAll: "全ての面", wallsFC: "床と天井", wallsLR: "左右の壁",
+    backWall: "奥の壁グリッド",
+    secGeomCross: "形状 · クロス",
+    crossRings: "リングの数", growth: "広がり率", armRatio: "腕の太さ",
+    aspect: "横 / 縦の比", corner: "角の丸み", coreSize: "中心の大きさ",
+    pulse: "脈動の強さ", pulseMode: "脈動の向き", fillFalloff: "外側のフェード",
+    animMode: "アニメーション", animSpeed: "アニメ速度",
+    amZoomIn: "ズームイン（吸い込まれる）", amZoomOut: "ズームアウト", amPulse: "脈動", amRotate: "回転",
+    tip_animMode: "クロスの動き方。ズームインはリングが拡大して手前へ抜け、無限トンネルのような錯覚になります。",
+    tip_animSpeed: "ズームや回転の速さ。ズームでは1ループあたり何個のリングが通過するか。",
+    pmOutward: "外向き", pmInward: "内向き", pmBreathe: "呼吸",
+    tip_crossRings: "入れ子のクロスリングの数。増やすと外側へパターンが拡張されます。",
+    tip_growth: "外へ向かってリングが広がる速さ。小さいほど中心が密で外が疎になります。",
+    tip_armRatio: "各リングの幅に対する十字の腕の太さ。",
+    tip_aspect: "クロス全体の縦横比。0.47で元データと一致、1で正方形のクロス。",
+    tip_corner: "すべての角の丸み。0=角ばる、1=完全に丸い。",
+    tip_coreSize: "中心の一番小さいクロスの大きさ。",
+    tip_pulse: "リングを流れる脈動アニメの強さ。0で静止。",
+    tip_pulseMode: "脈動の進む向き：外向き・内向き・同期した呼吸。",
+    tip_fillFalloff: "外側のリングをフェードして中心を目立たせます。",
+    expWebmT: "WebM", expWebmS: "動画 · 1ループ",
+    expPngT: "PNG連番", expPngS: "フレーム .zip",
+    expGifT: "GIF", expGifS: "ループアニメ",
+    expHtmlT: "HTML", expHtmlS: "単体ファイル",
+    expSvgT: "SVG", expSvgS: "現フレーム・ベクター",
+    exportHint: "上の解像度でループ1周を書き出すので、継ぎ目なくループします。",
+    tWebmDone: "WebMを保存しました", tPngDone: "PNG連番を保存しました", tGifDone: "GIFを保存しました",
+    tHtmlDone: "単体HTMLを保存しました", tSvgDone: "SVGフレームを保存しました", tReset: "初期値に戻しました", tRandom: "ランダム化しました",
+    tPreset: "プリセットを適用しました", tFail: "書き出しに失敗しました",
+    bgColor: "背景色", lineColor: "ライン色", opacity: "ラインの不透明度",
+    loopLength: "ループ長（秒）", speed: "再生速度", resolution: "解像度",
+    fov: "視野角", distance: "カメラ距離", height: "カメラ高さ",
+    autoMotion: "カメラの揺らぎ", motionAmt: "揺らぎの強さ",
+    vignette: "周辺減光", grain: "粒状ノイズ", fade: "フェードイン/アウト",
+    columns: "縦の分割数", rows: "横の分割数", spread: "広がり",
+    ampA: "波A 高さ", lenA: "波A 波長", ampB: "波B 高さ", lenB: "波B 波長",
+    waveSpeed: "波の速さ", fisheye: "魚眼の膨らみ", showNodes: "点を表示", nodeSize: "点のサイズ",
+    widthSeg: "横の細かさ", depthSeg: "奥行きの細かさ", fieldSize: "地形の大きさ",
+    heightA: "起伏A 高さ", lengthA: "起伏A 間隔", heightB: "起伏B 高さ", lengthB: "起伏B 間隔",
+    scrollSpeed: "流れる速さ",
+    rings: "リングの数", ringGap: "リング間隔", ringScale: "リングの大きさ", twist: "ねじれ",
+    travelSpeed: "前進速度", stars: "星の数", starBright: "星の明るさ",
+    tip_bgColor: "ワイヤーの背後のステージ色。定番は真っ黒です。",
+    tip_lineColor: "シーン内のすべての線と点の色。",
+    tip_opacity: "線の濃さ。下げるとうっすら透けたグリッドになります。",
+    tip_loopLength: "アニメが繰り返すまでの秒数。この1周ぶんが書き出されます。",
+    tip_speed: "全体の再生速度。ループ長そのものは変わりません。",
+    tip_resolution: "書き出しサイズ（px）。プリセットはSNS向けの比率です。",
+    tip_fov: "レンズの広さ。小=望遠で平面的、大=広角でダイナミック。",
+    tip_distance: "カメラと形状の距離。",
+    tip_height: "カメラの上下位置。地平線が上下します。",
+    tip_autoMotion: "カメラを左右にゆっくり揺らして生命感を出します。",
+    tip_motionAmt: "その揺れの強さ。",
+    tip_vignette: "四隅を暗くして中央に視線を集めます。",
+    tip_grain: "フィルム風のノイズ。暗いグラデのバンディング隠しにも。",
+    tip_fade: "ループの最初と最後を黒へフェードします。",
+    tip_columns: "縦のグリッド線。多いほど細かいメッシュ（重くなります）。",
+    tip_rows: "横のグリッド線。",
+    tip_spread: "シーン内でのグリッドの物理的な大きさ。",
+    tip_ampA: "メインの波の高さ。0で平坦。",
+    tip_lenA: "波の山の間隔。小=さざ波、大=うねり。",
+    tip_ampB: "重ねる2つめの波。自然な動きになります。",
+    tip_lenB: "2つめの波の山の間隔。",
+    tip_waveSpeed: "波の進む速さ。整数だとループが綺麗に繋がります。",
+    tip_fisheye: "グリッドを魚眼レンズのようにカメラ側へ膨らませます。",
+    tip_showNodes: "グリッドの交点に点を表示します。",
+    tip_nodeSize: "その点の大きさ。",
+    tip_widthSeg: "地形の横方向の細かさ。",
+    tip_depthSeg: "奥行き方向の細かさ。",
+    tip_fieldSize: "地面の広さ。",
+    tip_heightA: "メインの起伏の高さ。",
+    tip_lengthA: "メインの起伏の間隔。",
+    tip_heightB: "サブの起伏の高さ。",
+    tip_lengthB: "サブの起伏の間隔。",
+    tip_scrollSpeed: "地形が手前に流れてくる速さ。",
+    tip_rings: "トンネルを作る四角リングの数。多いほど長いトンネル。",
+    tip_boxW: "部屋の開口部の横幅。高さと合わせてボックスの縦横比を決めます。",
+    tip_boxH: "部屋の開口部の高さ。カメラが自動調整され、開口部が常に画面いっぱいに収まります。",
+    tip_boxDepth: "部屋が画面奥へどれだけ伸びるか。",
+    tip_boxGridX: "横方向のグリッド分割数（床・天井の線）。",
+    tip_boxGridY: "縦方向のグリッド分割数（左右の壁の線）。",
+    tip_boxGridZ: "奥行き方向に並ぶ四角形の数。",
+    tip_perspExp: "奥に向かう線の詰まり具合。大きいほど遠近感が強調されます。",
+    tip_flySpeed: "グリッドの中を奥へ前進します（ドリーイン）。0で静止。動きは継ぎ目なくループします。",
+    tip_depthFade: "奥に向かってグリッドを背景色へ溶かします。0でフェードなし。",
+    tip_walls: "どの内壁にグリッドを描くか。",
+    tip_backWall: "一番奥の壁（中央の四角）にグリッドを描きます。",
+    tip_ringGap: "リング同士の間隔。",
+    tip_ringScale: "トンネルの太さ。",
+    tip_twist: "リングを徐々に回してスパイラルにします。",
+    tip_travelSpeed: "トンネルを進む速さ。",
+    tip_stars: "背景の星の数。0で消えます。",
+    tip_starBright: "星の明るさ。",
+  },
+};
+function t(key) { return (I18N[LANG] && I18N[LANG][key]) || (I18N.en[key]) || key; }
+
+function applyLang() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const k = el.getAttribute("data-i18n");
+    if (I18N[LANG][k]) el.textContent = I18N[LANG][k];
+  });
+  document.documentElement.lang = LANG;
+  // scene tabs
+  const tabMap = { wave: "tabWave", terrain: "tabTerrain", tunnel: "tabTunnel", box: "tabBox", cross: "tabCross" };
+  document.querySelectorAll("#sceneSwitch button").forEach(b => {
+    b.textContent = t(tabMap[b.dataset.scene]);
+  });
+  renderPanel();
+}
+
+/* ----------------------------------------------------------------------------
+   1. STATE MODEL
+   Every visual is fully described by `params`. Defaults per scene live in
+   SCENE_DEFAULTS; the active set is a merge of global + scene params.
+---------------------------------------------------------------------------- */
+const GLOBAL_DEFAULTS = {
+  bgColor:    "#000000",
+  lineColor:  "#ffffff",
+  lineWidth:  1,
+  opacity:    1,
+  loopLength: 20,      // seconds — animation repeats seamlessly over this period
+  speed:      1,
+  resW:       1920,
+  resH:       1080,
+  // post
+  vignette:   0.35,
+  grain:      0.06,
+  fade:       0.0,     // fade in/out portion of loop (0 = none)
+  // camera
+  fov:        55,
+  autoMotion: true,
+  motionSpeed: 1,
+};
+
+const SCENE_DEFAULTS = {
+  wave: {
+    segX: 40, segZ: 24, spread: 14,
+    amp: 1.1, waveLen: 3.2, waveSpeed: 1,
+    amp2: 0.5, waveLen2: 1.4,
+    distort: 0.55,           // fisheye / spherical bulge
+    nodes: false, nodeSize: 2.2,
+    camDist: 9, camHeight: 0,
+  },
+  terrain: {
+    segX: 48, segZ: 40, spread: 30,
+    amp: 1.4, waveLen: 5, waveSpeed: 1,
+    amp2: 0.6, waveLen2: 2.2,
+    distort: 0,
+    nodes: true, nodeSize: 2.6,
+    camDist: 11, camHeight: 3.2,
+    fade: 0.0,
+  },
+  tunnel: {
+    rings: 60, ringGap: 1.6, ringScale: 5, twist: 0.0,
+    travelSpeed: 1.0,
+    stars: 700, starBright: 0.7,
+    camDist: 0, camHeight: 0,
+    nodes: false, nodeSize: 2,
+  },
+  box: {
+    // Perspective box / corridor that recedes to a centre vanishing point.
+    // The room cross-section is boxW × boxH; it extends `depth` into the screen.
+    boxW: 12, boxH: 12, depth: 22,
+    gridX: 12,            // vertical grid divisions across the width
+    gridY: 12,            // grid divisions across the height
+    gridZ: 14,            // number of receding rectangle "rings" along the depth
+    perspExp: 1.6,        // spacing curve of the depth rings (>1 = denser toward the back)
+    flySpeed: 0,          // 0 = static. >0 = fly forward (dolly-in) at this many rings/second, seamlessly looping
+    backWall: true,       // draw the far rectangle
+    walls: "all",         // all | floorCeil | leftRight — which surfaces get the grid
+    stars: 600, starBright: 0.6,
+    camDist: 0, camHeight: 0,
+    nodes: false, nodeSize: 2,
+    autoMotion: false,
+    depthFade: 0.85, depthNear: 3, depthFar: 24,
+  },
+  cross: {
+    // Concentric rounded-cross rings. Derived from the reference SVG:
+    //   spacing shrinks inward by `growth` (0.9) — i.e. expands outward by 1/0.9.
+    crossRings: 20,        // how many rings (raise to extend further outward)
+    growth: 0.9,           // gap ratio between adjacent rings (<1 = denser toward centre)
+    armRatio: 0.157,       // arm thickness as a fraction of the ring's width (from SVG ≈ 0.157)
+    aspect: 0.473,         // height/width of each ring (SVG 178.9/378.3 ≈ 0.473)
+    corner: 0.5,           // corner roundness (0 = sharp, 1 = fully rounded arm ends)
+    coreSize: 0.12,        // size of the innermost cross relative to the outermost
+    animMode: "zoomIn",    // pulse | zoomIn | zoomOut | rotate
+    animSpeed: 1,          // animation speed (rings advanced per loop for zoom)
+    pulse: 0.6,            // pulse mode: ripple strength
+    pulseMode: "outward",  // outward | inward | breathe (only used in pulse mode)
+    fillFalloff: 0.0,      // fade outer rings (0 = all equal)
+    camDist: 9, camHeight: 0,
+    nodes: false, nodeSize: 2,
+    autoMotion: false,
+    loopLength: 6,
+  },
+};
+
+let currentScene = "wave";
+let params = {};      // active merged parameters
+
+function buildParams(scene) {
+  return Object.assign({}, GLOBAL_DEFAULTS, SCENE_DEFAULTS[scene]);
+}
+
+/* ----------------------------------------------------------------------------
+   2 + 3. THREE.JS ENGINE
+---------------------------------------------------------------------------- */
+let renderer, scene3, camera, sceneObj = null;
+let playing = true;
+let phase = 0;          // 0..1 position within the loop
+const canvas = document.getElementById("three-canvas");
+
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.localClippingEnabled = true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  scene3 = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(params.fov, params.resW / params.resH, 0.1, 200);
+  resizeRenderer();
+}
+
+/* --- helpers --------------------------------------------------------------- */
+function disposeScene() {
+  if (!sceneObj) return;
+  scene3.remove(sceneObj);
+  sceneObj.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  sceneObj = null;
+}
+
+function lineMat() {
+  return new THREE.LineBasicMaterial({
+    color: new THREE.Color(params.lineColor),
+    transparent: true,
+    opacity: params.opacity,
+  });
+}
+function pointMat() {
+  return new THREE.PointsMaterial({
+    color: new THREE.Color(params.lineColor),
+    size: params.nodeSize * 0.012 * (params.spread || params.ringScale || 10) / 10,
+    transparent: true,
+    opacity: params.opacity,
+    sizeAttenuation: true,
+  });
+}
+
+/* --- scene builders -------------------------------------------------------- */
+// store update functions so the loop can animate vertices per frame
+let sceneUpdate = () => {};
+
+function buildScene() {
+  disposeScene();
+  scene3.background = new THREE.Color(params.bgColor);
+  scene3.fog = null;   // box re-enables it; other scenes stay fog-free
+  sceneObj = new THREE.Group();
+  if (currentScene === "wave") buildWave();
+  else if (currentScene === "terrain") buildTerrain();
+  else if (currentScene === "tunnel") buildTunnel();
+  else if (currentScene === "box") buildBox();
+  else if (currentScene === "cross") buildCross();
+  scene3.add(sceneObj);
+  updateCamera();
+}
+
+/* WAVE GRID --------------------------------------------------------
+   A front-facing plane grid that ripples with summed sine waves and an
+   optional spherical (fisheye) bulge. Built as a line-segment grid so the
+   cells read as clean wireframe quads. */
+function buildWave() {
+  const nx = Math.min(params.segX, 120), nz = Math.min(params.segZ, 90);
+  const W = params.spread, H = W * 9 / 16;
+  const positions = [];
+  const baseXY = [];   // store base x,y for each vertex index in a (nx+1)*(nz+1) grid
+
+  // vertices grid
+  for (let j = 0; j <= nz; j++) {
+    for (let i = 0; i <= nx; i++) {
+      const x = (i / nx - 0.5) * W;
+      const y = (j / nz - 0.5) * H;
+      baseXY.push(x, y, 0);
+    }
+  }
+  // line segments: horizontal + vertical edges
+  const idx = (i, j) => (j * (nx + 1) + i);
+  const segPairs = [];
+  for (let j = 0; j <= nz; j++)
+    for (let i = 0; i < nx; i++) segPairs.push(idx(i, j), idx(i + 1, j));
+  for (let i = 0; i <= nx; i++)
+    for (let j = 0; j < nz; j++) segPairs.push(idx(i, j), idx(i, j + 1));
+
+  const segGeo = new THREE.BufferGeometry();
+  const segPos = new Float32Array(segPairs.length * 3);
+  segGeo.setAttribute("position", new THREE.BufferAttribute(segPos, 3));
+  const lines = new THREE.LineSegments(segGeo, lineMat());
+  sceneObj.add(lines);
+
+  let pts = null, ptGeo = null;
+  if (params.nodes) {
+    ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(baseXY.length), 3));
+    pts = new THREE.Points(ptGeo, pointMat());
+    sceneObj.add(pts);
+  }
+
+  // per-frame deformation
+  const vertOut = new Float32Array(baseXY.length);
+  sceneUpdate = (t) => {
+    const k1 = (2 * Math.PI) / params.waveLen;
+    const k2 = (2 * Math.PI) / params.waveLen2;
+    // loop-aligned angular speed: integer cycles per loop keeps it seamless
+    const w = 2 * Math.PI; // one cycle of the loop-normalised time t (0..1)
+    for (let v = 0; v < baseXY.length; v += 3) {
+      const x = baseXY[v], y = baseXY[v + 1];
+      const r = Math.sqrt(x * x + y * y);
+      let z = Math.sin(x * k1 + w * t * params.waveSpeed) * params.amp
+            + Math.sin(y * k2 - w * t * params.waveSpeed) * params.amp2;
+      // spherical bulge toward camera
+      const bulge = params.distort * (1 - Math.min(r / (W * 0.62), 1)) * 3.0;
+      z += bulge;
+      vertOut[v] = x; vertOut[v + 1] = y; vertOut[v + 2] = z;
+    }
+    if (pts) { ptGeo.attributes.position.array.set(vertOut); ptGeo.attributes.position.needsUpdate = true; }
+    // rebuild segment positions from vertOut
+    const arr = segGeo.attributes.position.array;
+    for (let s = 0; s < segPairs.length; s++) {
+      const base = segPairs[s] * 3;
+      arr[s * 3] = vertOut[base];
+      arr[s * 3 + 1] = vertOut[base + 1];
+      arr[s * 3 + 2] = vertOut[base + 2];
+    }
+    segGeo.attributes.position.needsUpdate = true;
+  };
+}
+
+/* TERRAIN ----------------------------------------------------------
+   A receding ground plane viewed at an angle, rippling like a landscape,
+   with glowing nodes at the vertices and distance fade. */
+function buildTerrain() {
+  const nx = Math.min(params.segX, 120), nz = Math.min(params.segZ, 100);
+  const W = params.spread, D = params.spread * 1.4;
+  const base = [];
+  for (let j = 0; j <= nz; j++)
+    for (let i = 0; i <= nx; i++) {
+      const x = (i / nx - 0.5) * W;
+      const z = (j / nz) * D;          // recede into distance
+      base.push(x, 0, z);
+    }
+  const idx = (i, j) => (j * (nx + 1) + i);
+  const segPairs = [];
+  for (let j = 0; j <= nz; j++)
+    for (let i = 0; i < nx; i++) segPairs.push(idx(i, j), idx(i + 1, j));
+  for (let i = 0; i <= nx; i++)
+    for (let j = 0; j < nz; j++) segPairs.push(idx(i, j), idx(i, j + 1));
+
+  const segGeo = new THREE.BufferGeometry();
+  segGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(segPairs.length * 3), 3));
+  // vertex colors for distance fade
+  const segCol = new Float32Array(segPairs.length * 3);
+  segGeo.setAttribute("color", new THREE.BufferAttribute(segCol, 3));
+  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: params.opacity });
+  const lines = new THREE.LineSegments(segGeo, mat);
+  sceneObj.add(lines);
+
+  let pts = null, ptGeo = null, ptCol = null;
+  if (params.nodes) {
+    ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(base.length), 3));
+    ptCol = new Float32Array(base.length);
+    ptGeo.setAttribute("color", new THREE.BufferAttribute(ptCol, 3));
+    pts = new THREE.Points(ptGeo, new THREE.PointsMaterial({
+      vertexColors: true, size: params.nodeSize * 0.02, transparent: true, opacity: params.opacity, sizeAttenuation: true,
+    }));
+    sceneObj.add(pts);
+  }
+
+  const lc = new THREE.Color(params.lineColor);
+  const vertOut = new Float32Array(base.length);
+  sceneUpdate = (t) => {
+    const k1 = (2 * Math.PI) / params.waveLen;
+    const k2 = (2 * Math.PI) / params.waveLen2;
+    const w = 2 * Math.PI;
+    const scroll = t * params.waveSpeed * (D / params.waveLen); // scroll terrain toward viewer, loop-aligned
+    for (let v = 0; v < base.length; v += 3) {
+      const x = base[v], z = base[v + 2];
+      const zz = z + scroll;
+      const h = Math.sin(x * k1 + zz * 0.6) * params.amp
+              + Math.sin(z * k2 - w * t * params.waveSpeed) * params.amp2;
+      vertOut[v] = x; vertOut[v + 1] = h; vertOut[v + 2] = z;
+    }
+    if (pts) {
+      ptGeo.attributes.position.array.set(vertOut);
+      for (let v = 0, c = 0; v < base.length; v += 3, c += 3) {
+        const f = 1 - Math.min(base[v + 2] / D, 1);
+        ptCol[v] = lc.r * f; ptCol[v + 1] = lc.g * f; ptCol[v + 2] = lc.b * f;
+      }
+      ptGeo.attributes.position.needsUpdate = true;
+      ptGeo.attributes.color.needsUpdate = true;
+    }
+    const arr = segGeo.attributes.position.array;
+    const col = segGeo.attributes.color.array;
+    for (let s = 0; s < segPairs.length; s++) {
+      const b = segPairs[s] * 3;
+      arr[s * 3] = vertOut[b]; arr[s * 3 + 1] = vertOut[b + 1]; arr[s * 3 + 2] = vertOut[b + 2];
+      const f = 1 - Math.min(base[b + 2] / D, 1); // fade with distance
+      col[s * 3] = lc.r * f; col[s * 3 + 1] = lc.g * f; col[s * 3 + 2] = lc.b * f;
+    }
+    segGeo.attributes.position.needsUpdate = true;
+    segGeo.attributes.color.needsUpdate = true;
+  };
+}
+
+/* TUNNEL -----------------------------------------------------------
+   Square rings receding along -Z; camera flies forward. Rings recycle to the
+   back as they pass, producing an infinite seamless tunnel. Starfield behind. */
+function buildTunnel() {
+  const ringCount = Math.min(params.rings, 160);
+  const gap = params.ringGap, s = params.ringScale;
+  const span = ringCount * gap;
+
+  // one ring = square outline (LineLoop)
+  const ringGeoTemplate = new THREE.BufferGeometry();
+  const half = s / 2;
+  const corners = new Float32Array([
+    -half, -half, 0, half, -half, 0, half, half, 0, -half, half, 0,
+  ]);
+  ringGeoTemplate.setAttribute("position", new THREE.BufferAttribute(corners, 3));
+
+  const rings = [];
+  const mat = lineMat();
+  for (let i = 0; i < ringCount; i++) {
+    const loop = new THREE.LineLoop(ringGeoTemplate, mat);
+    loop.position.z = -i * gap;
+    loop.rotation.z = i * params.twist;
+    sceneObj.add(loop);
+    rings.push(loop);
+  }
+  // connecting longitudinal lines (4 corners along the tunnel)
+  const railMat = lineMat();
+  const railPts = [[-half,-half],[half,-half],[half,half],[-half,half]];
+  const rails = [];
+  railPts.forEach(([rx, ry]) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array([rx,ry,0, rx,ry,-span], 3), 3));
+    const l = new THREE.Line(g, railMat);
+    sceneObj.add(l);
+    rails.push(l);
+  });
+
+  // starfield
+  let stars = null;
+  if (params.stars > 0) {
+    const sg = new THREE.BufferGeometry();
+    const n = Math.min(params.stars, 4000);
+    const sp = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      sp[i*3]   = (Math.random() - 0.5) * s * 4;
+      sp[i*3+1] = (Math.random() - 0.5) * s * 4;
+      sp[i*3+2] = -Math.random() * span;
+    }
+    sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
+    stars = new THREE.Points(sg, new THREE.PointsMaterial({
+      color: new THREE.Color(params.lineColor),
+      size: 0.04, transparent: true, opacity: params.opacity * params.starBright, sizeAttenuation: true,
+    }));
+    sceneObj.add(stars);
+  }
+
+  // capture base star Z positions so we can scroll + recycle them
+  let starBaseZ = null;
+  if (stars) {
+    const arr = stars.geometry.attributes.position.array;
+    starBaseZ = new Float32Array(arr.length / 3);
+    for (let i = 0; i < starBaseZ.length; i++) starBaseZ[i] = arr[i*3+2];
+  }
+
+  sceneUpdate = (t) => {
+    const travel = t * params.travelSpeed * gap * 8;
+    // rings march toward the camera and recycle to the back seamlessly
+    rings.forEach((r, i) => {
+      let z = -(((i * gap - travel) % span) + span) % span; // 0..-span
+      r.position.z = z;
+      r.rotation.z = i * params.twist + travel * params.twist * 0.1;
+    });
+    // scroll the starfield through the tunnel and wrap
+    if (stars) {
+      const arr = stars.geometry.attributes.position.array;
+      for (let i = 0; i < starBaseZ.length; i++) {
+        let z = (((starBaseZ[i] + travel) % span) + span) % span;
+        arr[i*3+2] = -z; // keep stars in front of camera, receding
+      }
+      stars.geometry.attributes.position.needsUpdate = true;
+    }
+  };
+}
+
+/* PERSPECTIVE BOX --------------------------------------------------
+   A rectangular room/corridor that recedes to a central vanishing point,
+   with a grid drawn on the inner walls (floor, ceiling, left, right) plus an
+   optional far wall. Static by design — depth fade dissolves the far end.
+   Matches the classic "infinite room" reference look. */
+function buildBox() {
+  const W = params.boxW, H = params.boxH, D = params.depth;
+  const hw = W / 2, hh = H / 2;
+  const nx = Math.max(1, Math.round(params.gridX));   // divisions across width
+  const ny = Math.max(1, Math.round(params.gridY));   // divisions across height
+  const nz = Math.max(1, Math.round(params.gridZ));   // receding rectangles
+  const exp = Math.max(0.2, params.perspExp);
+  const walls = params.walls || "all";
+  const doFloorCeil = (walls === "all" || walls === "floorCeil");
+  const doLeftRight = (walls === "all" || walls === "leftRight");
+
+  const flying = (params.flySpeed || 0) > 0;
+  const gap = D / nz;                       // uniform gap between rings
+
+  // helper to build one big LineSegments from a flat segment array
+  const toLines = (segs, clip) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(segs), 3));
+    const m = lineMat();
+    m.fog = true;
+    if (clip && clip.length) { m.clippingPlanes = clip; m.clipping = true; }
+    return new THREE.LineSegments(g, m);
+  };
+  const push = (arr, a, b) => { arr.push(a[0],a[1],a[2], b[0],b[1],b[2]); };
+
+  if (!flying) {
+    /* ---- STATIC: single grid with perspective power-curve spacing (original look) ---- */
+    const zAt = i => -D * Math.pow(i / nz, exp);
+    const segs = [];
+    for (let i = 0; i <= nz; i++) { const z = zAt(i);
+      const c = [[-hw,-hh,z],[hw,-hh,z],[hw,hh,z],[-hw,hh,z]];
+      push(segs,c[0],c[1]); push(segs,c[1],c[2]); push(segs,c[2],c[3]); push(segs,c[3],c[0]); }
+    if (doFloorCeil) for (let k=0;k<=nx;k++){ const x=-hw+(W*k)/nx; let pf=null,pc=null;
+      for(let i=0;i<=nz;i++){ const z=zAt(i); const f=[x,-hh,z],c=[x,hh,z]; if(pf){push(segs,pf,f);push(segs,pc,c);} pf=f;pc=c; } }
+    if (doLeftRight) for (let k=0;k<=ny;k++){ const y=-hh+(H*k)/ny; let pl=null,pr=null;
+      for(let i=0;i<=nz;i++){ const z=zAt(i); const l=[-hw,y,z],r=[hw,y,z]; if(pl){push(segs,pl,l);push(segs,pr,r);} pl=l;pr=r; } }
+    if (!doFloorCeil || !doLeftRight) { [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].forEach(([cx,cy])=>{ let p=null;
+      for(let i=0;i<=nz;i++){ const z=zAt(i); const q=[cx,cy,z]; if(p)push(segs,p,q); p=q; } }); }
+    if (params.backWall) { const z=zAt(nz);
+      for(let k=0;k<=nx;k++){ const x=-hw+(W*k)/nx; push(segs,[x,-hh,z],[x,hh,z]); }
+      for(let k=0;k<=ny;k++){ const y=-hh+(H*k)/ny; push(segs,[-hw,y,z],[hw,y,z]); } }
+    sceneObj.add(toLines(segs));
+    finishBox(D);
+    sceneUpdate = () => {};
+    return;
+  }
+
+  /* ---- FLYING: front frame + back wall FIXED, inner grid scrolls between them ---- */
+  renderer.localClippingEnabled = true;
+  // clip the moving grid to stay strictly inside the box (between z=0 front and z=-D back)
+  const clip = [
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), 0),   // keep z <= 0  (in front plane)
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), D),    // keep z >= -D (behind = back wall)
+  ];
+
+  // (A) FIXED parts: the near opening rectangle + the far wall (with its grid)
+  const fixed = [];
+  // near frame at z=0
+  const zf = 0;
+  push(fixed,[-hw,-hh,zf],[hw,-hh,zf]); push(fixed,[hw,-hh,zf],[hw,hh,zf]);
+  push(fixed,[hw,hh,zf],[-hw,hh,zf]);   push(fixed,[-hw,hh,zf],[-hw,-hh,zf]);
+  // far wall rectangle + grid at z=-D
+  const zb = -D;
+  push(fixed,[-hw,-hh,zb],[hw,-hh,zb]); push(fixed,[hw,-hh,zb],[hw,hh,zb]);
+  push(fixed,[hw,hh,zb],[-hw,hh,zb]);   push(fixed,[-hw,hh,zb],[-hw,-hh,zb]);
+  if (params.backWall) {
+    for(let k=0;k<=nx;k++){ const x=-hw+(W*k)/nx; push(fixed,[x,-hh,zb],[x,hh,zb]); }
+    for(let k=0;k<=ny;k++){ const y=-hh+(H*k)/ny; push(fixed,[-hw,y,zb],[hw,y,zb]); }
+  }
+  sceneObj.add(toLines(fixed));   // not clipped — always fully visible
+
+  // (B) MOVING part: the depth rings + longitudinal wall lines, built one extra gap
+  //     beyond BOTH ends so that as it scrolls there is always geometry filling the box.
+  const iMin = -1, iMax = nz + 1;      // one spare ring each side
+  const zAtU = i => -gap * i;          // uniform spacing
+  const moving = [];
+  // depth rings (these visibly travel toward the viewer)
+  for (let i = iMin; i <= iMax; i++) { const z = zAtU(i);
+    const c = [[-hw,-hh,z],[hw,-hh,z],[hw,hh,z],[-hw,hh,z]];
+    push(moving,c[0],c[1]); push(moving,c[1],c[2]); push(moving,c[2],c[3]); push(moving,c[3],c[0]); }
+  // longitudinal lines on floor/ceiling
+  if (doFloorCeil) for (let k=0;k<=nx;k++){ const x=-hw+(W*k)/nx; let pf=null,pc=null;
+    for(let i=iMin;i<=iMax;i++){ const z=zAtU(i); const f=[x,-hh,z],c=[x,hh,z]; if(pf){push(moving,pf,f);push(moving,pc,c);} pf=f;pc=c; } }
+  // longitudinal lines on left/right walls
+  if (doLeftRight) for (let k=0;k<=ny;k++){ const y=-hh+(H*k)/ny; let pl=null,pr=null;
+    for(let i=iMin;i<=iMax;i++){ const z=zAtU(i); const l=[-hw,y,z],r=[hw,y,z]; if(pl){push(moving,pl,l);push(moving,pr,r);} pl=l;pr=r; } }
+  if (!doFloorCeil || !doLeftRight) { [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].forEach(([cx,cy])=>{ let p=null;
+    for(let i=iMin;i<=iMax;i++){ const z=zAtU(i); const q=[cx,cy,z]; if(p)push(moving,p,q); p=q; } }); }
+  const movingLines = toLines(moving, clip);   // clipped to the box interior
+  sceneObj.add(movingLines);
+
+  finishBox(D);
+
+  // seamless scroll: advance by whole gaps per loop; wrap every gap
+  const cycles = Math.max(1, Math.round(params.flySpeed * params.loopLength));
+  sceneUpdate = (t) => {
+    movingLines.position.z = ((t * cycles) % 1) * gap;   // 0..gap, wraps seamlessly
+  };
+}
+
+// shared tail: fog + starfield, used by both static and flying box builds
+function finishBox(D) {
+  const W = params.boxW, H = params.boxH;
+  const fade = (params.depthFade != null) ? params.depthFade : 0.85;
+  if (fade > 0.001) {
+    const near = D * (0.05 + (1 - fade) * 0.5);
+    const far  = D * (0.85 + (1 - fade) * 0.6);
+    scene3.fog = new THREE.Fog(new THREE.Color(params.bgColor), near, far);
+  } else scene3.fog = null;
+
+  if (params.stars > 0) {
+    const n = Math.min(params.stars, 4000);
+    const sp = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      sp[i*3]   = (Math.random() - 0.5) * W * 0.96;
+      sp[i*3+1] = (Math.random() - 0.5) * H * 0.96;
+      sp[i*3+2] = -Math.random() * D;
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
+    sceneObj.add(new THREE.Points(sg, new THREE.PointsMaterial({
+      color: new THREE.Color(params.lineColor),
+      size: 0.05, transparent: true, opacity: params.opacity * params.starBright, sizeAttenuation: true, fog: true,
+    })));
+  }
+}
+
+/* CROSS ------------------------------------------------------------
+   Concentric rounded-cross rings. Reproduces the reference SVG: each ring is a
+   rounded plus/cross outline, and successive rings shrink toward the centre by a
+   constant ratio `growth`. Because the spacing is geometric, raising crossRings
+   simply extends the same pattern further outward — exactly "measure the current
+   line spacing and keep expanding it".
+
+   One ring outline is generated by walking the 12 corners of a plus shape with
+   rounded corners. `s` is the half-width of the ring (outer arm reach in X).
+---------------------------------------------------------------------------- */
+function crossOutline(sx, sy, armX, armY, r, segs) {
+  // sx, sy: half extent in x and y (arm tip reach)
+  // armX: half-width of the vertical bar; armY: half-height of the horizontal bar
+  // r: corner radius; segs: points per rounded corner
+  // The plus has 12 corners. We list them clockwise with their turn direction,
+  // then round each corner with a small arc.
+  // Corner points (before rounding), starting top-left of the top arm:
+  const P = [
+    [-armX, -sy], [ armX, -sy],          // top arm top edge
+    [ armX, -armY], [ sx, -armY],        // step out to right arm
+    [ sx,  armY], [ armX, armY],         // right arm bottom
+    [ armX, sy], [-armX, sy],            // bottom arm
+    [-armX, armY], [-sx, armY],          // left arm bottom
+    [-sx, -armY], [-armX, -armY],        // left arm top
+  ];
+  // Determine convex/concave per vertex to bend the fillet the right way.
+  const pts = [];
+  const n = P.length;
+  for (let i = 0; i < n; i++) {
+    const prev = P[(i - 1 + n) % n], cur = P[i], next = P[(i + 1) % n];
+    // direction in/out
+    const v1 = [cur[0]-prev[0], cur[1]-prev[1]];
+    const v2 = [next[0]-cur[0], next[1]-cur[1]];
+    const l1 = Math.hypot(v1[0],v1[1]) || 1, l2 = Math.hypot(v2[0],v2[1]) || 1;
+    const u1 = [v1[0]/l1, v1[1]/l1], u2 = [v2[0]/l2, v2[1]/l2];
+    const rr = Math.min(r, l1/2, l2/2);
+    const pA = [cur[0]-u1[0]*rr, cur[1]-u1[1]*rr];   // arc start
+    const pB = [cur[0]+u2[0]*rr, cur[1]+u2[1]*rr];   // arc end
+    if (rr < 1e-4) { pts.push(cur); continue; }
+    // quadratic bezier through cur as control point, sampled
+    for (let k = 0; k <= segs; k++) {
+      const tt = k / segs;
+      const mt = 1 - tt;
+      const x = mt*mt*pA[0] + 2*mt*tt*cur[0] + tt*tt*pB[0];
+      const y = mt*mt*pA[1] + 2*mt*tt*cur[1] + tt*tt*pB[1];
+      pts.push([x, y]);
+    }
+  }
+  return pts;
+}
+
+function buildCross() {
+  const N = Math.min(Math.max(params.crossRings|0, 1), 80);
+  const growth = Math.min(Math.max(params.growth, 0.6), 0.99);
+  const aspect = params.aspect;          // height/width
+  const armRatio = params.armRatio;      // arm thickness / full width
+  const corner = params.corner;
+
+  // Geometric size progression. We define a continuous size function so the zoom
+  // animation can place a ring at any fractional position along the series:
+  //   sizeAt(pos) = core * (1/growth)^pos   (pos = 0 is innermost)
+  // The static ring k sits at pos = (N-1-k), so ring 0 is the outer ring.
+  const core = params.coreSize;
+  const invG = 1 / growth;
+  const WORLD = 6.5;
+  // Normalise so the outermost ring (pos = N-1) maps to WORLD.
+  const sizeAt = (pos) => {
+    const raw = core * Math.pow(invG, pos);
+    const outer = core * Math.pow(invG, N - 1);
+    return raw / outer * WORLD;
+  };
+
+  const lc = new THREE.Color(params.lineColor);
+  const segs = 6;
+
+  // Build one outline at unit half-width = 1, then per-frame we just scale each
+  // ring. This keeps geometry cheap and lets zoom remap sizes smoothly.
+  const unitPts = crossOutline(1, aspect, armRatio, armRatio, corner * armRatio, segs);
+  const unitArr = new Float32Array(unitPts.length * 3);
+  for (let i = 0; i < unitPts.length; i++) { unitArr[i*3]=unitPts[i][0]; unitArr[i*3+1]=unitPts[i][1]; unitArr[i*3+2]=0; }
+
+  const ringObjs = [];
+  for (let k = 0; k < N; k++) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(unitArr.slice(), 3));
+    const mat = new THREE.LineBasicMaterial({ color: lc, transparent: true, opacity: params.opacity });
+    const loop = new THREE.LineLoop(geo, mat);
+    sceneObj.add(loop);
+    ringObjs.push(loop);
+  }
+  params._crossFit = WORLD;
+
+  const w = 2 * Math.PI;
+  sceneUpdate = (tt) => {
+    const mode = params.animMode || "pulse";
+    const speed = params.animSpeed != null ? params.animSpeed : 1;
+    const falloff = params.fillFalloff;
+
+    if (mode === "zoomIn" || mode === "zoomOut") {
+      // Infinite zoom: advance every ring along the geometric series. For the loop
+      // to tile seamlessly, the total advance over one loop must be a WHOLE number
+      // of ring-steps (the scale multiset returns to itself every integer step).
+      const steps = Math.max(1, Math.round(speed));   // ring-steps per loop
+      const dir = mode === "zoomIn" ? 1 : -1;          // zoomIn = sizes grow → fly inward
+      const flow = tt * steps * dir;
+      for (let k = 0; k < N; k++) {
+        let pos = (N - 1 - k) + flow;
+        pos = ((pos % N) + N) % N;                      // wrap into [0, N)
+        const s = sizeAt(pos);
+        ring_setScale(ringObjs[k], s);
+        // fade a ring in as it appears at the centre and out at the outer edge,
+        // so the wrap is invisible.
+        const edge = pos / (N - 1 || 1);
+        const appear = Math.min(pos / 1.2, 1);
+        const vanish = Math.min((N - 1 - pos) / 1.2, 1);
+        const fall = 1 - falloff * edge;
+        ringObjs[k].material.opacity = params.opacity * fall * appear * vanish;
+      }
+    } else if (mode === "rotate") {
+      const turns = Math.max(1, Math.round(speed));   // whole turns per loop → seamless
+      const ang = tt * w * turns;
+      for (let k = 0; k < N; k++) {
+        const s = sizeAt(N - 1 - k);
+        ring_setScale(ringObjs[k], s);
+        ringObjs[k].rotation.z = ang;
+        const edge = (N - 1 - k) / (N - 1 || 1);
+        ringObjs[k].material.opacity = params.opacity * (1 - falloff * edge);
+      }
+    } else {
+      // PULSE / breathe — gentle ripple, the original behaviour.
+      const amt = params.pulse;
+      for (let k = 0; k < N; k++) {
+        const baseS = sizeAt(N - 1 - k);
+        const idxPhase = k / Math.max(N, 1);
+        let phase;
+        if (params.pulseMode === "inward") phase = tt + idxPhase;
+        else if (params.pulseMode === "breathe") phase = tt;
+        else phase = tt - idxPhase;          // outward
+        const m = Math.sin(w * phase);
+        ring_setScale(ringObjs[k], baseS * (1 + m * 0.05 * amt));
+        const edge = (N - 1 - k) / (N - 1 || 1);
+        const fall = 1 - falloff * edge;
+        const glow = params.pulseMode === "breathe" ? 0.5 + 0.5*m : 0.55 + 0.45*Math.cos(w*phase);
+        ringObjs[k].material.opacity = params.opacity * fall * (1 - amt*0.5 + amt*0.5*glow);
+      }
+    }
+  };
+}
+function ring_setScale(ring, s) { ring.scale.set(s, s, 1); }
+
+
+
+
+/* --- camera ---------------------------------------------------------------- */
+// When the resolution changes, make the Perspective Box adopt the same aspect
+// ratio so it fills the frame instead of being letter-/pillar-boxed. The overall
+// size (geometric mean of W and H) is preserved so depth/feel stay consistent.
+function matchBoxAspectToResolution() {
+  if (currentScene !== "box") return false;
+  const ar = params.resW / params.resH;
+  const base = Math.sqrt(params.boxW * params.boxH) || 12;  // preserve overall scale
+  params.boxW = +(base * Math.sqrt(ar)).toFixed(2);
+  params.boxH = +(base / Math.sqrt(ar)).toFixed(2);
+  return true;
+}
+
+function updateCamera() {
+  camera.fov = params.fov;
+  camera.aspect = params.resW / params.resH;
+  if (currentScene === "tunnel") {
+    camera.position.set(0, 0, 3.5);
+    camera.lookAt(0, 0, -10);
+  } else if (currentScene === "box") {
+    // Auto-fit: pull the camera back just enough that the near opening (boxW×boxH)
+    // fills the frame, accounting for both vertical and horizontal FOV.
+    const aspect = params.resW / params.resH;
+    const vFovHalf = (params.fov * Math.PI / 180) / 2;
+    const distH = (params.boxH / 2) / Math.tan(vFovHalf);          // distance to fit height
+    const hFovHalf = Math.atan(Math.tan(vFovHalf) * aspect);
+    const distW = (params.boxW / 2) / Math.tan(hFovHalf);          // distance to fit width
+    const fit = Math.max(distH, distW) * 1.02;                     // 2% margin
+    camera.position.set(0, 0, fit);
+    camera.lookAt(0, 0, -params.depth);
+  } else if (currentScene === "cross") {
+    // front-on orthographic-like framing; distance auto-fits the outer ring
+    camera.position.set(0, 0, params.camDist);
+    camera.lookAt(0, 0, 0);
+  } else if (currentScene === "terrain") {
+    camera.position.set(0, params.camHeight, params.camDist);
+    camera.lookAt(0, -0.5, -params.spread * 0.5);
+  } else { // wave
+    camera.position.set(0, params.camHeight, params.camDist);
+    camera.lookAt(0, 0, 0);
+  }
+  camera.updateProjectionMatrix();
+}
+
+/* --- post overlay (vignette + grain + fade) via CSS canvas overlay --------- */
+let overlayCanvas, overlayCtx;
+function ensureOverlay() {
+  if (overlayCanvas) return;
+  overlayCanvas = document.createElement("canvas");
+  overlayCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;";
+  document.getElementById("canvas-frame").appendChild(overlayCanvas);
+  overlayCtx = overlayCanvas.getContext("2d");
+}
+function drawOverlay(t) {
+  ensureOverlay();
+  const w = overlayCanvas.width = canvas.width;
+  const h = overlayCanvas.height = canvas.height;
+  overlayCtx.clearRect(0, 0, w, h);
+  // vignette
+  if (params.vignette > 0) {
+    const g = overlayCtx.createRadialGradient(w/2, h/2, h*0.2, w/2, h/2, h*0.75);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, `rgba(0,0,0,${params.vignette})`);
+    overlayCtx.fillStyle = g; overlayCtx.fillRect(0, 0, w, h);
+  }
+  // grain
+  if (params.grain > 0) {
+    const amt = params.grain;
+    const id = overlayCtx.getImageData(0, 0, w, h);
+    // cheap grain: sparse noise dots
+    const dots = Math.floor(w * h * 0.02 * amt);
+    overlayCtx.fillStyle = `rgba(255,255,255,${amt*0.5})`;
+    for (let i = 0; i < dots; i++) {
+      overlayCtx.fillRect((Math.random()*w)|0, (Math.random()*h)|0, 1, 1);
+    }
+  }
+  // fade in/out at loop edges
+  if (params.fade > 0) {
+    const f = params.fade;
+    let a = 0;
+    if (t < f) a = 1 - t / f;
+    else if (t > 1 - f) a = (t - (1 - f)) / f;
+    if (a > 0) { overlayCtx.fillStyle = `rgba(0,0,0,${a})`; overlayCtx.fillRect(0,0,w,h); }
+  }
+}
+
+/* --- resize ---------------------------------------------------------------- */
+function resizeRenderer() {
+  const frame = document.getElementById("canvas-frame");
+  const wrap = document.getElementById("canvas-wrap");
+  const aspect = params.resW / params.resH;
+  const availW = wrap.clientWidth - 56;
+  const availH = wrap.clientHeight - 56;
+  let w = availW, h = availW / aspect;
+  if (h > availH) { h = availH; w = availH * aspect; }
+  frame.style.width = w + "px";
+  frame.style.height = h + "px";
+  renderer.setSize(w, h, false);
+  if (camera) { camera.aspect = aspect; camera.updateProjectionMatrix(); }
+  document.getElementById("resTag").textContent = `${params.resW} × ${params.resH}`;
+}
+window.addEventListener("resize", () => { if (renderer) resizeRenderer(); });
+
+/* --- animation loop -------------------------------------------------------- */
+let lastTS = performance.now();
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const dt = (ts - lastTS) / 1000; lastTS = ts;
+  if (playing) {
+    phase += (dt * params.speed) / params.loopLength;
+    phase %= 1; if (phase < 0) phase += 1;
+    syncScrub();
+  }
+  renderFrame(phase);
+}
+function renderFrame(t) {
+  if (sceneUpdate) sceneUpdate(t);
+  // camera ambient motion
+  if (params.autoMotion && currentScene !== "tunnel") {
+    const a = Math.sin(t * 2 * Math.PI) * 0.04 * params.motionSpeed;
+    if (currentScene === "wave") {
+      camera.position.x = Math.sin(t*2*Math.PI)*0.6*params.motionSpeed;
+      camera.lookAt(0,0,0);
+    } else {
+      camera.position.x = Math.sin(t*2*Math.PI)*0.8*params.motionSpeed;
+      camera.lookAt(0,-0.5,-params.spread*0.5);
+    }
+  }
+  renderer.render(scene3, camera);
+  drawOverlay(t);
+}
+
+/* ----------------------------------------------------------------------------
+   5. TRANSPORT
+---------------------------------------------------------------------------- */
+const playBtn = document.getElementById("playBtn");
+const scrub = document.getElementById("scrub");
+const PLAY_SVG = '<svg width="12" height="13" viewBox="0 0 12 13"><path d="M1 1l10 5.5L1 12z" fill="currentColor"/></svg>';
+const PAUSE_SVG = '<svg width="11" height="12" viewBox="0 0 11 12"><rect x="0" y="0" width="3.5" height="12" fill="currentColor"/><rect x="7.5" y="0" width="3.5" height="12" fill="currentColor"/></svg>';
+function setPlay(p) { playing = p; playBtn.innerHTML = p ? PAUSE_SVG : PLAY_SVG; }
+playBtn.addEventListener("click", () => setPlay(!playing));
+scrub.addEventListener("input", () => {
+  phase = scrub.value / 1000;
+  document.getElementById("curTime").textContent = (phase * params.loopLength).toFixed(2);
+  if (!playing) renderFrame(phase);
+});
+function syncScrub() {
+  scrub.value = Math.round(phase * 1000);
+  document.getElementById("curTime").textContent = (phase * params.loopLength).toFixed(2);
+}
+
+/* ----------------------------------------------------------------------------
+   4. PROPERTY PANEL — declarative control schema per scene
+---------------------------------------------------------------------------- */
+const panel = document.getElementById("panel");
+
+// control descriptors
+function describe(scene) {
+  const common = {
+    global: {
+      labelKey: "secGlobal", idx: "00",
+      controls: [
+        { type: "color", key: "bgColor", nameKey: "bgColor", tip: "tip_bgColor" },
+        { type: "color", key: "lineColor", nameKey: "lineColor", tip: "tip_lineColor" },
+        { type: "range", key: "opacity", nameKey: "opacity", tip: "tip_opacity", min: 0.1, max: 1, step: 0.01 },
+        { type: "range", key: "loopLength", nameKey: "loopLength", tip: "tip_loopLength", min: 2, max: 60, step: 0.5 },
+        { type: "range", key: "speed", nameKey: "speed", tip: "tip_speed", min: 0.1, max: 4, step: 0.05 },
+        { type: "res", nameKey: "resolution", tip: "tip_resolution" },
+      ],
+    },
+    camera: {
+      labelKey: "secCamera", idx: "02",
+      controls: [
+        { type: "range", key: "fov", nameKey: "fov", tip: "tip_fov", min: 20, max: 110, step: 1 },
+        ...(scene !== "tunnel" && scene !== "box" ? [
+          { type: "range", key: "camDist", nameKey: "distance", tip: "tip_distance", min: 3, max: 30, step: 0.1 },
+          { type: "range", key: "camHeight", nameKey: "height", tip: "tip_height", min: -6, max: 12, step: 0.1 },
+        ] : []),
+        ...(scene !== "box" ? [
+          { type: "toggle", key: "autoMotion", nameKey: "autoMotion", tip: "tip_autoMotion" },
+          { type: "range", key: "motionSpeed", nameKey: "motionAmt", tip: "tip_motionAmt", min: 0, max: 3, step: 0.05 },
+        ] : []),
+      ],
+    },
+    post: {
+      labelKey: "secPost", idx: "03",
+      controls: [
+        { type: "range", key: "vignette", nameKey: "vignette", tip: "tip_vignette", min: 0, max: 0.9, step: 0.01 },
+        { type: "range", key: "grain", nameKey: "grain", tip: "tip_grain", min: 0, max: 0.4, step: 0.01 },
+        { type: "range", key: "fade", nameKey: "fade", tip: "tip_fade", min: 0, max: 0.4, step: 0.01 },
+      ],
+    },
+  };
+
+  const geom = {
+    wave: {
+      labelKey: "secGeomWave", idx: "01",
+      controls: [
+        { type: "range", key: "segX", nameKey: "columns", tip: "tip_columns", min: 6, max: 120, step: 1 },
+        { type: "range", key: "segZ", nameKey: "rows", tip: "tip_rows", min: 6, max: 90, step: 1 },
+        { type: "range", key: "spread", nameKey: "spread", tip: "tip_spread", min: 4, max: 30, step: 0.5 },
+        { type: "range", key: "amp", nameKey: "ampA", tip: "tip_ampA", min: 0, max: 4, step: 0.05 },
+        { type: "range", key: "waveLen", nameKey: "lenA", tip: "tip_lenA", min: 0.5, max: 10, step: 0.1 },
+        { type: "range", key: "amp2", nameKey: "ampB", tip: "tip_ampB", min: 0, max: 4, step: 0.05 },
+        { type: "range", key: "waveLen2", nameKey: "lenB", tip: "tip_lenB", min: 0.5, max: 10, step: 0.1 },
+        { type: "range", key: "waveSpeed", nameKey: "waveSpeed", tip: "tip_waveSpeed", min: 0.25, max: 4, step: 0.25 },
+        { type: "range", key: "distort", nameKey: "fisheye", tip: "tip_fisheye", min: 0, max: 1.5, step: 0.01 },
+        { type: "toggle", key: "nodes", nameKey: "showNodes", tip: "tip_showNodes" },
+        { type: "range", key: "nodeSize", nameKey: "nodeSize", tip: "tip_nodeSize", min: 0.5, max: 8, step: 0.1, dep: "nodes" },
+      ],
+    },
+    terrain: {
+      labelKey: "secGeomTerrain", idx: "01",
+      controls: [
+        { type: "range", key: "segX", nameKey: "widthSeg", tip: "tip_widthSeg", min: 8, max: 120, step: 1 },
+        { type: "range", key: "segZ", nameKey: "depthSeg", tip: "tip_depthSeg", min: 8, max: 100, step: 1 },
+        { type: "range", key: "spread", nameKey: "fieldSize", tip: "tip_fieldSize", min: 8, max: 60, step: 1 },
+        { type: "range", key: "amp", nameKey: "heightA", tip: "tip_heightA", min: 0, max: 5, step: 0.05 },
+        { type: "range", key: "waveLen", nameKey: "lengthA", tip: "tip_lengthA", min: 1, max: 12, step: 0.2 },
+        { type: "range", key: "amp2", nameKey: "heightB", tip: "tip_heightB", min: 0, max: 5, step: 0.05 },
+        { type: "range", key: "waveLen2", nameKey: "lengthB", tip: "tip_lengthB", min: 1, max: 12, step: 0.2 },
+        { type: "range", key: "waveSpeed", nameKey: "scrollSpeed", tip: "tip_scrollSpeed", min: 0.25, max: 4, step: 0.25 },
+        { type: "toggle", key: "nodes", nameKey: "showNodes", tip: "tip_showNodes" },
+        { type: "range", key: "nodeSize", nameKey: "nodeSize", tip: "tip_nodeSize", min: 0.5, max: 8, step: 0.1, dep: "nodes" },
+      ],
+    },
+    tunnel: {
+      labelKey: "secGeomTunnel", idx: "01",
+      controls: [
+        { type: "range", key: "rings", nameKey: "rings", tip: "tip_rings", min: 8, max: 160, step: 1 },
+        { type: "range", key: "ringGap", nameKey: "ringGap", tip: "tip_ringGap", min: 0.4, max: 5, step: 0.1 },
+        { type: "range", key: "ringScale", nameKey: "ringScale", tip: "tip_ringScale", min: 1, max: 12, step: 0.1 },
+        { type: "range", key: "twist", nameKey: "twist", tip: "tip_twist", min: 0, max: 0.3, step: 0.005 },
+        { type: "range", key: "travelSpeed", nameKey: "travelSpeed", tip: "tip_travelSpeed", min: 0.1, max: 4, step: 0.1 },
+        { type: "range", key: "stars", nameKey: "stars", tip: "tip_stars", min: 0, max: 4000, step: 50 },
+        { type: "range", key: "starBright", nameKey: "starBright", tip: "tip_starBright", min: 0, max: 1, step: 0.02, dep: "stars" },
+      ],
+    },
+    box: {
+      labelKey: "secGeomBox", idx: "01",
+      controls: [
+        { type: "range", key: "boxW", nameKey: "boxW", tip: "tip_boxW", min: 2, max: 40, step: 0.5 },
+        { type: "range", key: "boxH", nameKey: "boxH", tip: "tip_boxH", min: 2, max: 40, step: 0.5 },
+        { type: "range", key: "depth", nameKey: "boxDepth", tip: "tip_boxDepth", min: 5, max: 60, step: 1 },
+        { type: "range", key: "gridX", nameKey: "boxGridX", tip: "tip_boxGridX", min: 1, max: 40, step: 1 },
+        { type: "range", key: "gridY", nameKey: "boxGridY", tip: "tip_boxGridY", min: 1, max: 40, step: 1 },
+        { type: "range", key: "gridZ", nameKey: "boxGridZ", tip: "tip_boxGridZ", min: 1, max: 40, step: 1 },
+        { type: "range", key: "perspExp", nameKey: "perspExp", tip: "tip_perspExp", min: 1, max: 3, step: 0.05 },
+        { type: "range", key: "flySpeed", nameKey: "flySpeed", tip: "tip_flySpeed", min: 0, max: 3, step: 0.05 },
+        { type: "range", key: "depthFade", nameKey: "depthFade", tip: "tip_depthFade", min: 0, max: 1, step: 0.01 },
+        { type: "select", key: "walls", nameKey: "walls", tip: "tip_walls",
+          options: [["all","wallsAll"],["floorCeil","wallsFC"],["leftRight","wallsLR"]] },
+        { type: "toggle", key: "backWall", nameKey: "backWall", tip: "tip_backWall" },
+        { type: "range", key: "stars", nameKey: "stars", tip: "tip_stars", min: 0, max: 4000, step: 50 },
+        { type: "range", key: "starBright", nameKey: "starBright", tip: "tip_starBright", min: 0, max: 1, step: 0.02, dep: "stars" },
+      ],
+    },
+    cross: {
+      labelKey: "secGeomCross", idx: "01",
+      controls: [
+        { type: "select", key: "animMode", nameKey: "animMode", tip: "tip_animMode",
+          options: [["zoomIn","amZoomIn"],["zoomOut","amZoomOut"],["rotate","amRotate"],["pulse","amPulse"]] },
+        { type: "range", key: "animSpeed", nameKey: "animSpeed", tip: "tip_animSpeed", min: 1, max: 8, step: 1 },
+        { type: "select", key: "pulseMode", nameKey: "pulseMode", tip: "tip_pulseMode",
+          options: [["outward","pmOutward"],["inward","pmInward"],["breathe","pmBreathe"]], depEq: { key: "animMode", val: "pulse" } },
+        { type: "range", key: "pulse", nameKey: "pulse", tip: "tip_pulse", min: 0, max: 1, step: 0.02, depEq: { key: "animMode", val: "pulse" } },
+        { type: "range", key: "crossRings", nameKey: "crossRings", tip: "tip_crossRings", min: 1, max: 80, step: 1 },
+        { type: "range", key: "growth", nameKey: "growth", tip: "tip_growth", min: 0.7, max: 0.98, step: 0.005 },
+        { type: "range", key: "armRatio", nameKey: "armRatio", tip: "tip_armRatio", min: 0.04, max: 0.4, step: 0.005 },
+        { type: "range", key: "aspect", nameKey: "aspect", tip: "tip_aspect", min: 0.2, max: 1, step: 0.01 },
+        { type: "range", key: "corner", nameKey: "corner", tip: "tip_corner", min: 0, max: 1, step: 0.02 },
+        { type: "range", key: "coreSize", nameKey: "coreSize", tip: "tip_coreSize", min: 0.02, max: 0.4, step: 0.01 },
+        { type: "range", key: "fillFalloff", nameKey: "fillFalloff", tip: "tip_fillFalloff", min: 0, max: 1, step: 0.02 },
+      ],
+    },
+  };
+
+  return [common.global, geom[scene], common.camera, common.post];
+}
+
+function renderPanel() {
+  panel.innerHTML = "";
+  // Looks gallery first — the fastest path to a good-looking result
+  panel.appendChild(buildLooksSection());
+  const sections = describe(currentScene);
+  sections.forEach(sec => panel.appendChild(buildSection(sec)));
+  // export section
+  panel.appendChild(buildExportSection());
+  // actions
+  const act = document.createElement("div");
+  act.className = "section";
+  act.innerHTML = `<div class="section-body" style="padding-top:14px">
+    <div class="btn-row">
+      <button class="pbtn" id="resetBtn2">${t("resetDefault")}</button>
+      <button class="pbtn" id="randBtn2">${t("randomize")}</button>
+    </div></div>`;
+  panel.appendChild(act);
+  act.querySelector("#resetBtn2").onclick = resetParams;
+  act.querySelector("#randBtn2").onclick = randomize;
+}
+
+function buildSection(sec) {
+  const el = document.createElement("div");
+  el.className = "section";
+  const head = document.createElement("div");
+  head.className = "section-head";
+  head.innerHTML = `<span class="chev"></span><span class="label">${t(sec.labelKey)}</span><span class="idx">${sec.idx}</span>`;
+  const body = document.createElement("div");
+  body.className = "section-body";
+  head.onclick = () => el.classList.toggle("collapsed");
+  sec.controls.forEach(c => {
+    const node = buildControl(c);
+    if (node) body.appendChild(node);
+  });
+  el.appendChild(head); el.appendChild(body);
+  return el;
+}
+
+// small "?" that shows an explanatory tooltip on hover/focus
+function infoDot(tipKey) {
+  if (!tipKey) return "";
+  return `<span class="info-dot" data-tip="${tipKey}" tabindex="0">?</span>`;
+}
+
+function buildControl(c) {
+  if (c.type === "res") return buildResControl();
+  // conditional visibility: hide entirely when a depEq condition isn't met
+  if (c.depEq && params[c.depEq.key] !== c.depEq.val) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "ctrl";
+  if (c.dep && !params[c.dep]) wrap.style.opacity = "0.45";
+
+  if (c.type === "range") {
+    wrap.innerHTML = `
+      <div class="ctrl-row">
+        <span class="ctrl-label">${t(c.nameKey)}${infoDot(c.tip)}</span>
+        <input class="ctrl-val" type="text" value="${fmt(params[c.key])}" />
+      </div>
+      <input type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${params[c.key]}" />`;
+    const range = wrap.querySelector('input[type=range]');
+    const val = wrap.querySelector('.ctrl-val');
+    range.addEventListener("input", () => {
+      params[c.key] = parseFloat(range.value);
+      val.value = fmt(params[c.key]);
+      applyParamChange(c.key);
+    });
+    val.addEventListener("change", () => {
+      let v = parseFloat(val.value);
+      if (isNaN(v)) { val.value = fmt(params[c.key]); return; }
+      v = Math.max(c.min, Math.min(c.max, v));
+      params[c.key] = v; range.value = v; val.value = fmt(v);
+      applyParamChange(c.key);
+    });
+  } else if (c.type === "color") {
+    wrap.innerHTML = `
+      <div class="ctrl-row"><span class="ctrl-label">${t(c.nameKey)}${infoDot(c.tip)}</span></div>
+      <div class="color-ctrl">
+        <input type="color" value="${params[c.key]}" />
+        <input class="hex" type="text" value="${params[c.key]}" />
+      </div>`;
+    const col = wrap.querySelector('input[type=color]');
+    const hex = wrap.querySelector('.hex');
+    col.addEventListener("input", () => { params[c.key] = col.value; hex.value = col.value; applyParamChange(c.key); });
+    hex.addEventListener("change", () => {
+      let v = hex.value.trim(); if (!v.startsWith("#")) v = "#" + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) { params[c.key] = v; col.value = v; applyParamChange(c.key); }
+      else hex.value = params[c.key];
+    });
+  } else if (c.type === "toggle") {
+    wrap.innerHTML = `
+      <div class="ctrl-row">
+        <span class="ctrl-label">${t(c.nameKey)}${infoDot(c.tip)}</span>
+        <label class="toggle"><input type="checkbox" ${params[c.key] ? "checked" : ""}/><span class="track"></span></label>
+      </div>`;
+    wrap.querySelector('input').addEventListener("change", e => {
+      params[c.key] = e.target.checked; applyParamChange(c.key); renderPanel();
+    });
+  } else if (c.type === "select") {
+    wrap.innerHTML = `
+      <div class="ctrl-row"><span class="ctrl-label">${t(c.nameKey)}${infoDot(c.tip)}</span></div>
+      <select>${c.options.map(([val,labelKey]) =>
+        `<option value="${val}" ${params[c.key]===val?"selected":""}>${t(labelKey)}</option>`).join("")}</select>`;
+    wrap.querySelector('select').addEventListener("change", e => {
+      params[c.key] = e.target.value; applyParamChange(c.key);
+      if (c.key === "animMode") renderPanel();   // show/hide pulse controls
+    });
+  }
+  return wrap;
+}
+
+function buildResControl() {
+  const wrap = document.createElement("div");
+  wrap.className = "ctrl";
+  const presets = [
+    ["16:9", 1920, 1080], ["1:1", 1080, 1080], ["9:16", 1080, 1920], ["4:5", 1080, 1350],
+  ];
+  wrap.innerHTML = `
+    <div class="ctrl-row"><span class="ctrl-label">${t("resolution")}${infoDot("tip_resolution")}</span></div>
+    <div class="seg" id="resSeg">
+      ${presets.map(p => `<button data-w="${p[1]}" data-h="${p[2]}"
+        class="${params.resW==p[1]&&params.resH==p[2]?'active':''}">${p[0]}</button>`).join("")}
+    </div>
+    <div class="row-2" style="margin-top:8px">
+      <input class="ctrl-val" id="resW" type="text" value="${params.resW}" style="text-align:center"/>
+      <input class="ctrl-val" id="resH" type="text" value="${params.resH}" style="text-align:center"/>
+    </div>`;
+  wrap.querySelectorAll('#resSeg button').forEach(b => {
+    b.onclick = () => {
+      params.resW = +b.dataset.w; params.resH = +b.dataset.h;
+      const rebuilt = matchBoxAspectToResolution();
+      renderPanel(); resizeRenderer();
+      if (rebuilt) buildScene(); else updateCamera();
+      if (!playing) renderFrame(phase);
+    };
+  });
+  const rw = wrap.querySelector('#resW'), rh = wrap.querySelector('#resH');
+  const commit = () => {
+    const w = Math.max(120, Math.min(3840, parseInt(rw.value)||params.resW));
+    const h = Math.max(120, Math.min(3840, parseInt(rh.value)||params.resH));
+    params.resW = w; params.resH = h;
+    const rebuilt = matchBoxAspectToResolution();
+    renderPanel(); resizeRenderer();
+    if (rebuilt) buildScene(); else updateCamera();
+    if (!playing) renderFrame(phase);
+  };
+  rw.addEventListener("change", commit); rh.addEventListener("change", commit);
+  return wrap;
+}
+
+function fmt(v) { return (Math.round(v * 100) / 100).toString(); }
+
+// decide whether a param change needs a full rebuild or just a tweak
+const REBUILD_KEYS = new Set(["segX","segZ","spread","nodes","rings","ringGap","ringScale","twist","stars",
+  "crossRings","growth","armRatio","aspect","corner","coreSize","fillFalloff",
+  "boxW","boxH","depth","gridX","gridY","gridZ","perspExp","flySpeed","walls","backWall","depthFade","depthNear","depthFar"]);
+function applyParamChange(key) {
+  if (key === "loopLength") document.getElementById("loopTime").textContent = params.loopLength.toFixed(2);
+  // when flying, the seamless-loop cycle count depends on loopLength/flySpeed, so rebuild
+  if (currentScene === "box" && (params.flySpeed || 0) > 0 && (key === "loopLength")) { buildScene(); if (!playing) renderFrame(phase); return; }
+  if (REBUILD_KEYS.has(key)) { buildScene(); }
+  else {
+    // light updates
+    scene3.background = new THREE.Color(params.bgColor);
+    if (scene3.fog) scene3.fog.color.set(params.bgColor);   // keep box fog matched to bg
+    if (sceneObj) sceneObj.traverse(o => {
+      if (o.material && o.material.color && !o.material.vertexColors) o.material.color.set(params.lineColor);
+      if (o.material) o.material.opacity = params.opacity;
+    });
+    updateCamera();
+  }
+  if (!playing) renderFrame(phase);
+}
+
+/* ----------------------------------------------------------------------------
+   LOOKS — named starting points per scene. Applying one merges its values over
+   the current scene defaults; the user can keep tweaking from there.
+---------------------------------------------------------------------------- */
+const LOOKS = {
+  wave: [
+    { name: "Calm", svg: "wave", set: { amp: 0.5, amp2: 0.2, waveLen: 4, waveLen2: 2, distort: 0.2, waveSpeed: 0.5, segX: 36, segZ: 22 } },
+    { name: "Ripple", svg: "wave", set: { amp: 1.1, amp2: 0.5, waveLen: 2.2, waveLen2: 1.2, distort: 0.55, waveSpeed: 1, segX: 48, segZ: 30 } },
+    { name: "Fisheye", svg: "bulge", set: { amp: 0.7, amp2: 0.3, waveLen: 3, waveLen2: 1.6, distort: 1.2, waveSpeed: 1, segX: 44, segZ: 28 } },
+    { name: "Storm", svg: "wave", set: { amp: 2.4, amp2: 1.3, waveLen: 1.6, waveLen2: 0.9, distort: 0.4, waveSpeed: 2, segX: 60, segZ: 38, nodes: true } },
+  ],
+  terrain: [
+    { name: "Plains", svg: "terrain", set: { amp: 0.8, amp2: 0.3, waveLen: 7, waveLen2: 3, camHeight: 2.4, nodes: true } },
+    { name: "Ocean", svg: "terrain", set: { amp: 1.4, amp2: 0.6, waveLen: 5, waveLen2: 2.2, camHeight: 3.2, waveSpeed: 1.2, nodes: false } },
+    { name: "Canyon", svg: "terrain", set: { amp: 3, amp2: 1, waveLen: 4, waveLen2: 2, camHeight: 5, camDist: 14, nodes: true } },
+    { name: "Data field", svg: "dots", set: { amp: 1, amp2: 0.5, waveLen: 6, waveLen2: 2.5, nodes: true, nodeSize: 4, camHeight: 2.6 } },
+  ],
+  tunnel: [
+    { name: "Drift", svg: "tunnel", set: { travelSpeed: 0.6, twist: 0, ringGap: 1.8, ringScale: 5, stars: 600 } },
+    { name: "Hyperspace", svg: "tunnel", set: { travelSpeed: 2.6, twist: 0.02, ringGap: 1.2, ringScale: 5, stars: 1600, starBright: 0.9 } },
+    { name: "Spiral", svg: "spiral", set: { travelSpeed: 1.2, twist: 0.12, ringGap: 1.4, ringScale: 5.5, stars: 800 } },
+    { name: "Void", svg: "tunnel", set: { travelSpeed: 1, twist: 0.03, ringGap: 2.2, ringScale: 7, stars: 0 } },
+  ],
+  box: [
+    { name: "Infinite room", svg: "box", set: { boxW: 12, boxH: 12, depth: 22, gridX: 12, gridY: 12, gridZ: 14, perspExp: 1.6, walls: "all", backWall: true, stars: 600, starBright: 0.6, depthFade: 0.85 } },
+    { name: "Fly through", svg: "box", set: { boxW: 30, boxH: 14, depth: 34, gridX: 20, gridY: 10, gridZ: 20, perspExp: 1, flySpeed: 0.6, walls: "all", backWall: false, stars: 500, starBright: 0.5, depthFade: 0.9, loopLength: 8 } },
+    { name: "Wide hall", svg: "box", set: { boxW: 22, boxH: 10, depth: 26, gridX: 18, gridY: 8, gridZ: 16, perspExp: 1.7, walls: "all", backWall: true, stars: 400, depthFade: 0.8 } },
+    { name: "Deep well", svg: "box", set: { boxW: 9, boxH: 9, depth: 40, gridX: 9, gridY: 9, gridZ: 22, perspExp: 2.0, walls: "all", backWall: true, stars: 900, starBright: 0.7, depthFade: 0.95 } },
+    { name: "Corridor", svg: "box", set: { boxW: 10, boxH: 14, depth: 24, gridX: 8, gridY: 12, gridZ: 16, perspExp: 1.5, walls: "all", backWall: false, stars: 300, depthFade: 0.78 } },
+  ],
+  cross: [
+    { name: "Infinite zoom", svg: "cross", set: { crossRings: 28, growth: 0.9, armRatio: 0.157, aspect: 0.473, corner: 0.5, coreSize: 0.08, animMode: "zoomIn", animSpeed: 1, fillFalloff: 0.25, loopLength: 6 } },
+    { name: "Reference", svg: "cross", set: { crossRings: 20, growth: 0.9, armRatio: 0.157, aspect: 0.473, corner: 0.5, coreSize: 0.12, animMode: "pulse", pulse: 0, fillFalloff: 0 } },
+    { name: "Pull back", svg: "cross", set: { crossRings: 32, growth: 0.9, armRatio: 0.14, aspect: 0.473, corner: 0.5, coreSize: 0.07, animMode: "zoomOut", animSpeed: 1, fillFalloff: 0.3 } },
+    { name: "Spin well", svg: "crossSq", set: { crossRings: 36, growth: 0.92, armRatio: 0.2, aspect: 1, corner: 0.15, coreSize: 0.05, animMode: "rotate", animSpeed: 1, fillFalloff: 0.4 } },
+  ],
+};
+
+function looksThumb(kind) {
+  // tiny inline SVG previews — pure decoration, themed to match each look
+  const wrap = (inner) => `<svg viewBox="0 0 100 56" preserveAspectRatio="none"><rect width="100" height="56" fill="#000"/>${inner}</svg>`;
+  if (kind === "wave") return wrap(`<path d="M0 28 Q25 14 50 28 T100 28" stroke="#7a7a7a" fill="none" stroke-width="1"/><path d="M0 38 Q25 24 50 38 T100 38" stroke="#fff" fill="none" stroke-width="1"/><path d="M0 18 Q25 32 50 18 T100 18" stroke="#555" fill="none" stroke-width="1"/>`);
+  if (kind === "bulge") return wrap(`<ellipse cx="50" cy="28" rx="34" ry="20" stroke="#888" fill="none"/><ellipse cx="50" cy="28" rx="20" ry="11" stroke="#fff" fill="none"/><line x1="16" y1="28" x2="84" y2="28" stroke="#555"/><line x1="50" y1="8" x2="50" y2="48" stroke="#555"/>`);
+  if (kind === "terrain") return wrap(`<path d="M0 46 L20 40 L40 44 L60 38 L80 42 L100 36" stroke="#fff" fill="none"/><path d="M0 50 L25 46 L50 49 L75 44 L100 47" stroke="#777" fill="none"/><line x1="20" y1="40" x2="20" y2="56" stroke="#444"/><line x1="60" y1="38" x2="60" y2="56" stroke="#444"/>`);
+  if (kind === "dots") return wrap(`${[14,30,46,62,78].map((x,i)=>[16,28,40].map(y=>`<circle cx="${x}" cy="${y+(i%2?3:0)}" r="1.4" fill="#fff"/>`).join("")).join("")}`);
+  if (kind === "tunnel") return wrap(`${[28,20,13,8,5].map((r,i)=>`<rect x="${50-r*1.6}" y="${28-r}" width="${r*3.2}" height="${r*2}" stroke="${i?'#888':'#fff'}" fill="none"/>`).join("")}`);
+  if (kind === "spiral") return wrap(`${[28,20,13,8].map((r,i)=>`<rect x="${50-r*1.6}" y="${28-r}" width="${r*3.2}" height="${r*2}" stroke="#aaa" fill="none" transform="rotate(${i*12} 50 28)"/>`).join("")}`);
+  if (kind === "cross" || kind === "crossSq") {
+    // nested plus shapes shrinking toward centre
+    const ar = kind === "crossSq" ? 1 : 0.5;
+    const plus = (sx) => { const sy=sx*ar*1.8, a=sx*0.34;
+      return `M${50-a} ${28-sy} H${50+a} V${28-a} H${50+sx} V${28+a} H${50+a} V${28+sy} H${50-a} V${28+a} H${50-sx} V${28-a} H${50-a} Z`; };
+    return wrap([22,16,11,7,4].map((s,i)=>`<path d="${plus(s)}" stroke="${i?'#888':'#fff'}" fill="none" stroke-width="0.8"/>`).join(""));
+  }
+  if (kind === "box") {
+    // perspective room: outer rect + inner rect + 4 converging corner lines + a couple of depth rings
+    const ox=6, oy=4, ow=88, oh=48, ix=38, iy=20, iw=24, ih=16;
+    const corners = `<line x1="${ox}" y1="${oy}" x2="${ix}" y2="${iy}" stroke="#888"/>
+      <line x1="${ox+ow}" y1="${oy}" x2="${ix+iw}" y2="${iy}" stroke="#888"/>
+      <line x1="${ox}" y1="${oy+oh}" x2="${ix}" y2="${iy+ih}" stroke="#888"/>
+      <line x1="${ox+ow}" y1="${oy+oh}" x2="${ix+iw}" y2="${iy+ih}" stroke="#888"/>`;
+    const rings = [[16,10,68,36,"#666"],[26,15,48,26,"#aaa"]]
+      .map(([rx,ry,rw,rh,c])=>`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" stroke="${c}" fill="none"/>`).join("");
+    return wrap(`<rect x="${ox}" y="${oy}" width="${ow}" height="${oh}" stroke="#fff" fill="none"/>${rings}${corners}<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" stroke="#555" fill="none"/>`);
+  }
+  return wrap("");
+}
+
+function buildLooksSection() {
+  const el = document.createElement("div");
+  el.className = "section";
+  const looks = LOOKS[currentScene] || [];
+  el.innerHTML = `
+    <div class="section-head"><span class="chev"></span><span class="label">${t("looks")}</span><span class="idx">★</span></div>
+    <div class="section-body">
+      <div class="preset-grid">
+        ${looks.map((l, i) => `
+          <button class="preset-card ${activeLook===i?'active':''}" data-look="${i}">
+            ${looksThumb(l.svg)}
+            <span class="pc-name">${l.name}</span>
+          </button>`).join("")}
+      </div>
+    </div>`;
+  el.querySelector('.section-head').onclick = () => el.classList.toggle("collapsed");
+  el.querySelectorAll('.preset-card').forEach(b => b.onclick = () => applyLook(+b.dataset.look));
+  return el;
+}
+
+let activeLook = -1;
+function applyLook(i) {
+  const look = LOOKS[currentScene][i];
+  if (!look) return;
+  Object.assign(params, look.set);
+  activeLook = i;
+  document.getElementById("loopTime").textContent = params.loopLength.toFixed(2);
+  buildScene(); renderPanel(); resizeRenderer();
+  if (!playing) renderFrame(phase);
+  toast(t("tPreset") + " · " + look.name);
+}
+
+/* ----------------------------------------------------------------------------
+   6. EXPORT
+---------------------------------------------------------------------------- */
+function buildExportSection() {
+  const el = document.createElement("div");
+  el.className = "section";
+  el.innerHTML = `
+    <div class="section-head"><span class="chev"></span><span class="label">${t("secExport")}</span><span class="idx">04</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <div class="ctrl-row"><span class="ctrl-label">${t("frameRate")}</span></div>
+        <div class="seg" id="fpsSeg">
+          <button data-fps="24" class="${exportFps===24?'active':''}">24</button>
+          <button data-fps="30" class="${exportFps===30?'active':''}">30</button>
+          <button data-fps="60" class="${exportFps===60?'active':''}">60</button>
+        </div>
+      </div>
+      <div class="export-grid">
+        <button class="exp-card" data-exp="webm"><div class="ec-title">▸ ${t("expWebmT")}</div><div class="ec-sub">${t("expWebmS")}</div></button>
+        <button class="exp-card" data-exp="png"><div class="ec-title">▸ ${t("expPngT")}</div><div class="ec-sub">${t("expPngS")}</div></button>
+        <button class="exp-card" data-exp="gif"><div class="ec-title">▸ ${t("expGifT")}</div><div class="ec-sub">${t("expGifS")}</div></button>
+        <button class="exp-card" data-exp="svg"><div class="ec-title">▸ ${t("expSvgT")}</div><div class="ec-sub">${t("expSvgS")}</div></button>
+        <button class="exp-card" data-exp="html"><div class="ec-title">▸ ${t("expHtmlT")}</div><div class="ec-sub">${t("expHtmlS")}</div></button>
+      </div>
+      <div class="export-status" id="expStatus">
+        <span id="expLabel">…</span>
+        <div class="progress"><div class="bar" id="expBar"></div></div>
+      </div>
+      <div class="hint">${t("exportHint")}</div>
+    </div>`;
+  el.querySelector('.section-head').onclick = () => el.classList.toggle("collapsed");
+  el.querySelectorAll('#fpsSeg button').forEach(b => b.onclick = () => {
+    el.querySelectorAll('#fpsSeg button').forEach(x => x.classList.remove("active"));
+    b.classList.add("active"); exportFps = +b.dataset.fps;
+  });
+  el.querySelectorAll('.exp-card').forEach(b => b.onclick = () => window.runExport(b.dataset.exp));
+  return el;
+}
+
+let exportFps = 30;
+let exporting = false;
+
+function setExportStatus(show, label, pct) {
+  const s = document.getElementById("expStatus");
+  s.classList.toggle("show", show);
+  if (label) document.getElementById("expLabel").textContent = label;
+  if (pct != null) document.getElementById("expBar").style.width = (pct*100).toFixed(0) + "%";
+}
+function setExportLock(lock) {
+  exporting = lock;
+  document.querySelectorAll('.exp-card').forEach(b => b.disabled = lock);
+}
+
+// Render a frame at full export resolution into an offscreen renderer
+let exRenderer, exCanvas;
+function makeExportRenderer() {
+  exCanvas = document.createElement("canvas");
+  exCanvas.width = params.resW; exCanvas.height = params.resH;
+  exRenderer = new THREE.WebGLRenderer({ canvas: exCanvas, antialias: true, preserveDrawingBuffer: true });
+  exRenderer.localClippingEnabled = true;
+  exRenderer.setSize(params.resW, params.resH, false);
+}
+function renderExportFrame(t) {
+  sceneUpdate(t);
+  if (params.autoMotion && currentScene !== "tunnel") {
+    if (currentScene === "wave") { camera.position.x = Math.sin(t*2*Math.PI)*0.6*params.motionSpeed; camera.lookAt(0,0,0); }
+    else { camera.position.x = Math.sin(t*2*Math.PI)*0.8*params.motionSpeed; camera.lookAt(0,-0.5,-params.spread*0.5); }
+  }
+  camera.aspect = params.resW/params.resH; camera.updateProjectionMatrix();
+  exRenderer.render(scene3, camera);
+  // composite overlay onto a 2d canvas
+  const comp = document.createElement("canvas");
+  comp.width = params.resW; comp.height = params.resH;
+  const cx = comp.getContext("2d");
+  cx.drawImage(exCanvas, 0, 0);
+  // overlay post
+  drawExportOverlay(cx, params.resW, params.resH, t);
+  return comp;
+}
+function drawExportOverlay(cx, w, h, t) {
+  if (params.vignette > 0) {
+    const g = cx.createRadialGradient(w/2,h/2,h*0.2,w/2,h/2,h*0.75);
+    g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,`rgba(0,0,0,${params.vignette})`);
+    cx.fillStyle = g; cx.fillRect(0,0,w,h);
+  }
+  if (params.grain > 0) {
+    cx.fillStyle = `rgba(255,255,255,${params.grain*0.5})`;
+    const dots = Math.floor(w*h*0.02*params.grain);
+    for (let i=0;i<dots;i++) cx.fillRect((Math.random()*w)|0,(Math.random()*h)|0,1,1);
+  }
+  if (params.fade > 0) {
+    const f = params.fade; let a=0;
+    if (t<f) a=1-t/f; else if (t>1-f) a=(t-(1-f))/f;
+    if (a>0){ cx.fillStyle=`rgba(0,0,0,${a})`; cx.fillRect(0,0,w,h); }
+  }
+}
+
+async function runExport(kind) {
+  if (exporting) return;
+  const wasPlaying = playing; setPlay(false);
+  setExportLock(true);
+  makeExportRenderer();
+  try {
+    if (kind === "html") { exportHTML(); }
+    else if (kind === "svg") { exportSVG(); }
+    else if (kind === "png") { await exportPNG(); }
+    else if (kind === "gif") { await exportGIF(); }
+    else if (kind === "webm") { await exportWebM(); }
+  } catch (e) {
+    setExportStatus(true, "Export failed: " + e.message, 0);
+    console.error(e);
+    setTimeout(() => setExportStatus(false), 2500);
+  }
+  if (exRenderer) exRenderer.dispose();
+  setExportLock(false);
+  setPlay(wasPlaying);
+}
+window.runExport = runExport;
+
+function downloadBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function exportPNG() {
+  const total = Math.round(params.loopLength * exportFps);
+  const zip = new JSZip();
+  setExportStatus(true, "Rendering frames…", 0);
+  for (let i = 0; i < total; i++) {
+    const t = i / total;
+    const comp = renderExportFrame(t);
+    const blob = await new Promise(r => comp.toBlob(r, "image/png"));
+    zip.file(`frame_${String(i).padStart(4,"0")}.png`, blob);
+    setExportStatus(true, `Rendering ${i+1}/${total}`, (i+1)/total);
+    if (i % 3 === 0) await new Promise(r => setTimeout(r));
+  }
+  setExportStatus(true, "Zipping…", 1);
+  const out = await zip.generateAsync({ type: "blob" });
+  downloadBlob(out, `wireframe_${currentScene}_${params.resW}x${params.resH}.zip`);
+  setExportStatus(true, "Done ✓", 1); toast(t("tPngDone") + ` · ${total} frames`);
+  setTimeout(() => setExportStatus(false), 1800);
+}
+
+async function exportGIF() {
+  // gif.js needs a worker; use blob-url worker from CDN script text
+  const total = Math.min(Math.round(params.loopLength * Math.min(exportFps, 25)), 200);
+  setExportStatus(true, "Preparing GIF…", 0);
+  const workerBlob = await fetch("https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js")
+    .then(r => r.blob()).catch(() => null);
+  const workerURL = workerBlob ? URL.createObjectURL(workerBlob) : undefined;
+  const gif = new GIF({ workers: 2, quality: 10, width: params.resW, height: params.resH, workerScript: workerURL });
+  const delay = 1000 / Math.min(exportFps, 25);
+  for (let i = 0; i < total; i++) {
+    const comp = renderExportFrame(i / total);
+    gif.addFrame(comp, { delay, copy: true });
+    setExportStatus(true, `Capturing ${i+1}/${total}`, (i+1)/total*0.5);
+    if (i % 3 === 0) await new Promise(r => setTimeout(r));
+  }
+  await new Promise((resolve, reject) => {
+    gif.on("progress", p => setExportStatus(true, "Encoding GIF…", 0.5 + p*0.5));
+    gif.on("finished", blob => {
+      downloadBlob(blob, `wireframe_${currentScene}.gif`);
+      setExportStatus(true, "Done ✓", 1); toast(t("tGifDone"));
+      setTimeout(() => setExportStatus(false), 1800);
+      resolve();
+    });
+    gif.render();
+  });
+}
+
+// WebM via a 2D mirror canvas (WebGL canvas can't also expose a 2D ctx for the
+// overlay, so we composite each frame onto a capturable 2D canvas and record that).
+let streamMirror;
+async function exportWebM() {
+  if (!streamMirror) streamMirror = document.createElement("canvas");
+  streamMirror.width = params.resW; streamMirror.height = params.resH;
+  const fps = exportFps;
+  const mcx = streamMirror.getContext("2d");
+  const stream = streamMirror.captureStream(fps);
+  const types = ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+  const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/webm";
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const done = new Promise(res => rec.onstop = res);
+  setExportStatus(true, "Recording…", 0);
+  rec.start();
+  const total = Math.round(params.loopLength * fps);
+  const frameMs = 1000 / fps;
+  for (let i = 0; i < total; i++) {
+    const comp = renderExportFrame(i / total);
+    mcx.drawImage(comp, 0, 0);
+    setExportStatus(true, `Recording ${i+1}/${total}`, (i+1)/total);
+    await new Promise(r => setTimeout(r, frameMs));
+  }
+  rec.stop(); await done;
+  downloadBlob(new Blob(chunks, { type: mime }), `wireframe_${currentScene}_${params.resW}x${params.resH}.webm`);
+  setExportStatus(true, "Done ✓", 1); toast(t("tWebmDone"));
+  setTimeout(() => setExportStatus(false), 1800);
+}
+
+/* ----------------------------------------------------------------------------
+   SVG EXPORT — capture the CURRENT frame as a true vector file.
+   Every line object in the scene is projected through the camera at the export
+   resolution, emitting <polyline>/<line> elements (and Cross emits closed
+   shapes). Raster post-effects (vignette/grain) are intentionally omitted so the
+   result stays clean, editable vector art that scales without quality loss.
+---------------------------------------------------------------------------- */
+function exportSVG() {
+  setExportStatus(true, "Tracing vectors…", 0.4);
+  const W = params.resW, H = params.resH;
+
+  // Make sure geometry + camera reflect the frame currently on screen.
+  renderFrame(phase);
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+
+  const v = new THREE.Vector3();
+  // project a local-space point of `obj` to screen pixels; returns null if behind camera
+  function project(obj, ix, arr) {
+    v.set(arr[ix], arr[ix+1], arr[ix+2]);
+    obj.updateMatrixWorld(true);
+    v.applyMatrix4(obj.matrixWorld);
+    v.project(camera);
+    if (v.z > 1) return null;                 // behind the camera / clipped
+    return [ (v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H ];
+  }
+  const fix = (n) => Math.round(n * 100) / 100;   // trim coordinate precision
+
+  const lineColor = params.lineColor;
+  const strokeW = Math.max(params.lineWidth || 1, 0.4);
+  const parts = [];
+  parts.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${params.bgColor}"/>`);
+  parts.push(`<g stroke="${lineColor}" stroke-width="${strokeW}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="${fix(params.opacity)}">`);
+
+  let segCount = 0;
+  sceneObj.traverse(obj => {
+    if (!obj.geometry || !obj.geometry.attributes || !obj.geometry.attributes.position) return;
+    const arr = obj.geometry.attributes.position.array;
+    const type = obj.type;
+    const op = obj.material && obj.material.opacity != null ? fix(obj.material.opacity) : 1;
+    const opAttr = op < 0.99 ? ` opacity="${op}"` : "";
+
+    if (type === "LineSegments") {
+      // pairs of vertices = independent segments
+      for (let i = 0; i < arr.length; i += 6) {
+        const a = project(obj, i, arr), b = project(obj, i+3, arr);
+        if (a && b) { parts.push(`<line x1="${fix(a[0])}" y1="${fix(a[1])}" x2="${fix(b[0])}" y2="${fix(b[1])}"${opAttr}/>`); segCount++; }
+      }
+    } else if (type === "Line" || type === "LineLoop") {
+      // continuous polyline through all vertices
+      const pts = [];
+      for (let i = 0; i < arr.length; i += 3) {
+        const p = project(obj, i, arr);
+        pts.push(p);
+      }
+      // split into runs of consecutive on-screen points
+      let run = [];
+      const flush = () => {
+        if (run.length >= 2) {
+          const d = run.map(p => `${fix(p[0])},${fix(p[1])}`).join(" ");
+          const closed = (type === "LineLoop" && run.length === pts.length);
+          parts.push(`<polyline points="${d}${closed ? " " + run[0].map(fix).join(",") : ""}"${opAttr}/>`);
+          segCount++;
+        }
+        run = [];
+      };
+      for (const p of pts) { if (p) run.push(p); else flush(); }
+      flush();
+    } else if (type === "Points") {
+      // emit small dots
+      const r = Math.max((obj.material && obj.material.size || 0.05) * 60, 1);
+      for (let i = 0; i < arr.length; i += 3) {
+        const p = project(obj, i, arr);
+        if (p) { parts.push(`<circle cx="${fix(p[0])}" cy="${fix(p[1])}" r="${fix(r)}" fill="${lineColor}" stroke="none"${opAttr}/>`); segCount++; }
+      }
+    }
+  });
+  parts.push(`</g>`);
+
+  const svg =
+`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+${parts.join("\n")}
+</svg>`;
+
+  const tsec = (phase * params.loopLength).toFixed(2);
+  downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `wireframe_${currentScene}_${tsec}s_${W}x${H}.svg`);
+  setExportStatus(true, "Done ✓", 1); toast(t("tSvgDone"));
+  setTimeout(() => setExportStatus(false), 1600);
+}
+
+function exportHTML() {
+  setExportStatus(true, "Building HTML…", 0.5);
+  const cfg = JSON.stringify({ scene: currentScene, params });
+  const html = STANDALONE_TEMPLATE.replace("/*__CONFIG__*/", cfg);
+  downloadBlob(new Blob([html], { type: "text/html" }), `wireframe_${currentScene}_player.html`);
+  setExportStatus(true, "Done ✓", 1); toast(t("tHtmlDone"));
+  setTimeout(() => setExportStatus(false), 1500);
+}
+
+/* Standalone player template — embeds the engine + a frozen config, no UI */
+const STANDALONE_TEMPLATE = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Wireframe loop</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}canvas{display:block;width:100vw;height:100vh}</style>
+</head><body><canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
+<script>
+const CFG = /*__CONFIG__*/;
+const params = CFG.params, currentScene = CFG.scene;
+let renderer,scene3,camera,sceneObj=null,sceneUpdate=()=>{},phase=0,lastTS=performance.now();
+const canvas=document.getElementById("c");
+function lineMat(){return new THREE.LineBasicMaterial({color:new THREE.Color(params.lineColor),transparent:true,opacity:params.opacity});}
+function pointMat(){return new THREE.PointsMaterial({color:new THREE.Color(params.lineColor),size:params.nodeSize*0.012*(params.spread||params.ringScale||10)/10,transparent:true,opacity:params.opacity,sizeAttenuation:true});}
+${buildWave.toString()}
+${buildTerrain.toString()}
+${buildTunnel.toString()}
+${buildBox.toString()}
+${finishBox.toString()}
+${crossOutline.toString()}
+${buildCross.toString()}
+${ring_setScale.toString()}
+${updateCamera.toString()}
+function buildScene(){scene3.background=new THREE.Color(params.bgColor);scene3.fog=null;sceneObj=new THREE.Group();
+ if(currentScene==="wave")buildWave();else if(currentScene==="terrain")buildTerrain();else if(currentScene==="tunnel")buildTunnel();else if(currentScene==="box")buildBox();else buildCross();
+ scene3.add(sceneObj);updateCamera();}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=params.resW/params.resH;camera.updateProjectionMatrix();}
+addEventListener("resize",resize);
+renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.localClippingEnabled=true;
+scene3=new THREE.Scene();camera=new THREE.PerspectiveCamera(params.fov,params.resW/params.resH,0.1,200);
+buildScene();resize();
+function loop(ts){requestAnimationFrame(loop);const dt=(ts-lastTS)/1000;lastTS=ts;
+ phase=(phase+dt*params.speed/params.loopLength)%1;
+ sceneUpdate(phase);
+ if(params.autoMotion&&currentScene!=="tunnel"){if(currentScene==="wave"){camera.position.x=Math.sin(phase*2*Math.PI)*0.6*params.motionSpeed;camera.lookAt(0,0,0);}else{camera.position.x=Math.sin(phase*2*Math.PI)*0.8*params.motionSpeed;camera.lookAt(0,-0.5,-params.spread*0.5);}}
+ renderer.render(scene3,camera);}
+requestAnimationFrame(loop);
+<\/script></body></html>`;
+
+/* ----------------------------------------------------------------------------
+   ACTIONS: reset / randomize / scene switch
+---------------------------------------------------------------------------- */
+function resetParams() {
+  params = buildParams(currentScene);
+  activeLook = -1;
+  document.getElementById("loopTime").textContent = params.loopLength.toFixed(2);
+  buildScene(); renderPanel(); resizeRenderer();
+  if (!playing) renderFrame(phase);
+  toast(t("tReset"));
+}
+function randomize() {
+  const r = (a,b) => a + Math.random()*(b-a);
+  activeLook = -1;
+  if (currentScene === "wave") {
+    params.amp = r(0.3,2.5); params.amp2 = r(0,1.5);
+    params.waveLen = r(1.5,6); params.waveLen2 = r(0.8,4);
+    params.distort = r(0,1.1); params.waveSpeed = [0.5,1,1.5,2][Math.floor(Math.random()*4)];
+    params.segX = Math.round(r(24,70)); params.segZ = Math.round(r(16,46));
+  } else if (currentScene === "terrain") {
+    params.amp = r(0.6,3); params.amp2 = r(0.2,1.2);
+    params.waveLen = r(3,9); params.waveLen2 = r(1.5,5);
+    params.camHeight = r(1.5,6); params.camDist = r(8,16);
+    params.segX = Math.round(r(30,80)); params.segZ = Math.round(r(28,70));
+  } else if (currentScene === "tunnel") {
+    params.rings = Math.round(r(30,110)); params.ringGap = r(0.8,3);
+    params.ringScale = r(3,8); params.twist = r(0,0.12);
+    params.travelSpeed = r(0.5,2.5); params.stars = Math.round(r(200,2000));
+  } else if (currentScene === "cross") {
+    params.crossRings = Math.round(r(18,48));
+    params.growth = r(0.85, 0.94);
+    params.armRatio = r(0.1, 0.24);
+    params.aspect = r(0.4, 1);
+    params.corner = r(0.2, 0.8);
+    params.coreSize = r(0.05, 0.14);
+    params.animMode = ["zoomIn","zoomOut","rotate","pulse"][Math.floor(Math.random()*4)];
+    params.animSpeed = Math.round(r(1, 4));
+    params.pulse = r(0.2, 0.8);
+    params.pulseMode = ["outward","inward","breathe"][Math.floor(Math.random()*3)];
+    params.fillFalloff = r(0.1, 0.45);
+  }
+  buildScene(); renderPanel(); if (!playing) renderFrame(phase);
+  toast(t("tRandom"));
+}
+document.getElementById("resetBtn").onclick = resetParams;
+document.getElementById("randomBtn").onclick = randomize;
+
+function switchScene(s) {
+  currentScene = s;
+  activeLook = -1;
+  document.querySelectorAll('#sceneSwitch button').forEach(b =>
+    b.classList.toggle("active", b.dataset.scene === s));
+  params = buildParams(s);
+  matchBoxAspectToResolution();   // box adopts the current frame aspect on entry
+  document.getElementById("loopTime").textContent = params.loopLength.toFixed(2);
+  phase = 0;
+  buildScene(); renderPanel(); resizeRenderer();
+}
+document.querySelectorAll('#sceneSwitch button').forEach(b =>
+  b.onclick = () => switchScene(b.dataset.scene));
+
+/* ----------------------------------------------------------------------------
+   UI HELPERS — toast, tooltip, help, language, keyboard, onboarding
+---------------------------------------------------------------------------- */
+// Toast notifications
+function toast(msg) {
+  const wrap = document.getElementById("toast-wrap");
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<span class="tg">✓</span><span>${msg}</span>`;
+  wrap.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 2600);
+}
+
+// Floating tooltips driven by .info-dot[data-tip] (delegated, survives re-render)
+const tipEl = document.getElementById("tip");
+function showTip(target) {
+  const key = target.getAttribute("data-tip");
+  tipEl.textContent = t(key);
+  const r = target.getBoundingClientRect();
+  tipEl.classList.add("show");
+  let x = r.left - tipEl.offsetWidth - 10;
+  let y = r.top + r.height/2 - tipEl.offsetHeight/2;
+  if (x < 8) x = r.right + 10;            // flip to right if no room left
+  if (y < 8) y = 8;
+  if (y + tipEl.offsetHeight > innerHeight - 8) y = innerHeight - tipEl.offsetHeight - 8;
+  tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
+}
+function hideTip() { tipEl.classList.remove("show"); }
+document.addEventListener("mouseover", e => {
+  const dot = e.target.closest && e.target.closest(".info-dot");
+  if (dot) showTip(dot);
+});
+document.addEventListener("mouseout", e => {
+  if (e.target.closest && e.target.closest(".info-dot")) hideTip();
+});
+document.addEventListener("focusin", e => {
+  if (e.target.classList && e.target.classList.contains("info-dot")) showTip(e.target);
+});
+document.addEventListener("focusout", hideTip);
+
+// Help overlay
+const helpEl = document.getElementById("help");
+function openHelp() { helpEl.classList.add("show"); }
+function closeHelp() { helpEl.classList.remove("show"); }
+document.getElementById("helpBtn").onclick = openHelp;
+document.getElementById("helpClose").onclick = closeHelp;
+helpEl.addEventListener("click", e => { if (e.target === helpEl) closeHelp(); });
+
+// Language toggle
+document.getElementById("langToggle").querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    LANG = b.dataset.lang;
+    document.querySelectorAll("#langToggle button").forEach(x => x.classList.toggle("active", x === b));
+    applyLang();
+  };
+});
+
+// Keyboard shortcuts
+document.addEventListener("keydown", e => {
+  const tag = (e.target && e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || (e.target && e.target.isContentEditable)) return;
+  if (e.key === " ") { e.preventDefault(); setPlay(!playing); }
+  else if (e.key === "r" || e.key === "R") randomize();
+  else if (e.key === "1") switchScene("wave");
+  else if (e.key === "2") switchScene("terrain");
+  else if (e.key === "3") switchScene("tunnel");
+  else if (e.key === "?" ) openHelp();
+  else if (e.key === "Escape") { closeHelp(); endCoach(); }
+  else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !playing) {
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    phase = (phase + dir/(params.loopLength*exportFps) + 1) % 1;
+    syncScrub(); renderFrame(phase);
+  }
+});
+
+/* Onboarding coachmarks — a 4-step guided tour shown on first load */
+const COACH_STEPS = [
+  { sel: "#sceneSwitch", t: { en: "Pick a scene", ja: "シーンを選ぶ" },
+    p: { en: "Start from one of three base scenes. You can switch any time with keys 1–3.",
+         ja: "3つのベースシーンから出発します。1〜3キーでいつでも切替できます。" } },
+  { sel: ".preset-grid", t: { en: "Choose a Look", ja: "見た目を選ぶ" },
+    p: { en: "Looks are ready-made starting points. Apply one, then fine-tune from there.",
+         ja: "Looksは完成された出発点です。適用してから細かく調整できます。" } },
+  { sel: "#panel", t: { en: "Shape it", ja: "形を整える" },
+    p: { en: "Every slider changes the preview live. Hover any “?” for a plain explanation.",
+         ja: "各スライダーは即プレビューに反映。「?」にカーソルを合わせると説明が出ます。" } },
+  { sel: "#transport", t: { en: "Preview & export", ja: "確認して書き出す" },
+    p: { en: "It loops here. When happy, open Export in the panel and pick a format.",
+         ja: "ここでループ再生されます。仕上がったらパネルのExportから形式を選びます。" } },
+];
+let coachIdx = 0;
+const coachEl = document.getElementById("coach");
+function startCoach() {
+  coachIdx = 0; coachEl.classList.add("show"); showCoachStep();
+}
+function showCoachStep() {
+  const step = COACH_STEPS[coachIdx];
+  const target = document.querySelector(step.sel);
+  if (!target) { endCoach(); return; }
+  const r = target.getBoundingClientRect();
+  const spot = document.getElementById("coachSpot");
+  const pad = 6;
+  spot.style.left = (r.left - pad) + "px";
+  spot.style.top = (r.top - pad) + "px";
+  spot.style.width = (r.width + pad*2) + "px";
+  spot.style.height = (r.height + pad*2) + "px";
+  document.getElementById("coachTitle").textContent = step.t[LANG] || step.t.en;
+  document.getElementById("coachText").textContent = step.p[LANG] || step.p.en;
+  document.getElementById("coachNext").textContent =
+    coachIdx === COACH_STEPS.length-1 ? t("done") : t("next");
+  document.getElementById("coachDots").innerHTML =
+    COACH_STEPS.map((_,i) => `<span class="${i===coachIdx?'on':''}"></span>`).join("");
+  // place bubble near the spot
+  const bubble = document.getElementById("coachBubble");
+  let bx = r.left, by = r.bottom + 12;
+  if (step.sel === "#panel" || step.sel === ".preset-grid") { bx = r.left - 280; by = r.top + 20; }
+  if (bx < 12) bx = 12;
+  if (bx + 280 > innerWidth) bx = innerWidth - 290;
+  if (by + 130 > innerHeight) by = r.top - 140;
+  bubble.style.left = bx + "px"; bubble.style.top = by + "px";
+}
+function nextCoach() {
+  coachIdx++;
+  if (coachIdx >= COACH_STEPS.length) endCoach();
+  else showCoachStep();
+}
+function endCoach() { coachEl.classList.remove("show"); }
+document.getElementById("coachNext").onclick = nextCoach;
+document.getElementById("coachSkip").onclick = endCoach;
+
+/* ----------------------------------------------------------------------------
+   BOOT
+---------------------------------------------------------------------------- */
+function boot() {
+  if (typeof THREE === "undefined") {
+    document.querySelector("#boot .txt").textContent = "Failed to load Three.js — check your connection";
+    return;
+  }
+  params = buildParams(currentScene);
+  initThree();
+  buildScene();
+  applyLang();          // builds the panel in the chosen language
+  resizeRenderer();
+  setPlay(true);
+  document.getElementById("loopTime").textContent = params.loopLength.toFixed(2);
+  requestAnimationFrame(animate);
+  document.getElementById("boot").style.display = "none";
+}
+
+// wait for scripts
+let bootTries = 0;
+(function waitBoot(){
+  if (typeof THREE !== "undefined") boot();
+  else if (bootTries++ < 100) setTimeout(waitBoot, 50);
+  else boot();
+})();
+</script>
+</body>
+</html>

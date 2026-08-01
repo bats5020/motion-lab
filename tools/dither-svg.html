@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dither → SVG</title>
+<style>
+  :root{
+    --app-bg:#111111;--panel-bg:#1f1f1f;--input-bg:#2b2b2b;--border:#3a3a3a;
+    --text:#eeeeee;--subtext:#aaaaaa;--accent:#4f5cff;--danger:#ff5c5c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--app-bg);color:var(--text);font-size:13px;
+    font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;-webkit-font-smoothing:antialiased;}
+  #app{display:flex;width:100vw;height:100vh;overflow:hidden;}
+
+  /* 左プレビュー */
+  #previewPane{flex:1 1 auto;position:relative;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;min-width:0;background:
+      repeating-conic-gradient(#1a1a1a 0% 25%, #161616 0% 50%) 50% / 22px 22px;padding:0;}
+  /* ズーム/パンの対象。translate/scaleで操作 */
+  #previewInner{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;
+    display:flex;align-items:center;justify-content:center;}
+  #svgHolder svg{display:block;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+  /* のぞき窓レイヤー：svgにピッタリ重ねる。マスクで一部だけ元画像を見せる */
+  #peekLayer{position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;
+    opacity:0;transition:opacity var(--peek-fade,260ms) ease;}
+  #peekLayer.on{opacity:1;}
+  #peekImg{position:absolute;left:0;top:0;width:100%;height:100%;
+    image-rendering:auto;display:block;}
+  /* 空状態は中央表示（ズーム対象外） */
+  #emptyWrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  #emptyState{color:var(--subtext);text-align:center;font-size:14px;line-height:1.8;pointer-events:auto;}
+  #emptyState .big{font-size:18px;color:var(--text);margin-bottom:6px;}
+  #dropHint{margin-top:18px;border:1.5px dashed var(--border);border-radius:12px;padding:30px 40px;}
+  #dropHint.drag{border-color:var(--accent);background:rgba(79,92,255,.08);}
+  #previewPane.panning{cursor:grabbing;}
+  #previewPane.canpan{cursor:grab;}
+  #stat{position:absolute;left:16px;bottom:14px;font:11px monospace;color:var(--subtext);
+    background:rgba(0,0,0,.4);padding:4px 8px;border-radius:4px;z-index:4;pointer-events:none;}
+  #busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.45);font-size:14px;color:var(--text);z-index:5;}
+  #busy.show{display:flex;}
+
+  /* ズームコントロール */
+  #zoomCtl{position:absolute;right:16px;bottom:14px;z-index:6;display:none;align-items:center;gap:6px;
+    background:rgba(20,20,20,.85);border:1px solid var(--border);border-radius:8px;padding:5px 7px;
+    backdrop-filter:blur(4px);}
+  #zoomCtl.show{display:flex;}
+  #zoomCtl button{width:28px;height:28px;border:1px solid var(--border);background:var(--input-bg);
+    color:var(--text);border-radius:6px;cursor:pointer;font-size:15px;line-height:1;display:flex;
+    align-items:center;justify-content:center;font-family:inherit;}
+  #zoomCtl button:hover{border-color:var(--accent);}
+  #zoomCtl button.wide{width:auto;padding:0 9px;font-size:11px;}
+  #zoomLevel{min-width:48px;text-align:center;font:12px monospace;color:var(--text);cursor:pointer;user-select:none;}
+
+  /* 右パネル */
+  #propPane{flex:0 0 400px;width:400px;background:var(--panel-bg);border-left:1px solid var(--border);
+    overflow-y:auto;padding-bottom:60px;}
+  @media (max-width:900px){#app{flex-direction:column;}#previewPane{flex:0 0 46vh;}
+    #propPane{flex:1 1 auto;width:100%;border-left:none;border-top:1px solid var(--border);}}
+
+  .section{border-bottom:1px solid var(--border);}
+  .section>.head{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;user-select:none;}
+  .section>.head:hover{background:#262626;}
+  .section .head h2{margin:0;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  .section .head .chev{color:var(--subtext);font-size:11px;transition:transform .15s;}
+  .section.collapsed .chev{transform:rotate(-90deg);}
+  .section.collapsed .body{display:none;}
+  .section .body{padding:4px 16px 16px;}
+
+  .field{margin:11px 0;}
+  .field label{display:block;font-size:11px;color:var(--subtext);margin-bottom:5px;}
+  .field .hint{font-size:10px;color:var(--subtext);margin-top:4px;opacity:.8;line-height:1.45;}
+  input[type=text],input[type=number],select{width:100%;background:var(--input-bg);border:1px solid var(--border);
+    color:var(--text);border-radius:6px;padding:7px 9px;font-size:13px;font-family:inherit;outline:none;}
+  input:focus,select:focus{border-color:var(--accent);}
+  input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);cursor:pointer;vertical-align:middle;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  input[type=checkbox]{accent-color:var(--accent);width:auto;}
+  .slider-row{display:flex;align-items:center;gap:8px;}
+  .slider-row input[type=range]{flex:1;}
+  .slider-row input[type=number]{flex:0 0 64px;width:64px;text-align:right;}
+  .row2{display:flex;gap:10px;}.row2>*{flex:1;min-width:0;}
+  .check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text);}
+
+  button.btn{background:var(--input-bg);border:1px solid var(--border);color:var(--text);border-radius:6px;
+    padding:7px 11px;font-size:12px;cursor:pointer;font-family:inherit;}
+  button.btn:hover{border-color:var(--accent);}
+  button.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.btn.accent:hover{filter:brightness(1.1);}
+  button.btn.full{width:100%;padding:10px;}
+  button.btn.sm{padding:5px 9px;font-size:11px;}
+  button.btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .btn-row.tight{gap:6px;}
+
+  /* メソッド選択 タイル */
+  .method-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .method-tile{background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:9px;
+    cursor:pointer;text-align:left;}
+  .method-tile:hover{border-color:#555;}
+  .method-tile.active{border-color:var(--accent);background:rgba(79,92,255,.12);}
+  .method-tile .mt-name{font-size:12px;font-weight:600;}
+  .method-tile .mt-sub{font-size:9.5px;color:var(--subtext);margin-top:2px;line-height:1.3;}
+
+  .seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .seg button{flex:1;background:var(--input-bg);border:none;color:var(--subtext);padding:7px 4px;font-size:11px;
+    cursor:pointer;border-right:1px solid var(--border);font-family:inherit;}
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent);color:#fff;}
+
+  .note{font-size:10px;color:var(--subtext);background:#1a2030;border:1px solid #2a3550;border-radius:6px;
+    padding:7px 9px;margin-top:8px;line-height:1.5;}
+  .warn{background:#241f1a;border-color:#4a3a1a;}
+  .small-label{font-size:10px;color:var(--subtext);margin:10px 0 4px;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--accent);color:#fff;
+    padding:9px 16px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .2s,transform .2s;
+    pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:center;justify-content:center;padding:30px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;width:100%;max-width:780px;max-height:84vh;display:flex;flex-direction:column;}
+  .modal .mhead{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--border);}
+  .modal .mhead h3{margin:0;font-size:14px;}
+  .modal textarea{flex:1;min-height:360px;margin:0;border:none;border-radius:0;font:11.5px monospace;background:#161616;color:var(--text);resize:none;padding:12px;}
+  .modal .mfoot{padding:11px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
+ onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+
+<div id="app">
+  <!-- 左：プレビュー -->
+  <div id="previewPane">
+    <div id="previewInner">
+      <div id="svgHolder"></div>
+      <!-- ホバー時に元画像をのぞき窓として表示するレイヤー（svgと同じ拡縮を共有） -->
+      <div id="peekLayer"><img id="peekImg" alt=""></div>
+    </div>
+    <div id="emptyWrap">
+      <div id="emptyState">
+        <div class="big">画像をアップロード</div>
+        <div>ここにドラッグ＆ドロップ、または右の「画像を選択」</div>
+        <div id="dropHint">PNG / JPG / WebP / SVG(ラスタライズ)<br>→ ビットマップSVGに変換</div>
+      </div>
+    </div>
+    <div id="stat" style="display:none;"></div>
+    <div id="zoomCtl">
+      <button id="zoomOut" title="ズームアウト (−)">−</button>
+      <span id="zoomLevel" title="クリックで100%">100%</span>
+      <button id="zoomIn" title="ズームイン (＋)">＋</button>
+      <button id="zoomFit" class="wide" title="画面に合わせる (F)">Fit</button>
+      <button id="zoom100" class="wide" title="原寸 1:1 (1)">1:1</button>
+    </div>
+    <div id="busy">処理中…</div>
+  </div>
+
+  <!-- 右：設定 -->
+  <div id="propPane">
+    <div class="section">
+      <div class="body" style="padding-top:14px;">
+        <div style="font-size:12px;font-weight:700;">Bitmap / Dither → SVG</div>
+        <div style="font-size:10px;color:var(--subtext);margin-bottom:10px;">画像をビットマップ風SVGに変換</div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none;">
+        <button class="btn accent full" id="btnPick">画像を選択</button>
+        <div class="btn-row tight" style="margin-top:8px;">
+          <button class="btn sm" id="btnSampleReset" disabled>別の画像に変更</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 変換方式 -->
+    <div class="section" data-sec="method">
+      <div class="head"><h2>変換方式</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="method-grid" id="methodGrid">
+          <button class="method-tile active" data-m="floyd">
+            <div class="mt-name">Floyd–Steinberg</div>
+            <div class="mt-sub">誤差拡散。自然で有機的なドット</div></button>
+          <button class="method-tile" data-m="atkinson">
+            <div class="mt-name">Atkinson</div>
+            <div class="mt-sub">Mac風。コントラスト高めで軽快</div></button>
+          <button class="method-tile" data-m="bayer">
+            <div class="mt-name">Bayer (Ordered)</div>
+            <div class="mt-sub">規則的な格子状ディザ</div></button>
+          <button class="method-tile" data-m="halftone">
+            <div class="mt-name">Halftone（網点）</div>
+            <div class="mt-sub">濃度で大きさが変わる丸ドット</div></button>
+          <button class="method-tile" data-m="threshold">
+            <div class="mt-name">Threshold</div>
+            <div class="mt-sub">単純2値化（ディザなし）</div></button>
+          <button class="method-tile" data-m="dotgrid">
+            <div class="mt-name">Dot Grid</div>
+            <div class="mt-sub">濃淡をドット有無で表現</div></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 解像度・調整 -->
+    <div class="section" data-sec="adjust">
+      <div class="head"><h2>解像度・トーン調整</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="field">
+          <label>解像度（横ピクセル数）<span id="resInfo" style="color:var(--accent);"></span></label>
+          <div class="slider-row">
+            <input type="range" id="resR" min="20" max="400" step="2" value="160">
+            <input type="number" id="resN" step="2" value="160">
+          </div>
+          <div class="hint">大きいほど細かく、SVGも重くなります。160〜240が目安。</div>
+        </div>
+        <div class="field" id="cellField" style="display:none;">
+          <label>セルサイズ（網点/ドットの粗さ px）</label>
+          <div class="slider-row">
+            <input type="range" id="cellR" min="3" max="24" step="1" value="8">
+            <input type="number" id="cellN" step="1" value="8">
+          </div>
+        </div>
+        <div class="field">
+          <label>明るさ <span id="briInfo" style="color:var(--subtext);"></span></label>
+          <div class="slider-row">
+            <input type="range" id="briR" min="-100" max="100" step="1" value="0">
+            <input type="number" id="briN" step="1" value="0">
+          </div>
+        </div>
+        <div class="field">
+          <label>コントラスト <span id="conInfo" style="color:var(--subtext);"></span></label>
+          <div class="slider-row">
+            <input type="range" id="conR" min="-100" max="100" step="1" value="0">
+            <input type="number" id="conN" step="1" value="0">
+          </div>
+        </div>
+        <div class="field">
+          <label>ガンマ <span id="gamInfo" style="color:var(--subtext);"></span></label>
+          <div class="slider-row">
+            <input type="range" id="gamR" min="0.2" max="3" step="0.05" value="1">
+            <input type="number" id="gamN" step="0.05" value="1">
+          </div>
+        </div>
+        <div class="field">
+          <label>しきい値（2値の境目）</label>
+          <div class="slider-row">
+            <input type="range" id="thrR" min="0" max="255" step="1" value="128">
+            <input type="number" id="thrN" step="1" value="128">
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="invert"> 白黒反転（Invert）</label>
+      </div>
+    </div>
+
+    <!-- 出力スタイル -->
+    <div class="section" data-sec="style">
+      <div class="head"><h2>出力スタイル</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="field">
+          <label>ドットの形</label>
+          <div class="seg" id="shapeSeg">
+            <button data-val="square" class="active">四角</button>
+            <button data-val="circle">丸</button>
+          </div>
+          <div class="hint">Halftoneは常に丸（濃度で半径が変化）。</div>
+        </div>
+        <div class="field">
+          <label>ドット倍率（隙間の調整）</label>
+          <div class="slider-row">
+            <input type="range" id="dotR" min="0.5" max="1.6" step="0.05" value="1">
+            <input type="number" id="dotN" step="0.05" value="1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>前景色（ドット）</label>
+            <div class="slider-row"><input type="color" id="fg" value="#000000"><input type="text" id="fgT" value="#000000"></div>
+          </div>
+          <div class="field">
+            <label>背景色</label>
+            <div class="slider-row"><input type="color" id="bg" value="#ffffff"><input type="text" id="bgT" value="#ffffff"></div>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="transBg"> 背景を透過にする</label>
+        <div class="note">SVGのファイルサイズを抑えるため、同じ行で連続する四角は自動的に1つの矩形にまとめます（最適化）。</div>
+      </div>
+    </div>
+
+    <!-- ホバー：のぞき窓 -->
+    <div class="section" data-sec="peek">
+      <div class="head"><h2>ホバー：のぞき窓</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <label class="check"><input type="checkbox" id="peekOn" checked> マウスオーバーで元画像を表示</label>
+        <div class="hint" style="margin-bottom:6px;">プレビュー上にカーソルを乗せると、その部分だけ元画像が現れます。</div>
+
+        <div class="field">
+          <label>窓の形</label>
+          <div class="seg" id="peekShapeSeg">
+            <button data-val="circle" class="active">丸</button>
+            <button data-val="square">四角</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>表示領域のサイズ（直径 px）<span id="peekSizeInfo" style="color:var(--accent);"></span></label>
+          <div class="slider-row">
+            <input type="range" id="peekSizeR" min="40" max="600" step="5" value="200">
+            <input type="number" id="peekSizeN" step="5" value="200">
+          </div>
+          <div class="hint">プレビュー画面上での見た目の大きさ（ズーム非依存）。</div>
+        </div>
+
+        <div class="field">
+          <label>ふちのぼかし（フェザー %）</label>
+          <div class="slider-row">
+            <input type="range" id="peekFeatherR" min="0" max="100" step="1" value="35">
+            <input type="number" id="peekFeatherN" step="1" value="35">
+          </div>
+          <div class="hint">0=くっきり、上げるほど窓のふちが柔らかく溶けます。</div>
+        </div>
+
+        <div class="field">
+          <label>切り替わりの遅延（フェード ms）</label>
+          <div class="slider-row">
+            <input type="range" id="peekFadeR" min="0" max="1500" step="20" value="280">
+            <input type="number" id="peekFadeN" step="20" value="280">
+          </div>
+          <div class="hint">カーソルを乗せて/外してから、ふわっと現れ/消えるまでの時間。</div>
+        </div>
+
+        <div class="field">
+          <label>追従のなめらかさ（遅れ）</label>
+          <div class="slider-row">
+            <input type="range" id="peekLagR" min="0" max="95" step="1" value="55">
+            <input type="number" id="peekLagN" step="1" value="55">
+          </div>
+          <div class="hint">0=カーソルに即追従、上げるほど窓がゆっくり遅れて付いてきます。</div>
+        </div>
+
+        <div class="field">
+          <label>登場ディレイ（乗せてから現れるまで ms）</label>
+          <div class="slider-row">
+            <input type="range" id="peekDelayR" min="0" max="1500" step="20" value="0">
+            <input type="number" id="peekDelayN" step="20" value="0">
+          </div>
+          <div class="hint">乗せた瞬間ではなく、少し“ため”てから出したいとき。</div>
+        </div>
+
+        <div class="field">
+          <label>元画像の濃さ（不透明度 %）</label>
+          <div class="slider-row">
+            <input type="range" id="peekOpacityR" min="20" max="100" step="1" value="100">
+            <input type="number" id="peekOpacityN" step="1" value="100">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>窓内の拡大率（ルーペ）</label>
+          <div class="slider-row">
+            <input type="range" id="peekMagR" min="1" max="4" step="0.1" value="1">
+            <input type="number" id="peekMagN" step="0.1" value="1">
+          </div>
+          <div class="hint">1=等倍。上げると窓の中だけ元画像が拡大されます。</div>
+        </div>
+
+        <div class="row2">
+          <div class="field" style="margin-top:6px;">
+            <label class="check"><input type="checkbox" id="peekRing" checked> 窓のふち線</label>
+          </div>
+          <div class="field" style="margin-top:6px;">
+            <label class="check"><input type="checkbox" id="peekPixel"> ドット感を残す</label>
+          </div>
+        </div>
+        <div class="field" id="peekRingColorField">
+          <label>ふち線の色</label>
+          <div class="slider-row"><input type="color" id="peekRingColor" value="#4f5cff"><input type="text" id="peekRingColorT" value="#4f5cff"></div>
+        </div>
+        <div class="note">この効果はプレビュー専用です（書き出すSVG/PNGには含まれません）。</div>
+      </div>
+    </div>
+
+    <!-- 出力 -->
+    <div class="section" data-sec="export">
+      <div class="head"><h2>Export</h2><span class="chev">▼</span></div>
+      <div class="body">
+        <div class="btn-row tight">
+          <button class="btn accent full" id="btnDownloadSVG" disabled>Download SVG</button>
+        </div>
+        <div class="btn-row tight">
+          <button class="btn sm" id="btnCopySVG" disabled>Copy SVG Code</button>
+          <button class="btn sm" id="btnDownloadPNG" disabled>Download PNG</button>
+        </div>
+        <div id="sizeNote" class="note" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="work" style="display:none;"></canvas>
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="mhead"><h3>SVG Code</h3><button class="btn sm" id="modalClose">✕ Close</button></div>
+    <textarea id="modalText" readonly spellcheck="false"></textarea>
+    <div class="mfoot"><button class="btn sm accent" id="modalCopy">Copy</button></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),1700);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ================================================================
+   状態
+   ================================================================ */
+const state={
+  method:'floyd',
+  res:160, cell:8,
+  brightness:0, contrast:0, gamma:1, threshold:128, invert:false,
+  shape:'square', dotScale:1,
+  fg:'#000000', bg:'#ffffff', transBg:false,
+  // のぞき窓（ホバー）設定
+  peek:{
+    on:true, shape:'circle', size:200, feather:35, fade:280, lag:55,
+    delay:0, opacity:100, mag:1, ring:true, ringColor:'#4f5cff', pixel:false,
+  },
+};
+let srcImage=null;      // Image オブジェクト
+let lastSVG='';         // 生成したSVG文字列
+let renderTimer=null;
+
+/* どのmethodがセル系か */
+function isCellMethod(m){ return m==='halftone'||m==='dotgrid'; }
+
+/* ================================================================
+   画像読み込み
+   ================================================================ */
+$('#btnPick').onclick=()=>$('#fileInput').click();
+$('#btnSampleReset').onclick=()=>$('#fileInput').click();
+$('#fileInput').onchange=e=>{ const f=e.target.files[0]; if(f) loadFile(f); };
+
+function loadFile(file){
+  if(!file.type.startsWith('image/')){ toast('画像ファイルを選んでください'); return; }
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    srcImage=img;
+    // のぞき窓用の元画像をセット（このURLは表示中ずっと使うので、前の分だけ解放）
+    if(window._peekURL) URL.revokeObjectURL(window._peekURL);
+    window._peekURL=url;
+    $('#peekImg').src=url;
+    $('#emptyWrap').style.display='none';
+    $('#zoomCtl').classList.add('show');
+    $('#btnSampleReset').disabled=false;
+    ['#btnDownloadSVG','#btnCopySVG','#btnDownloadPNG'].forEach(id=>$(id).disabled=false);
+    zoom.pendingFit=true; // 新しい画像は読み込み後にFitする
+    scheduleRender();
+    toast('読み込みました: '+(file.name||'image'));
+  };
+  img.onerror=()=>{ toast('画像の読み込みに失敗しました'); URL.revokeObjectURL(url); };
+  img.src=url;
+}
+
+/* ドラッグ&ドロップ */
+const pane=$('#previewPane'), hint=$('#dropHint');
+['dragenter','dragover'].forEach(ev=>pane.addEventListener(ev,e=>{e.preventDefault();hint&&hint.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>pane.addEventListener(ev,e=>{e.preventDefault();hint&&hint.classList.remove('drag');}));
+pane.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) loadFile(f); });
+
+/* ================================================================
+   画像処理（グレースケール化＋トーン調整）
+   ================================================================ */
+function getGrayData(targetW){
+  const cw=$('#work');
+  const ar=srcImage.height/srcImage.width;
+  const W=Math.max(8,Math.round(targetW));
+  const H=Math.max(8,Math.round(W*ar));
+  cw.width=W; cw.height=H;
+  const ctx=cw.getContext('2d',{willReadFrequently:true});
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); // 透過画像は白背景に
+  ctx.drawImage(srcImage,0,0,W,H);
+  const id=ctx.getImageData(0,0,W,H);
+  const d=id.data;
+  const gray=new Float32Array(W*H);
+  const bri=state.brightness, con=state.contrast, gam=state.gamma;
+  const cf=(259*(con+255))/(255*(259-con)); // コントラスト係数
+  for(let i=0,p=0;i<gray.length;i++,p+=4){
+    let v=0.299*d[p]+0.587*d[p+1]+0.114*d[p+2];
+    v+=bri;                                  // 明るさ
+    v=cf*(v-128)+128;                        // コントラスト
+    v=Math.max(0,Math.min(255,v));
+    v=255*Math.pow(v/255, gam);              // ガンマ
+    if(state.invert) v=255-v;
+    gray[i]=Math.max(0,Math.min(255,v));
+  }
+  return {gray,W,H};
+}
+
+/* ================================================================
+   ディザ各種 → 2値ビットマップ(Uint8: 1=前景)
+   ================================================================ */
+function ditherToBitmap(gray,W,H,method,threshold){
+  const out=new Uint8Array(W*H);
+  if(method==='threshold'){
+    for(let i=0;i<out.length;i++) out[i]= gray[i]<threshold?1:0;
+    return out;
+  }
+  if(method==='bayer'){
+    const M=[ // 4x4 Bayer
+      [0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const t=(M[y&3][x&3]+0.5)/16*255;
+      out[y*W+x]= gray[y*W+x]<t?1:0;
+    }
+    return out;
+  }
+  // 誤差拡散（Floyd / Atkinson）
+  const buf=Float32Array.from(gray);
+  const isAtk=(method==='atkinson');
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i=y*W+x;
+      const old=buf[i];
+      const nw= old<128?0:255;
+      out[i]= nw===0?1:0;
+      const err=old-nw;
+      if(isAtk){
+        const e=err/8;
+        add(x+1,y,e);add(x+2,y,e);add(x-1,y+1,e);add(x,y+1,e);add(x+1,y+1,e);add(x,y+2,e);
+      }else{
+        add(x+1,y,err*7/16);add(x-1,y+1,err*3/16);add(x,y+1,err*5/16);add(x+1,y+1,err*1/16);
+      }
+    }
+  }
+  function add(x,y,e){ if(x<0||x>=W||y<0||y>=H)return; buf[y*W+x]+=e; }
+  return out;
+}
+
+/* ================================================================
+   SVG生成
+   ================================================================ */
+// ピクセル系（floyd/atkinson/bayer/threshold）→ ランレングス最適化した矩形/丸でSVG
+function bitmapToSVG(bmp,W,H){
+  const fg=state.fg, bg=state.bg, ds=state.dotScale;
+  const shape=state.shape;
+  let body='';
+  if(shape==='circle'){
+    const r=0.5*ds;
+    let circles='';
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      if(bmp[y*W+x]) circles+=`<circle cx="${x+0.5}" cy="${y+0.5}" r="${r.toFixed(3)}"/>`;
+    }
+    body=`<g fill="${fg}">${circles}</g>`;
+  }else{
+    // 行ごとに連続する前景ピクセルを1つのrectにまとめる（ランレングス）
+    let rects='';
+    const s=ds, off=(1-ds)/2;
+    for(let y=0;y<H;y++){
+      let x=0;
+      while(x<W){
+        if(bmp[y*W+x]){
+          let x0=x; while(x<W && bmp[y*W+x]) x++;
+          const run=x-x0;
+          rects+=`<rect x="${(x0+off).toFixed(3)}" y="${(y+off).toFixed(3)}" width="${(run-1+s).toFixed(3)}" height="${s.toFixed(3)}"/>`;
+        }else x++;
+      }
+    }
+    body=`<g fill="${fg}">${rects}</g>`;
+  }
+  return wrapSVG(body,W,H,bg);
+}
+
+// Halftone（網点）：セルごとに平均濃度→半径で表現
+function halftoneToSVG(gray,W,H,cell){
+  const fg=state.fg, bg=state.bg, ds=state.dotScale;
+  let circles='';
+  const maxR=cell/2*1.42*ds; // セル対角に少し収まる程度
+  for(let cy=0;cy<H;cy+=cell){
+    for(let cx=0;cx<W;cx+=cell){
+      let sum=0,cnt=0;
+      for(let y=cy;y<Math.min(cy+cell,H);y++)for(let x=cx;x<Math.min(cx+cell,W);x++){ sum+=gray[y*W+x];cnt++; }
+      const avg=cnt?sum/cnt:255;
+      const darkness=1-avg/255;          // 暗いほど大きい
+      const r=Math.sqrt(darkness)*maxR;  // 面積比に近づける
+      if(r>0.18){
+        circles+=`<circle cx="${(cx+cell/2).toFixed(2)}" cy="${(cy+cell/2).toFixed(2)}" r="${r.toFixed(2)}"/>`;
+      }
+    }
+  }
+  return wrapSVG(`<g fill="${fg}">${circles}</g>`,W,H,bg);
+}
+
+// Dot Grid：セル平均をしきい値でドット有無（均一サイズ）
+function dotgridToSVG(gray,W,H,cell){
+  const fg=state.fg, bg=state.bg, ds=state.dotScale;
+  const r=cell/2*0.8*ds;
+  let body='';
+  const shape=state.shape;
+  for(let cy=0;cy<H;cy+=cell){
+    for(let cx=0;cx<W;cx+=cell){
+      let sum=0,cnt=0;
+      for(let y=cy;y<Math.min(cy+cell,H);y++)for(let x=cx;x<Math.min(cx+cell,W);x++){ sum+=gray[y*W+x];cnt++; }
+      const avg=cnt?sum/cnt:255;
+      if((state.invert? (255-avg):avg) < state.threshold){
+        const px=cx+cell/2, py=cy+cell/2;
+        body += shape==='circle'
+          ? `<circle cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="${r.toFixed(2)}"/>`
+          : `<rect x="${(px-r).toFixed(2)}" y="${(py-r).toFixed(2)}" width="${(r*2).toFixed(2)}" height="${(r*2).toFixed(2)}"/>`;
+      }
+    }
+  }
+  return wrapSVG(`<g fill="${fg}">${body}</g>`,W,H,bg);
+}
+
+function wrapSVG(body,W,H,bg){
+  const bgRect=state.transBg?'':`<rect width="${W}" height="${H}" fill="${bg}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges">${bgRect}${body}</svg>`;
+}
+
+/* ================================================================
+   ズーム & パン
+   ================================================================ */
+const zoom={ scale:1, tx:0, ty:0, imgW:0, imgH:0, pendingFit:false, min:0.05, max:40 };
+const inner=$('#previewInner');
+
+function applyZoom(){
+  inner.style.transform=`translate(${zoom.tx}px,${zoom.ty}px) scale(${zoom.scale})`;
+  $('#zoomLevel').textContent=Math.round(zoom.scale*100)+'%';
+  // ズーム中（はみ出す可能性がある）ならパン可能カーソル
+  $('#previewPane').classList.toggle('canpan', !!srcImage);
+}
+function clampScale(s){ return Math.max(zoom.min, Math.min(zoom.max, s)); }
+
+// 指定したペイン内座標(px)を中心にズーム
+function zoomAt(px,py,factor){
+  const ns=clampScale(zoom.scale*factor);
+  const k=ns/zoom.scale;
+  // 拡縮の中心を(px,py)に保つ: 新tx = px - k*(px - tx)
+  zoom.tx = px - k*(px - zoom.tx);
+  zoom.ty = py - k*(py - zoom.ty);
+  zoom.scale=ns;
+  applyZoom();
+}
+// 画面中央基準でズーム（ボタン用）
+function zoomByCenter(factor){
+  const r=$('#previewPane').getBoundingClientRect();
+  zoomAt(r.width/2, r.height/2, factor);
+}
+// Fit: ペインに収まる倍率に。中央寄せ。
+function zoomFit(){
+  if(!zoom.imgW) return;
+  const r=$('#previewPane').getBoundingClientRect();
+  const pad=40;
+  const s=Math.min((r.width-pad)/zoom.imgW, (r.height-pad)/zoom.imgH);
+  zoom.scale=clampScale(s);
+  zoom.tx=(r.width - zoom.imgW*zoom.scale)/2;
+  zoom.ty=(r.height - zoom.imgH*zoom.scale)/2;
+  applyZoom();
+}
+// 1:1（原寸：1ビットマップピクセル=1CSSpx）、中央寄せ
+function zoom100(){
+  if(!zoom.imgW) return;
+  const r=$('#previewPane').getBoundingClientRect();
+  zoom.scale=1;
+  zoom.tx=(r.width - zoom.imgW)/2;
+  zoom.ty=(r.height - zoom.imgH)/2;
+  applyZoom();
+}
+
+// ホイールでズーム（カーソル位置基準）。Ctrl有無に関わらずズーム。
+$('#previewPane').addEventListener('wheel',e=>{
+  if(!srcImage) return;
+  e.preventDefault();
+  const r=$('#previewPane').getBoundingClientRect();
+  const px=e.clientX-r.left, py=e.clientY-r.top;
+  const factor=e.deltaY<0 ? 1.12 : 1/1.12;
+  zoomAt(px,py,factor);
+},{passive:false});
+
+// ドラッグでパン
+let panning=false, panStart=null;
+$('#previewPane').addEventListener('pointerdown',e=>{
+  if(!srcImage || e.button!==0) return;
+  // ズームコントロール等のUI上では pan を開始しない
+  if(e.target.closest('#zoomCtl')) return;
+  panning=true; panStart={x:e.clientX, y:e.clientY, tx:zoom.tx, ty:zoom.ty};
+  $('#previewPane').classList.add('panning');
+  $('#previewPane').setPointerCapture(e.pointerId);
+  $('#peekLayer').classList.remove('on');   // パン中はのぞき窓を隠す
+});
+$('#previewPane').addEventListener('pointermove',e=>{
+  if(!panning) return;
+  zoom.tx=panStart.tx+(e.clientX-panStart.x);
+  zoom.ty=panStart.ty+(e.clientY-panStart.y);
+  applyZoom();
+});
+function endPan(e){ if(!panning)return; panning=false; $('#previewPane').classList.remove('panning');
+  try{$('#previewPane').releasePointerCapture(e.pointerId);}catch(_){}
+  if(srcImage && state.peek.on && peek.inside && state.peek.delay===0) $('#peekLayer').classList.add('on'); }
+$('#previewPane').addEventListener('pointerup',endPan);
+$('#previewPane').addEventListener('pointercancel',endPan);
+
+// ダブルクリックで Fit ⇄ 200% トグル
+$('#previewPane').addEventListener('dblclick',e=>{
+  if(!srcImage) return;
+  const r=$('#previewPane').getBoundingClientRect();
+  const px=e.clientX-r.left, py=e.clientY-r.top;
+  if(zoom.scale<1.5) zoomAt(px,py, 2/zoom.scale); else zoomFit();
+});
+
+// ボタン
+$('#zoomIn').onclick=()=>zoomByCenter(1.25);
+$('#zoomOut').onclick=()=>zoomByCenter(1/1.25);
+$('#zoomFit').onclick=zoomFit;
+$('#zoom100').onclick=zoom100;
+$('#zoomLevel').onclick=zoom100;
+
+// キーボード（+ / - / 0=Fit / 1=1:1）
+window.addEventListener('keydown',e=>{
+  if(!srcImage) return;
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||tag==='select') return;
+  if(e.key==='+'||e.key==='='){ zoomByCenter(1.25); }
+  else if(e.key==='-'||e.key==='_'){ zoomByCenter(1/1.25); }
+  else if(e.key==='0'||e.key.toLowerCase()==='f'){ zoomFit(); }
+  else if(e.key==='1'){ zoom100(); }
+});
+
+// ウィンドウリサイズ時、Fit状態を保つのは難しいので位置だけ補正なし（現状維持）
+
+/* ================================================================
+   のぞき窓（ホバーで元画像を表示）エンジン
+   ================================================================ */
+const peek = {
+  // 目標位置（レイヤー座標 = imgピクセル空間）とスムーズ追従用の現在位置
+  targetX:0, targetY:0, curX:0, curY:0,
+  inside:false, hasPos:false, raf:null,
+  delayTimer:null, wantOn:false,
+};
+
+// ペイン内のスクリーン座標 → レイヤー（画像ピクセル）座標へ変換
+function screenToLayer(px,py){
+  // #previewInner が translate(tx,ty) scale(scale)。レイヤーは svgHolder のオフセット分ずれている。
+  const sh=$('#svgHolder');
+  const offX=sh.offsetLeft, offY=sh.offsetTop;
+  const lx=(px - zoom.tx)/zoom.scale - offX;
+  const ly=(py - zoom.ty)/zoom.scale - offY;
+  return {lx,ly};
+}
+
+function peekShowNow(){
+  $('#peekLayer').classList.add('on');
+}
+function setPeekCSSVars(){
+  document.documentElement.style.setProperty('--peek-fade', state.peek.fade+'ms');
+}
+
+// マスク・画像変形を現在位置に合わせて更新
+function updatePeekVisual(){
+  const pl=$('#peekLayer'), pimg=$('#peekImg');
+  if(!srcImage || !state.peek.on){ pl.classList.remove('on'); return; }
+  // スクリーン上での見た目サイズ→レイヤー座標へ（ズーム非依存にするため scale で割る）
+  const rScreen = state.peek.size/2;
+  const r = rScreen/zoom.scale;                  // レイヤー座標での半径
+  const cx=peek.curX, cy=peek.curY;
+  const feather=state.peek.feather/100;          // 0..1
+  // フェザー：中心は不透明、ふちに向かって透明へ
+  const solid = Math.max(0, (1-feather))*100;    // 完全不透明の内側%
+  let mask;
+  if(state.peek.shape==='circle'){
+    mask = `radial-gradient(circle ${r}px at ${cx}px ${cy}px, #000 ${solid}%, transparent 100%)`;
+  }else{
+    // 四角：中心の矩形を不透明、フェザーぶん外側へぼかし
+    const half=r, soft=r*feather;
+    const x0=cx-half, y0=cy-half, x1=cx+half, y1=cy+half;
+    // 2方向の線形グラデを掛け合わせて柔らかい四角に
+    const gx=`linear-gradient(to right, transparent ${x0-soft}px, #000 ${x0+soft}px, #000 ${x1-soft}px, transparent ${x1+soft}px)`;
+    const gy=`linear-gradient(to bottom, transparent ${y0-soft}px, #000 ${y0+soft}px, #000 ${y1-soft}px, transparent ${y1+soft}px)`;
+    mask = `${gx}, ${gy}`;
+    pl.style.webkitMaskComposite='source-in';
+    pl.style.maskComposite='intersect';
+  }
+  if(state.peek.shape==='circle'){ pl.style.webkitMaskComposite=''; pl.style.maskComposite=''; }
+  pl.style.webkitMaskImage=mask; pl.style.maskImage=mask;
+
+  // 元画像の不透明度
+  pimg.style.opacity=(state.peek.opacity/100).toString();
+  // ドット感（ピクセル化）
+  pimg.style.imageRendering = state.peek.pixel ? 'pixelated' : 'auto';
+  // ルーペ（窓内拡大）：カーソル位置を中心に画像をscale
+  const mag=state.peek.mag;
+  if(mag!==1){
+    pimg.style.transformOrigin=`${cx}px ${cy}px`;
+    pimg.style.transform=`scale(${mag})`;
+  }else{
+    pimg.style.transform='none';
+  }
+  // ふち線（リング）
+  if(state.peek.ring){
+    const rs=state.peek.size/2; // スクリーンサイズ基準で描く（レイヤーはズームされるので逆補正）
+    const rLayer=rs/zoom.scale;
+    const bw=Math.max(1, 1.5/zoom.scale);
+    if(state.peek.shape==='circle'){
+      pl.style.setProperty('--ring','');
+      ensureRing(cx,cy,rLayer,bw,true);
+    }else{
+      ensureRing(cx,cy,rLayer,bw,false);
+    }
+  }else{ removeRing(); }
+}
+
+// リング要素（窓のふち線）をレイヤー内に描く
+function ensureRing(cx,cy,r,bw,circle){
+  let ring=$('#peekRingEl');
+  if(!ring){ ring=document.createElement('div'); ring.id='peekRingEl';
+    ring.style.position='absolute'; ring.style.pointerEvents='none';
+    $('#peekLayer').appendChild(ring); }
+  ring.style.left=(cx-r)+'px'; ring.style.top=(cy-r)+'px';
+  ring.style.width=(r*2)+'px'; ring.style.height=(r*2)+'px';
+  ring.style.border=`${bw}px solid ${state.peek.ringColor}`;
+  ring.style.borderRadius=circle?'50%':'2px';
+  ring.style.boxShadow=`0 0 ${6/zoom.scale}px ${state.peek.ringColor}66`;
+}
+function removeRing(){ const r=$('#peekRingEl'); if(r) r.remove(); }
+
+// スムーズ追従ループ
+function peekLoop(){
+  peek.raf=requestAnimationFrame(peekLoop);
+  if(!srcImage || !state.peek.on){ return; }
+  // lag: 0=即時, 95=とても遅い。係数を 1..0.02 にマップ
+  const lag=state.peek.lag/100;
+  const ease=1 - Math.pow(lag, 0.55);   // 知覚的にちょうど良いカーブ
+  const k=Math.max(0.02, Math.min(1, ease));
+  peek.curX += (peek.targetX-peek.curX)*k;
+  peek.curY += (peek.targetY-peek.curY)*k;
+  if(peek.hasPos) updatePeekVisual();
+}
+peekLoop();
+
+// ポインタ追従
+$('#previewPane').addEventListener('pointermove',e=>{
+  if(!srcImage || !state.peek.on) return;
+  const r=$('#previewPane').getBoundingClientRect();
+  const {lx,ly}=screenToLayer(e.clientX-r.left, e.clientY-r.top);
+  peek.targetX=lx; peek.targetY=ly;
+  if(!peek.hasPos){ peek.curX=lx; peek.curY=ly; peek.hasPos=true; } // 初回はジャンプ
+});
+
+// ペインに入ったら（ディレイ後に）表示、出たら隠す
+$('#previewPane').addEventListener('pointerenter',()=>{
+  if(!srcImage || !state.peek.on) return;
+  peek.inside=true;
+  clearTimeout(peek.delayTimer);
+  if(state.peek.delay>0){
+    peek.delayTimer=setTimeout(()=>{ if(peek.inside) peekShowNow(); }, state.peek.delay);
+  }else peekShowNow();
+});
+$('#previewPane').addEventListener('pointerleave',()=>{
+  peek.inside=false;
+  clearTimeout(peek.delayTimer);
+  $('#peekLayer').classList.remove('on');
+});
+
+/* ================================================================
+   レンダリング（デバウンス）
+   ================================================================ */
+function scheduleRender(){ clearTimeout(renderTimer); renderTimer=setTimeout(render,120); }
+
+function render(){
+  if(!srcImage) return;
+  $('#busy').classList.add('show');
+  // 次フレームで重い処理（UI更新を反映させる）
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    try{
+      const m=state.method;
+      const {gray,W,H}=getGrayData(state.res);
+      let svg;
+      if(m==='halftone'){ svg=halftoneToSVG(gray,W,H,state.cell); }
+      else if(m==='dotgrid'){ svg=dotgridToSVG(gray,W,H,state.cell); }
+      else{
+        const bmp=ditherToBitmap(gray,W,H,m,state.threshold);
+        svg=bitmapToSVG(bmp,W,H);
+      }
+      lastSVG=svg;
+      $('#svgHolder').innerHTML=svg;
+      // ズームの基準にするため、SVGの表示サイズをCSSピクセル基準でセット
+      // 1ビットマップピクセル=zoom.basePx CSSpx を基準とし、transformで拡縮する
+      const svgEl=$('#svgHolder').querySelector('svg');
+      if(svgEl){
+        zoom.imgW=W; zoom.imgH=H;
+        svgEl.style.width=W+'px';
+        svgEl.style.height=H+'px';
+        svgEl.style.maxWidth='none';
+        // のぞき窓レイヤーをSVGと同じ寸法・位置に重ねる
+        const pl=$('#peekLayer');
+        pl.style.width=W+'px'; pl.style.height=H+'px';
+        // svgHolderはflex中央寄せなので、その左上オフセットに合わせる
+        const sh=$('#svgHolder');
+        pl.style.left=sh.offsetLeft+'px';
+        pl.style.top=sh.offsetTop+'px';
+      }
+      // 統計
+      const bytes=new Blob([svg]).size;
+      const kb=(bytes/1024).toFixed(1);
+      const elCount=(svg.match(/<rect|<circle/g)||[]).length - (state.transBg?0:1);
+      $('#stat').style.display='block';
+      $('#stat').textContent=`${W}×${H}px  /  要素 ${Math.max(0,elCount).toLocaleString()}  /  ${kb} KB`;
+      const sn=$('#sizeNote'); sn.style.display='block';
+      sn.className='note'+(bytes>1500000?' warn':'');
+      sn.textContent=bytes>1500000
+        ? `SVGが${kb}KBと大きめです。解像度を下げるか、Halftone/Dot Gridだと軽くなります。`
+        : `SVGサイズ: ${kb}KB / 要素数 ${Math.max(0,elCount).toLocaleString()}`;
+      // 初回 or 画像変更時はFit、それ以外は現在のズームを維持
+      if(zoom.pendingFit){ zoom.pendingFit=false; zoomFit(); }
+      else applyZoom();
+    }catch(err){ console.error(err); toast('変換エラー'); }
+    $('#busy').classList.remove('show');
+  }));
+}
+
+/* ================================================================
+   UIバインド
+   ================================================================ */
+// メソッドタイル
+$('#methodGrid').querySelectorAll('.method-tile').forEach(t=>{
+  t.onclick=()=>{
+    $('#methodGrid').querySelectorAll('.method-tile').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active'); state.method=t.dataset.m;
+    $('#cellField').style.display=isCellMethod(state.method)?'block':'none';
+    scheduleRender();
+  };
+});
+
+function bindPair(rId,nId,apply,after){
+  const r=$(rId),n=$(nId);
+  const f=v=>{ apply(v); if(after) after(v); scheduleRender(); };
+  r.oninput=()=>{ n.value=r.value; f(parseFloat(r.value)); };
+  n.oninput=()=>{ r.value=n.value; f(parseFloat(n.value)); };
+}
+bindPair('#resR','#resN', v=>state.res=v, v=>$('#resInfo').textContent=' '+v+'px');
+bindPair('#cellR','#cellN', v=>state.cell=v);
+bindPair('#briR','#briN', v=>state.brightness=v, v=>$('#briInfo').textContent=v>0?'+'+v:v);
+bindPair('#conR','#conN', v=>state.contrast=v, v=>$('#conInfo').textContent=v>0?'+'+v:v);
+bindPair('#gamR','#gamN', v=>state.gamma=v, v=>$('#gamInfo').textContent=v);
+bindPair('#thrR','#thrN', v=>state.threshold=v);
+bindPair('#dotR','#dotN', v=>state.dotScale=v);
+$('#invert').onchange=e=>{ state.invert=e.target.checked; scheduleRender(); };
+$('#transBg').onchange=e=>{ state.transBg=e.target.checked; scheduleRender(); };
+
+$('#shapeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  $('#shapeSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); state.shape=b.dataset.val; scheduleRender();
+});
+
+function bindColor(cId,tId,apply){
+  const c=$(cId),t=$(tId);
+  c.oninput=()=>{ t.value=c.value; apply(c.value); scheduleRender(); };
+  t.oninput=()=>{ if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(t.value)){ c.value=t.value; apply(t.value); scheduleRender(); } };
+}
+bindColor('#fg','#fgT', v=>state.fg=v);
+bindColor('#bg','#bgT', v=>state.bg=v);
+
+/* ---- のぞき窓（ホバー）コントロール ---- */
+// peek用のスライダーは再変換不要なので scheduleRender を呼ばない（即反映）
+function bindPeekPair(rId,nId,apply,after){
+  const r=$(rId),n=$(nId);
+  const f=v=>{ apply(v); if(after) after(v); };
+  r.oninput=()=>{ n.value=r.value; f(parseFloat(r.value)); };
+  n.oninput=()=>{ r.value=n.value; f(parseFloat(n.value)); };
+}
+$('#peekOn').onchange=e=>{ state.peek.on=e.target.checked;
+  if(!state.peek.on){ $('#peekLayer').classList.remove('on'); removeRing(); } };
+$('#peekShapeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  $('#peekShapeSeg').querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); state.peek.shape=b.dataset.val; removeRing(); });
+bindPeekPair('#peekSizeR','#peekSizeN', v=>state.peek.size=v, v=>$('#peekSizeInfo').textContent=' '+v+'px');
+bindPeekPair('#peekFeatherR','#peekFeatherN', v=>state.peek.feather=v);
+bindPeekPair('#peekFadeR','#peekFadeN', v=>{ state.peek.fade=v; setPeekCSSVars(); });
+bindPeekPair('#peekLagR','#peekLagN', v=>state.peek.lag=v);
+bindPeekPair('#peekDelayR','#peekDelayN', v=>state.peek.delay=v);
+bindPeekPair('#peekOpacityR','#peekOpacityN', v=>state.peek.opacity=v);
+bindPeekPair('#peekMagR','#peekMagN', v=>state.peek.mag=v);
+$('#peekRing').onchange=e=>{ state.peek.ring=e.target.checked; if(!e.target.checked) removeRing();
+  $('#peekRingColorField').style.display=e.target.checked?'block':'none'; };
+$('#peekPixel').onchange=e=>{ state.peek.pixel=e.target.checked; };
+(function(){ const c=$('#peekRingColor'),t=$('#peekRingColorT');
+  c.oninput=()=>{ t.value=c.value; state.peek.ringColor=c.value; };
+  t.oninput=()=>{ if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(t.value)){ c.value=t.value; state.peek.ringColor=t.value; } };
+})();
+
+document.querySelectorAll('.section[data-sec] > .head').forEach(h=>{
+  h.onclick=()=>h.parentElement.classList.toggle('collapsed');
+});
+
+/* ================================================================
+   出力
+   ================================================================ */
+function downloadFile(name,content,mime){
+  const b=content instanceof Blob?content:new Blob([content],{type:mime||'image/svg+xml'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+$('#btnDownloadSVG').onclick=()=>{ if(!lastSVG)return; downloadFile('bitmap.svg',lastSVG,'image/svg+xml'); toast('SVGをダウンロードしました'); };
+$('#btnCopySVG').onclick=()=>{
+  if(!lastSVG)return;
+  $('#modalText').value=lastSVG; $('#modalBg').classList.add('show');
+  navigator.clipboard.writeText(lastSVG).then(()=>toast('コピーしました')).catch(()=>{});
+};
+$('#modalClose').onclick=()=>$('#modalBg').classList.remove('show');
+$('#modalBg').onclick=e=>{ if(e.target===$('#modalBg'))$('#modalBg').classList.remove('show'); };
+$('#modalCopy').onclick=()=>{ navigator.clipboard.writeText($('#modalText').value).then(()=>toast('コピーしました')); };
+
+$('#btnDownloadPNG').onclick=()=>{
+  if(!lastSVG)return;
+  const img=new Image();
+  const blob=new Blob([lastSVG],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  img.onload=()=>{
+    const scale=Math.max(1, Math.round(1200/img.width)); // 出力を高解像度に
+    const c=document.createElement('canvas'); c.width=img.width*scale; c.height=img.height*scale;
+    const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
+    if(!state.transBg){ cx.fillStyle=state.bg; cx.fillRect(0,0,c.width,c.height); }
+    cx.drawImage(img,0,0,c.width,c.height);
+    c.toBlob(b=>{ downloadFile('bitmap.png',b,'image/png'); toast('PNGをダウンロードしました'); });
+    URL.revokeObjectURL(url);
+  };
+  img.src=url;
+};
+
+/* 初期表示のラベル */
+$('#resInfo').textContent=' '+state.res+'px';
+$('#gamInfo').textContent=state.gamma;
+$('#peekSizeInfo').textContent=' '+state.peek.size+'px';
+setPeekCSSVars();
+</script>
+</body>
+</html>

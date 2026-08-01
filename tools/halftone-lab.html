@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HALFTONE LAB v2 — 白黒エフェクト・ジェネレータ</title>
+<style>
+  :root{
+    --bg:#0a0a0b; --panel:#141417; --panel2:#1c1c21; --line:#2a2a31;
+    --ink:#f2f2f4; --sub:#9a9aa6; --acc:#ffd166; --ok:#5ee0a8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    display:flex; align-items:center; gap:14px; padding:9px 18px;
+    border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap;
+  }
+  header h1{font-size:15px; margin:0; letter-spacing:.08em; font-weight:800}
+  header h1 span{color:var(--acc)}
+  header .ver{font-size:10px;color:var(--sub);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .presets{display:flex; gap:6px; flex-wrap:wrap; margin-left:auto}
+  .chipbtn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--sub);
+    font-size:11.5px; padding:5px 11px; border-radius:999px; cursor:pointer; transition:.12s;
+  }
+  .chipbtn:hover{color:var(--ink); border-color:#44444f}
+  .main{flex:1; display:flex; min-height:0}
+  /* ---- sidebar ---- */
+  .side{
+    width:296px; min-width:296px; border-right:1px solid var(--line);
+    background:var(--panel); overflow-y:auto; padding:14px 16px 50px;
+  }
+  .side::-webkit-scrollbar{width:8px}
+  .side::-webkit-scrollbar-thumb{background:#2c2c34; border-radius:4px}
+  .seclabel{font-size:10.5px; letter-spacing:.2em; color:var(--sub); text-transform:uppercase; margin:20px 0 8px}
+  .seclabel:first-child{margin-top:2px}
+  .seg{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+  .seg button{
+    background:var(--panel2); border:1px solid var(--line); color:var(--sub);
+    padding:8px 4px; border-radius:9px; font-size:12.5px; cursor:pointer; transition:.12s;
+  }
+  .seg button.on{background:var(--ink); color:#0a0a0b; border-color:var(--ink); font-weight:700}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0}
+  .row label{font-size:12.5px; color:var(--sub); white-space:nowrap}
+  .row output{font-size:11.5px; color:var(--ink); font-family:ui-monospace,monospace; min-width:40px; text-align:right}
+  input[type=range]{flex:1; appearance:none; height:4px; background:#2c2c34; border-radius:2px; outline:none; min-width:0}
+  input[type=range]::-webkit-slider-thumb{appearance:none; width:15px; height:15px; border-radius:50%; background:var(--ink); border:none; cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--ink);border:none;cursor:pointer}
+  select{
+    background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:6px 8px; font-size:12.5px; width:100%;
+  }
+  .side input[type=text]{
+    background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:6px 8px; font-size:12px; width:100%; min-width:0;
+  }
+  .pchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .pchip{display:inline-flex;align-items:center;gap:7px}
+  .pchip .pdel{color:#6c6c78;font-size:10px}
+  .pchip .pdel:hover{color:var(--warn,#ff8fa3)}
+  .colors{display:flex; gap:8px}
+  .colorbox{flex:1; display:flex; align-items:center; gap:8px; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:6px 8px}
+  .colorbox span{font-size:11px; color:var(--sub)}
+  input[type=color]{width:26px; height:26px; border:none; background:none; padding:0; cursor:pointer}
+  .check{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--sub); margin:9px 0; cursor:pointer; user-select:none}
+  .check input{accent-color:var(--acc); width:15px; height:15px}
+  .check small{font-size:10.5px;color:#6c6c78;display:block}
+  .group{border-top:1px dashed var(--line); margin-top:13px; padding-top:2px}
+  .hidden{display:none!important}
+  .btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    padding:8px 13px; border-radius:10px; font-size:12.5px; cursor:pointer; transition:.12s; font-weight:600;
+  }
+  .btn:hover{border-color:#4a4a55}
+  .btn.primary{background:var(--acc); color:#0a0a0b; border-color:var(--acc)}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btnrow{display:flex; gap:8px; margin:8px 0}
+  .btnrow .btn{flex:1}
+  .exbtn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 6px}
+  .exbtn small{font-size:10px;color:var(--sub);font-family:ui-monospace,monospace;font-weight:400}
+  .btn.primary small{color:#5c4a10}
+  .exinfo{font-size:11px;color:var(--sub);margin:6px 0}
+  /* ---- stage ---- */
+  .stagecol{flex:1;display:flex;flex-direction:column;min-width:0}
+  .stagebar{
+    display:flex;align-items:center;gap:8px;padding:8px 14px;
+    border-bottom:1px solid var(--line);background:var(--panel);
+  }
+  .stagebar .sp{flex:1}
+  .zbtn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);width:30px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1}
+  .zpct{font-size:11.5px;color:var(--sub);font-family:ui-monospace,monospace;min-width:44px;text-align:center}
+  .tglbtn{background:var(--panel2);border:1px solid var(--line);color:var(--sub);padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+  .tglbtn.on{background:var(--acc);color:#0a0a0b;border-color:var(--acc);font-weight:700}
+  .stage{
+    flex:1; min-height:0; position:relative; overflow:hidden;
+    background:radial-gradient(#17171b 1px, transparent 1px); background-size:16px 16px;
+    cursor:grab;
+  }
+  .stage.panning{cursor:grabbing}
+  .stage.drag::after{
+    content:"画像をドロップ"; position:absolute; inset:14px; border:2px dashed var(--acc);
+    border-radius:16px; display:flex; align-items:center; justify-content:center;
+    font-size:18px; color:var(--acc); background:rgba(10,10,11,.75); pointer-events:none; z-index:30;
+  }
+  .canwrap{position:absolute; left:0; top:0; transform-origin:0 0}
+  .canwrap canvas{display:block; position:absolute; left:0; top:0}
+  #view{position:relative!important}
+  #orig{pointer-events:none}
+  .divider{
+    position:absolute; top:0; bottom:0; width:26px; margin-left:-13px; cursor:ew-resize; z-index:20;
+  }
+  .divider::before{content:""; position:absolute; left:12px; top:0; bottom:0; width:2px; background:var(--acc)}
+  .divider::after{
+    content:"◂ ▸"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:var(--acc); color:#0a0a0b; font-size:9px; font-weight:700;
+    padding:4px 6px; border-radius:999px; white-space:nowrap;
+  }
+  .divlabel{position:absolute;top:8px;font-size:10px;color:#0a0a0b;background:var(--acc);border-radius:5px;padding:1px 6px;font-weight:700;z-index:19}
+  .hint{position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:11px; color:var(--sub); pointer-events:none; z-index:5}
+  @media (max-width:760px){
+    body{overflow:auto}
+    .main{flex-direction:column}
+    .side{width:100%; min-width:0; border-right:none; border-bottom:1px solid var(--line); max-height:45vh}
+    .stagecol{min-height:55vh}
+  }
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
+ onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+
+<header>
+  <h1>HALFTONE <span>LAB</span></h1><span class="ver">v3.2 · save & export</span>
+  <div class="presets" id="presets">
+    <button class="chipbtn" data-p="lumina">Lumina風（動）</button>
+    <button class="chipbtn" data-p="sound">サウンド波形</button>
+    <button class="chipbtn" data-p="news">新聞印刷</button>
+    <button class="chipbtn" data-p="retro">1-bit レトロ</button>
+    <button class="chipbtn" data-p="led">LEDマトリクス</button>
+    <button class="chipbtn" data-p="ascii">ASCIIターミナル</button>
+    <button class="chipbtn" data-p="bayer">Bayerゲーム機</button>
+    <button class="chipbtn" data-p="wave">ゆらぎ（動）</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="side">
+    <div class="seclabel">画像</div>
+    <div class="btnrow">
+      <button class="btn" id="btnUpload">アップロード</button>
+      <button class="btn" id="btnDemo">デモ画像</button>
+    </div>
+    <input type="file" id="file" accept="image/*" style="display:none">
+    <div class="row"><label>作業解像度</label><input type="range" id="workRes" min="240" max="1600" step="20" value="1000"><output id="workResV">1000</output></div>
+    <label class="check"><input type="checkbox" id="linear"><span>リニアライト処理<small>sRGBをリニア化して階調を物理的に正確に（全競合が未実装）</small></span></label>
+
+    <div class="seclabel">ソース</div>
+    <div class="seg" id="sources">
+      <button data-s="image" class="on">画像</button>
+      <button data-s="ripple">リップル</button>
+      <button data-s="shape">シェイプ</button>
+      <button data-s="led">LEDブロック</button>
+      <button data-s="audio">波形</button>
+    </div>
+    <div class="group hidden" data-src="audio">
+      <div class="row"><label>スタイル</label></div>
+      <select id="auStyle">
+        <option value="waveform">波形（シンメトリー）</option>
+        <option value="eq">EQバー（下から）</option>
+        <option value="line">オシロライン</option>
+      </select>
+      <div class="row"><label>バー幅</label><input type="range" id="auBarW" min="3" max="40" step="1" value="7"><output id="auBarWV">7px</output></div>
+      <div class="row"><label>密度</label><input type="range" id="auDuty" min="0.3" max="1" step="0.05" value="0.65"><output id="auDutyV">0.65</output></div>
+      <div class="row"><label>振幅</label><input type="range" id="auAmp" min="0.2" max="1.2" step="0.05" value="0.85"><output id="auAmpV">0.85</output></div>
+      <div class="row"><label>テンポ</label><input type="range" id="auTempo" min="0.5" max="10" step="0.5" value="4"><output id="auTempoV">4.0</output></div>
+      <div class="row"><label>流れ</label><input type="range" id="auSpeed" min="-3" max="3" step="0.1" value="0.8"><output id="auSpeedV">0.8</output></div>
+      <div class="row"><label>ライン数</label><input type="range" id="auLines" min="1" max="3" step="1" value="2"><output id="auLinesV">2</output></div>
+    </div>
+    <div class="group hidden" data-src="ripple">
+      <div class="row"><label>リング幅</label><input type="range" id="ringW" min="20" max="200" step="2" value="70"><output id="ringWV">70px</output></div>
+      <div class="row"><label>速度</label><input type="range" id="ringSpeed" min="0" max="5" step="0.1" value="1.6"><output id="ringSpeedV">1.6</output></div>
+      <div class="row"><label>中心X</label><input type="range" id="srcCX" min="0" max="1" step="0.01" value="0.62"><output id="srcCXV">0.62</output></div>
+      <div class="row"><label>中心Y</label><input type="range" id="srcCY" min="0" max="1" step="0.01" value="0.38"><output id="srcCYV">0.38</output></div>
+      <div class="row"><label>フェード</label><input type="range" id="ringFade" min="0.3" max="1.5" step="0.05" value="1.1"><output id="ringFadeV">1.10</output></div>
+    </div>
+    <div class="group hidden" data-src="shape">
+      <div class="row"><label>形</label></div>
+      <select id="shapeKind">
+        <option value="square">◻ スクエア</option>
+        <option value="diamond">◇ ダイヤ</option>
+        <option value="circle">○ サークル</option>
+      </select>
+      <div class="row"><label>サイズ</label><input type="range" id="shSize" min="0.1" max="0.9" step="0.02" value="0.42"><output id="shSizeV">0.42</output></div>
+      <div class="row"><label>線幅</label><input type="range" id="shWidth" min="0.04" max="0.5" step="0.02" value="0.16"><output id="shWidthV">0.16</output></div>
+      <div class="row"><label>回転速度</label><input type="range" id="shRot" min="-2" max="2" step="0.1" value="0.4"><output id="shRotV">0.4</output></div>
+      <div class="row"><label>パルス</label><input type="range" id="shPulse" min="0" max="2" step="0.1" value="0.6"><output id="shPulseV">0.6</output></div>
+    </div>
+    <div class="group hidden" data-src="led">
+      <div class="row"><label>ブロック</label><input type="range" id="ledSize" min="20" max="160" step="4" value="64"><output id="ledSizeV">64px</output></div>
+      <div class="row"><label>テンポ</label><input type="range" id="ledTempo" min="0.5" max="10" step="0.5" value="3"><output id="ledTempoV">3.0</output></div>
+      <div class="row"><label>点灯率</label><input type="range" id="ledDensity" min="0.05" max="0.9" step="0.05" value="0.35"><output id="ledDensityV">0.35</output></div>
+      <div class="row"><label>中央集中</label><input type="range" id="ledBias" min="0" max="1" step="0.05" value="0.6"><output id="ledBiasV">0.60</output></div>
+    </div>
+
+    <div class="seclabel">エフェクト</div>
+    <div class="seg" id="effects">
+      <button data-e="halftone" class="on">ハーフトーン</button>
+      <button data-e="dither">ディザ</button>
+      <button data-e="ascii">ASCII</button>
+      <button data-e="mosaic">モザイク</button>
+    </div>
+
+    <!-- halftone -->
+    <div class="group" data-for="halftone">
+      <div class="row"><label>ドット形状</label></div>
+      <select id="shape">
+        <option value="circle">● サークル</option>
+        <option value="square">■ スクエア</option>
+        <option value="line">▬ ライン</option>
+      </select>
+      <div class="row"><label>角度</label><input type="range" id="angle" min="0" max="90" step="1" value="45"><output id="angleV">45°</output></div>
+      <div class="row"><label>ドット強さ</label><input type="range" id="dotGain" min="0.4" max="1.6" step="0.05" value="1"><output id="dotGainV">1.00</output></div>
+    </div>
+
+    <!-- dither -->
+    <div class="group hidden" data-for="dither">
+      <div class="row"><label>アルゴリズム</label></div>
+      <select id="algo">
+        <optgroup label="誤差拡散">
+          <option value="fs">Floyd–Steinberg</option>
+          <option value="falsefs">False Floyd–Steinberg</option>
+          <option value="atkinson">Atkinson</option>
+          <option value="jjn">Jarvis–Judice–Ninke</option>
+          <option value="stucki">Stucki</option>
+          <option value="burkes">Burkes</option>
+          <option value="sierra">Sierra</option>
+          <option value="sierra2">Two-Row Sierra</option>
+          <option value="sierralite">Sierra Lite</option>
+          <option value="stevenson">Stevenson–Arce</option>
+          <option value="riemersma">Riemersma（ヒルベルト曲線）</option>
+        </optgroup>
+        <optgroup label="Ordered / その他">
+          <option value="bayer2">Bayer 2×2</option>
+          <option value="bayer4">Bayer 4×4</option>
+          <option value="bayer8">Bayer 8×8</option>
+          <option value="bayer16">Bayer 16×16</option>
+          <option value="bluenoise">ブルーノイズ 32×32</option>
+          <option value="ign">ノイズ（IGN）</option>
+          <option value="random">ランダムしきい値</option>
+          <option value="threshold">2値化</option>
+        </optgroup>
+      </select>
+      <div id="edOpts">
+        <div class="row"><label>誤差強度</label><input type="range" id="errStrength" min="0" max="150" step="5" value="100"><output id="errStrengthV">100%</output></div>
+        <label class="check"><input type="checkbox" id="serpentine" checked><span>Serpentine走査<small>奇数行を逆方向に走査して縦筋を防ぐ</small></span></label>
+      </div>
+    </div>
+
+    <!-- ascii -->
+    <div class="group hidden" data-for="ascii">
+      <div class="row"><label>文字セット</label></div>
+      <select id="charset">
+        <option value="@%#*+=-:. ">@%#*+=-:.（標準）</option>
+        <option value="█▓▒░ ">█▓▒░（ブロック）</option>
+        <option value="01 ">01（バイナリ）</option>
+        <option value="◉●◐○∙ ">◉●◐○∙（ドット）</option>
+      </select>
+    </div>
+
+    <!-- mosaic -->
+    <div class="group hidden" data-for="mosaic">
+      <div class="row"><label>階調数</label><input type="range" id="levels" min="2" max="8" step="1" value="4"><output id="levelsV">4</output></div>
+    </div>
+
+    <div class="seclabel">共通パラメータ</div>
+    <div class="row"><label>セルサイズ</label><input type="range" id="cell" min="2" max="36" step="1" value="8"><output id="cellV">8px</output></div>
+    <div class="row"><label>明るさ</label><input type="range" id="bright" min="-0.5" max="0.5" step="0.01" value="0"><output id="brightV">0.00</output></div>
+    <div class="row"><label>コントラスト</label><input type="range" id="contrast" min="0.3" max="3" step="0.05" value="1.1"><output id="contrastV">1.10</output></div>
+    <div class="row"><label>ガンマ</label><input type="range" id="gamma" min="0.3" max="2.5" step="0.05" value="1"><output id="gammaV">1.00</output></div>
+    <label class="check"><input type="checkbox" id="invert">反転（ネガ）</label>
+
+    <div class="seclabel">カラー</div>
+    <div class="colors">
+      <div class="colorbox"><input type="color" id="fg" value="#f2f2f2"><span>インク</span></div>
+      <div class="colorbox"><input type="color" id="bg" value="#0a0a0b"><span>背景</span></div>
+    </div>
+
+    <div class="seclabel">マスク</div>
+    <select id="maskType">
+      <option value="none">なし</option>
+      <option value="band">斜めバンド（動画のあの帯）</option>
+      <option value="circle">サークル</option>
+    </select>
+    <div id="maskOpts" class="hidden">
+      <div class="row"><label>角度</label><input type="range" id="maskAngle" min="-60" max="60" step="1" value="30"><output id="maskAngleV">30°</output></div>
+      <div class="row"><label>幅</label><input type="range" id="maskWidth" min="0.15" max="1" step="0.05" value="0.5"><output id="maskWidthV">0.50</output></div>
+    </div>
+
+    <div class="seclabel">アニメーション（波）</div>
+    <label class="check"><input type="checkbox" id="animOn">動かす</label>
+    <div class="row"><label>波の強さ</label><input type="range" id="waveAmp" min="0" max="0.6" step="0.02" value="0.25"><output id="waveAmpV">0.25</output></div>
+    <div class="row"><label>波の間隔</label><input type="range" id="waveLen" min="30" max="400" step="5" value="140"><output id="waveLenV">140</output></div>
+    <div class="row"><label>速度</label><input type="range" id="waveSpeed" min="0.2" max="5" step="0.1" value="1.5"><output id="waveSpeedV">1.5</output></div>
+
+    <div class="seclabel">生成</div>
+    <div class="btnrow">
+      <button class="btn" id="btnRandom">🎲 ランダム</button>
+    </div>
+
+    <div class="seclabel">マイプリセット</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="presetName" placeholder="名前（例: 緑EQ荒め）">
+      <button class="btn" id="btnSavePreset" style="flex:none">保存</button>
+    </div>
+    <div class="pchips" id="presetList"></div>
+    <div class="btnrow">
+      <button class="btn" id="btnShare">🔗 共有リンク</button>
+      <button class="btn" id="btnToken">トークン</button>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="tokenIn" placeholder="トークンを貼り付けて復元">
+      <button class="btn" id="btnTokenLoad" style="flex:none">読込</button>
+    </div>
+    <p class="exinfo">ブラウザに保存されます。トークンは共有・バックアップ用（別環境でも復元可）。</p>
+
+    <div class="seclabel">アニメ書き出し</div>
+    <div class="btnrow">
+      <select id="recDur" style="width:84px;flex:none"><option value="3">3秒</option><option value="5" selected>5秒</option><option value="8">8秒</option></select>
+      <button class="btn" id="btnRec" style="flex:1">● WebM録画</button>
+    </div>
+
+    <div class="seclabel">書き出し</div>
+    <p class="exinfo" id="exRes">—</p>
+    <div class="btnrow">
+      <button class="btn primary exbtn" id="btnPng" style="flex:1.2">PNG<small id="szPng">サイズ計算中…</small></button>
+      <button class="btn exbtn" id="btnSvg">SVG<small id="szSvg">—</small></button>
+      <button class="btn exbtn" id="btnCopy">コピー<small>clipboard</small></button>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="btnCode">⟨/⟩ コードで書き出し（コーダー用）</button>
+    </div>
+    <p class="exinfo">PNGは元画像の解像度で書き出し。SVGはベクター（ASCIIは非対応）。コード書き出しは現在の見た目を再現する単体HTML/JS — Webサイトにそのまま組み込めます。</p>
+  </aside>
+
+  <div class="stagecol">
+    <div class="stagebar">
+      <button class="tglbtn" id="btnCompare">◧ 比較</button>
+      <span class="sp"></span>
+      <button class="zbtn" id="zOut">−</button>
+      <span class="zpct" id="zPct">100%</span>
+      <button class="zbtn" id="zIn">＋</button>
+      <button class="tglbtn" id="zFit">フィット</button>
+      <button class="tglbtn" id="z100">100%</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="canwrap" id="canwrap">
+        <canvas id="view"></canvas>
+        <canvas id="orig" class="hidden"></canvas>
+        <div class="divider hidden" id="divider"></div>
+        <div class="divlabel hidden" id="divlabel">元画像</div>
+      </div>
+      <div class="hint">ドラッグ＆ドロップで画像読込 ／ ドラッグでパン・ホイールでズーム ／ すべてブラウザ内処理</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const view = $('view'), vctx = view.getContext('2d');
+const origCv = $('orig'), origCtx = origCv.getContext('2d');
+
+const state = {
+  effect:'halftone',
+  cell:8, angle:45, shape:'circle', dotGain:1,
+  algo:'fs', errStrength:100, serpentine:true,
+  charset:'@%#*+=-:. ', levels:4,
+  bright:0, contrast:1.1, gamma:1, invert:false, linear:false,
+  fg:'#f2f2f2', bg:'#0a0a0b',
+  animOn:false, waveAmp:0.25, waveLen:140, waveSpeed:1.5, waveDir:45,
+  workRes:1000,
+  source:'image',
+  ringW:70, ringSpeed:1.6, srcCX:0.62, srcCY:0.38, ringFade:1.1,
+  shapeKind:'square', shSize:0.42, shWidth:0.16, shRot:0.4, shPulse:0.6,
+  ledSize:64, ledTempo:3, ledDensity:0.35, ledBias:0.6,
+  auStyle:'waveform', auBarW:7, auDuty:0.65, auAmp:0.85, auTempo:4, auSpeed:0.8, auLines:2,
+  maskType:'none', maskAngle:30, maskWidth:0.5
+};
+
+let original=null;              // 元画像 canvas（最大4096）
+let srcW=0, srcH=0;             // 作業解像度
+let lumS=null, lumL=null;       // sRGB輝度 / リニア輝度
+let lastT=0, raf=null;
+
+/* ==================== 画像読み込み ==================== */
+const ORIG_MAX = 4096;
+function ingest(img){
+  const r = Math.min(1, ORIG_MAX/Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width*r)), h = Math.max(1, Math.round(img.height*r));
+  original = document.createElement('canvas'); original.width=w; original.height=h;
+  const x = original.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,w,h);
+  x.drawImage(img,0,0,w,h);
+  setSource('image');
+}
+const s2l = v => { const c=v/255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+function rebuildWorking(){
+  if(state.source!=='image'){
+    srcW=state.workRes; srcH=Math.round(state.workRes*0.625);
+    view.width=srcW; view.height=srcH;
+    $('exRes').textContent=`書き出し: ${srcW*2}×${srcH*2}px（2×）／ ソース: プロシージャル`;
+    sizesDirty(); fitView(); render(lastT); return;
+  }
+  if(!original) return;
+  const r = Math.min(1, state.workRes/Math.max(original.width, original.height));
+  srcW = Math.max(1, Math.round(original.width*r));
+  srcH = Math.max(1, Math.round(original.height*r));
+  const c = document.createElement('canvas'); c.width=srcW; c.height=srcH;
+  const x = c.getContext('2d', {willReadFrequently:true});
+  x.drawImage(original,0,0,srcW,srcH);
+  const d = x.getImageData(0,0,srcW,srcH).data;
+  lumS = new Float32Array(srcW*srcH);
+  lumL = new Float32Array(srcW*srcH);
+  for(let i=0,p=0;i<lumS.length;i++,p+=4){
+    lumS[i] = (0.2126*d[p] + 0.7152*d[p+1] + 0.0722*d[p+2]) / 255;
+    lumL[i] = 0.2126*s2l(d[p]) + 0.7152*s2l(d[p+1]) + 0.0722*s2l(d[p+2]);
+  }
+  view.width=srcW; view.height=srcH;
+  origCv.width=srcW; origCv.height=srcH;
+  origCtx.drawImage(c,0,0);
+  $('exRes').textContent = `書き出し: ${original.width}×${original.height}px ／ 作業: ${srcW}×${srcH}px`;
+  sizesDirty();
+  fitView();
+  render(lastT);
+}
+function loadFile(f){
+  if(!f || !f.type.startsWith('image/')) return;
+  const img = new Image();
+  img.onload = () => { ingest(img); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f);
+}
+$('btnUpload').onclick = () => $('file').click();
+$('file').onchange = e => loadFile(e.target.files[0]);
+const stage = $('stage');
+['dragover','dragenter'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();stage.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();stage.classList.remove('drag');}));
+stage.addEventListener('drop', e=>loadFile(e.dataTransfer.files[0]));
+
+function demo(cb){
+  const w=1600, h=1080;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.fillStyle='#000'; x.fillRect(0,0,w,h);
+  const grad=(cx,cy,r,a)=>{ const g=x.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,`rgba(255,255,255,${a})`); g.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=g; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill(); };
+  grad(1150,370,520,1); grad(370,790,440,.75); grad(820,180,290,.4);
+  x.strokeStyle='rgba(0,0,0,.85)';
+  for(let r=44;r<480;r+=64){ x.lineWidth=23; x.beginPath(); x.arc(1150,370,r,0,7); x.stroke(); }
+  const lg=x.createLinearGradient(0,0,w,h);
+  lg.addColorStop(0,'rgba(255,255,255,.16)'); lg.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=lg; x.fillRect(0,0,w,h);
+  x.fillStyle='#fff'; x.font='800 140px -apple-system, sans-serif';
+  x.fillText('MONO', 88, h-130);
+  x.font='500 44px -apple-system, sans-serif';
+  x.fillText('LAB v2 — halftone playground', 92, h-66);
+  const img=new Image(); img.onload=()=>{ ingest(img); if(cb)cb(); }; img.src=c.toDataURL();
+}
+$('btnDemo').onclick = ()=>demo();
+
+/* ==================== プロシージャルソース ==================== */
+const ss=(a,b,x)=>{ x=Math.min(1,Math.max(0,(x-a)/(b-a))); return x*x*(3-2*x); };
+const hash3=(x,y,z)=>{ const n=Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453; return n-Math.floor(n); };
+// 戻り値は輝度（インク対象=0、紙=1）
+function procLum(sx,sy,t){
+  const cx=srcW*state.srcCX, cy=srcH*state.srcCY;
+  if(state.source==='ripple'){
+    const d=Math.hypot(sx-cx,sy-cy);
+    const v=0.5+0.5*Math.sin(d/state.ringW*6.2832 - t*state.ringSpeed*2.5);
+    const ring=ss(0.32,0.68,v);
+    const fall=Math.max(0, 1 - d/(Math.min(srcW,srcH)*state.ringFade));
+    return 1 - ring*fall;
+  }
+  if(state.source==='shape'){
+    const th=t*state.shRot, c=Math.cos(th), s=Math.sin(th);
+    const rx=(sx-srcW/2)*c+(sy-srcH/2)*s, ry=-(sx-srcW/2)*s+(sy-srcH/2)*c;
+    const R=Math.min(srcW,srcH)*state.shSize*0.5*(1+0.18*Math.sin(t*state.shPulse*2));
+    let d;
+    if(state.shapeKind==='square') d=Math.max(Math.abs(rx),Math.abs(ry));
+    else if(state.shapeKind==='diamond') d=(Math.abs(rx)+Math.abs(ry))*0.7071;
+    else d=Math.hypot(rx,ry);
+    const band=Math.min(srcW,srcH)*state.shWidth*0.25;
+    const ink=1-ss(band*0.55,band,Math.abs(d-R));
+    return 1-ink;
+  }
+  if(state.source==='audio'){
+    const W=srcW, H=srcH;
+    // 1D値ノイズ（滑らかなマクロ包絡）
+    const vn=x=>{ const i=Math.floor(x), fr=x-i, u=fr*fr*(3-2*fr);
+      return hash3(i,7,13)*(1-u)+hash3(i+1,7,13)*u; };
+    if(state.auStyle==='line'){
+      const lw=state.auBarW*0.6+2;
+      let ink=0;
+      for(let k=0;k<state.auLines;k++){
+        const env=0.55+0.45*Math.sin(sx/W*6.2832*0.5 + t*0.7 + k*1.7);
+        const y0=H*0.5 + Math.sin(sx/W*6.2832*(1.2+k*0.8) + t*state.auTempo*0.6*(1+k*0.35) + k*2.1)
+                 * H*0.32*state.auAmp*env;
+        ink=Math.max(ink, 1-ss(lw*0.55, lw, Math.abs(sy-y0)));
+      }
+      return 1-ink;
+    }
+    const bw=state.auBarW;
+    const bx=Math.floor(sx/bw);
+    if((sx/bw)%1 > state.auDuty) return 1;                    // バー間ギャップ
+    const step=Math.floor(t*state.auTempo), f=t*state.auTempo-step;
+    const base=vn(bx*0.13 + t*state.auSpeed);                 // うねる包絡
+    const jit=hash3(bx,step,3)*(1-f)+hash3(bx,step+1,3)*f;    // 拍動フリッカー
+    const a=Math.min(1,(0.22+0.78*base)*(0.35+0.65*jit)*state.auAmp);
+    if(state.auStyle==='eq'){
+      const yy=(H-sy)/H;                                      // 0=下端
+      if(yy>a) return 1;
+      if(((H-sy)/(bw*1.25))%1 > 0.78) return 1;               // LEDセグメントの区切り
+      return 0;
+    }
+    return Math.abs(sy-H*0.5) < a*H*0.5 ? 0 : 1;              // シンメトリー波形
+  }
+  // led
+  const bs=state.ledSize;
+  const step=Math.floor(t*state.ledTempo), f=t*state.ledTempo-step;
+  const bx=Math.floor(sx/bs), by=Math.floor(sy/bs);
+  const v=hash3(bx,by,step)*(1-f)+hash3(bx,by,step+1)*f;
+  const bias=Math.max(0, 1-Math.abs(sy-srcH*state.srcCY)/(srcH*0.5));
+  const thr=state.ledDensity*((1-state.ledBias)+2.2*state.ledBias*bias);
+  return 1 - ss(thr+0.04,thr-0.04,v);
+}
+function inMask(sx,sy){
+  if(state.maskType==='none') return true;
+  const cx=srcW/2, cy=srcH/2;
+  if(state.maskType==='band'){
+    const a=state.maskAngle*Math.PI/180;
+    return Math.abs(-(sx-cx)*Math.sin(a)+(sy-cy)*Math.cos(a)) < srcH*state.maskWidth*0.5;
+  }
+  return Math.hypot(sx-cx,sy-cy) < Math.min(srcW,srcH)*state.maskWidth*0.55;
+}
+
+/* ==================== サンプリング ==================== */
+function sampleLum(sx, sy, t){
+  if(!inMask(sx,sy)) return 1;
+  let l;
+  if(state.source==='image'){
+    let ix = sx|0, iy = sy|0;
+    if(ix<0)ix=0; else if(ix>=srcW)ix=srcW-1;
+    if(iy<0)iy=0; else if(iy>=srcH)iy=srcH-1;
+    l = (state.linear ? lumL : lumS)[iy*srcW+ix];
+  } else {
+    l = procLum(sx,sy,t);
+  }
+  if(state.animOn && state.waveAmp>0){
+    const d = state.waveDir*Math.PI/180;
+    l += state.waveAmp * Math.sin((sx*Math.cos(d)+sy*Math.sin(d))/state.waveLen*6.2832 + t*state.waveSpeed);
+  }
+  l = (l-0.5)*state.contrast + 0.5 + state.bright;
+  if(l<0)l=0; else if(l>1)l=1;
+  if(state.gamma!==1) l = Math.pow(l, state.gamma);
+  if(state.invert) l = 1-l;
+  return l;
+}
+
+/* ==================== ハーフトーン（sqrt面積補正） ==================== */
+function renderHalftone(ctx,W,H,scale,t){
+  const cell = state.cell*scale;
+  const a = state.angle*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+  const cx=W/2, cy=H/2;
+  const n = Math.ceil(Math.hypot(W,H)/2/cell)+2;
+  const shape = state.shape;
+  ctx.fillStyle = state.fg;
+  if(shape!=='line') ctx.beginPath();
+  else { ctx.strokeStyle = state.fg; ctx.lineCap='round'; }
+  // r = cell·0.7071·sqrt(ink)：被覆面積∝r²の面積補正。ink=1でセル対角を覆い完全黒に到達
+  const maxR = cell*0.7071*state.dotGain;
+  for(let j=-n;j<=n;j++){
+    for(let i=-n;i<=n;i++){
+      const x = cx + (i*ca - j*sa)*cell;
+      const y = cy + (i*sa + j*ca)*cell;
+      if(x<-cell||y<-cell||x>W+cell||y>H+cell) continue;
+      const ink = 1 - sampleLum(x/scale, y/scale, t);
+      if(ink<=0.004) continue;
+      const r = maxR*Math.sqrt(ink);
+      if(r<0.3) continue;
+      if(shape==='circle'){ ctx.moveTo(x+r,y); ctx.arc(x,y,r,0,6.2832); }
+      else if(shape==='square'){ const q=r*0.8862; ctx.rect(x-q,y-q,q*2,q*2); } // 同面積補正
+      else{
+        ctx.beginPath(); ctx.lineWidth=Math.min(r*1.1, cell*0.98);
+        ctx.moveTo(x-ca*cell*0.55, y-sa*cell*0.55);
+        ctx.lineTo(x+ca*cell*0.55, y+sa*cell*0.55);
+        ctx.stroke();
+      }
+    }
+  }
+  if(shape!=='line') ctx.fill();
+}
+
+/* ==================== ディザ：19アルゴリズム ==================== */
+// 誤差拡散カーネル [dx, dy, weight] / divisor
+const KERNELS = {
+  fs:       {div:16, taps:[[1,0,7],[-1,1,3],[0,1,5],[1,1,1]]},
+  falsefs:  {div:8,  taps:[[1,0,3],[0,1,3],[1,1,2]]},
+  atkinson: {div:8,  taps:[[1,0,1],[2,0,1],[-1,1,1],[0,1,1],[1,1,1],[0,2,1]]},
+  jjn:      {div:48, taps:[[1,0,7],[2,0,5],[-2,1,3],[-1,1,5],[0,1,7],[1,1,5],[2,1,3],[-2,2,1],[-1,2,3],[0,2,5],[1,2,3],[2,2,1]]},
+  stucki:   {div:42, taps:[[1,0,8],[2,0,4],[-2,1,2],[-1,1,4],[0,1,8],[1,1,4],[2,1,2],[-2,2,1],[-1,2,2],[0,2,4],[1,2,2],[2,2,1]]},
+  burkes:   {div:32, taps:[[1,0,8],[2,0,4],[-2,1,2],[-1,1,4],[0,1,8],[1,1,4],[2,1,2]]},
+  sierra:   {div:32, taps:[[1,0,5],[2,0,3],[-2,1,2],[-1,1,4],[0,1,5],[1,1,4],[2,1,2],[-1,2,2],[0,2,3],[1,2,2]]},
+  sierra2:  {div:16, taps:[[1,0,4],[2,0,3],[-2,1,1],[-1,1,2],[0,1,3],[1,1,2],[2,1,1]]},
+  sierralite:{div:4, taps:[[1,0,2],[-1,1,1],[0,1,1]]},
+  stevenson:{div:200,taps:[[2,0,32],[-3,1,12],[-1,1,26],[1,1,30],[3,1,16],[-2,2,12],[0,2,26],[2,2,12],[-3,3,5],[-1,3,12],[1,3,12],[3,3,5]]}
+};
+const ED_SET = new Set([...Object.keys(KERNELS),'riemersma']);
+
+// Bayer行列：再帰生成 M2n = [[4M, 4M+2],[4M+3, 4M+1]]
+function bayerMatrix(n){
+  let m=[[0,2],[3,1]];
+  while(m.length<n){
+    const s=m.length, o=[];
+    for(let y=0;y<s*2;y++) o.push(new Array(s*2));
+    for(let y=0;y<s;y++) for(let x=0;x<s;x++){
+      const v=m[y][x]*4;
+      o[y][x]=v; o[y][x+s]=v+2; o[y+s][x]=v+3; o[y+s][x+s]=v+1;
+    }
+    m=o;
+  }
+  return m;
+}
+const BAYER = {2:bayerMatrix(2),4:bayerMatrix(4),8:bayerMatrix(8),16:bayerMatrix(16)};
+
+// ブルーノイズ 32×32：greedy void-filling（起動時1回生成）
+const BN = (()=>{
+  const n=32, N=n*n, sig=1.9;
+  const rank=new Float32Array(N), energy=new Float64Array(N), placed=new Uint8Array(N);
+  const K=new Float64Array(N);
+  for(let dy=0;dy<n;dy++)for(let dx=0;dx<n;dx++){
+    const wx=Math.min(dx,n-dx), wy=Math.min(dy,n-dy);
+    K[dy*n+dx]=Math.exp(-(wx*wx+wy*wy)/(2*sig*sig));
+  }
+  const hash=i=>{ let h=i*2654435761>>>0; h^=h>>>13; h=Math.imul(h,1274126177)>>>0; return (h>>>16)/65536; };
+  for(let r=0;r<N;r++){
+    let best=-1,bestE=Infinity;
+    for(let i=0;i<N;i++){ if(placed[i])continue; const e=energy[i]+hash(i+r*N)*1e-7; if(e<bestE){bestE=e;best=i;} }
+    placed[best]=1; rank[best]=(r+0.5)/N;
+    const bx=best%n, by=(best/n)|0;
+    for(let dy=0;dy<n;dy++)for(let dx=0;dx<n;dx++){
+      energy[((by+dy)%n)*n+(bx+dx)%n]+=K[dy*n+dx];
+    }
+  }
+  return {n, rank};
+})();
+
+const ignT=(x,y)=>{ const v=52.9829189*((0.06711056*x+0.00583715*y)%1); return v-Math.floor(v); };
+const hashT=(x,y)=>{ const v=Math.sin(x*127.1+y*311.7)*43758.5453; return v-Math.floor(v); };
+
+// ヒルベルト曲線 d→(x,y)
+function hilbert(order,d){
+  let x=0,y=0,t=d;
+  for(let s=1;s<order;s<<=1){
+    const rx=1&(t>>1), ry=1&(t^rx);
+    if(ry===0){ if(rx===1){x=s-1-x;y=s-1-y;} const tmp=x;x=y;y=tmp; }
+    x+=s*rx; y+=s*ry; t>>=2;
+  }
+  return [x,y];
+}
+
+function ditherGrid(t){
+  const cell = state.cell;
+  const gw = Math.ceil(srcW/cell), gh = Math.ceil(srcH/cell);
+  const g = new Float32Array(gw*gh);
+  for(let y=0;y<gh;y++) for(let x=0;x<gw;x++)
+    g[y*gw+x] = sampleLum((x+0.5)*cell, (y+0.5)*cell, t);
+  const dark = new Uint8Array(gw*gh);
+  const algo = state.algo, s = state.errStrength/100;
+
+  if(algo==='threshold'){
+    for(let i=0;i<g.length;i++) dark[i]=g[i]<0.5?1:0;
+  } else if(algo==='random'){
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++)
+      dark[y*gw+x]=g[y*gw+x] < (0.001+hashT(x,y)*0.998) ?1:0;
+  } else if(algo==='ign'){
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++) dark[y*gw+x]=g[y*gw+x]<ignT(x,y)?1:0;
+  } else if(algo==='bluenoise'){
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++)
+      dark[y*gw+x]=g[y*gw+x]<BN.rank[(y%BN.n)*BN.n+(x%BN.n)]?1:0;
+  } else if(algo.startsWith('bayer')){
+    const m=BAYER[+algo.slice(5)], n=m.length, nn=n*n;
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++)
+      dark[y*gw+x]=g[y*gw+x]<(m[y%n][x%n]+0.5)/nn?1:0;
+  } else if(algo==='riemersma'){
+    const order=1<<Math.ceil(Math.log2(Math.max(gw,gh)||1));
+    const Q=16, q=new Float32Array(Q); let qi=0;
+    const wgt=[]; let wsum=0;
+    for(let j=0;j<Q;j++){ const w=Math.exp(-3*j/(Q-1)); wgt.push(w); wsum+=w; }
+    for(let j=0;j<Q;j++) wgt[j]/=wsum;
+    const total=order*order;
+    for(let d=0;d<total;d++){
+      const [x,y]=hilbert(order,d);
+      if(x>=gw||y>=gh) continue;
+      const i=y*gw+x;
+      let acc=0;
+      for(let j=0;j<Q;j++) acc+=q[(qi-1-j+Q*2)%Q]*wgt[j];
+      const v=g[i]+acc*s;
+      const nv=v<0.5?0:1;
+      dark[i]=nv?0:1;
+      q[qi]=v-nv; qi=(qi+1)%Q;
+    }
+  } else { // カーネル誤差拡散
+    const {div,taps}=KERNELS[algo];
+    for(let y=0;y<gh;y++){
+      const rev = state.serpentine && (y&1);
+      for(let xi=0;xi<gw;xi++){
+        const x = rev? gw-1-xi : xi;
+        const i=y*gw+x, old=g[i], nv=old<0.5?0:1;
+        dark[i]=nv?0:1;
+        const err=(old-nv)*s;
+        for(let k=0;k<taps.length;k++){
+          const dx = rev? -taps[k][0] : taps[k][0];
+          const ny = y+taps[k][1], nx = x+dx;
+          if(nx>=0 && nx<gw && ny<gh) g[ny*gw+nx]+=err*taps[k][2]/div;
+        }
+      }
+    }
+  }
+  return {dark,gw,gh};
+}
+function renderDither(ctx,W,H,scale,t){
+  const {dark,gw,gh}=ditherGrid(t);
+  const cs=state.cell*scale;
+  ctx.fillStyle=state.fg; ctx.beginPath();
+  for(let y=0;y<gh;y++){
+    for(let x=0;x<gw;x++){
+      if(!dark[y*gw+x]) continue;
+      let x2=x; while(x2+1<gw && dark[y*gw+x2+1]) x2++;   // 水平RLE
+      ctx.rect(x*cs, y*cs, (x2-x+1)*cs+0.4, cs+0.4);
+      x=x2;
+    }
+  }
+  ctx.fill();
+}
+
+/* ==================== ASCII / モザイク ==================== */
+function renderAscii(ctx,W,H,scale,t){
+  const cell = state.cell*scale;
+  const chars = state.charset, n = chars.length;
+  ctx.fillStyle = state.fg;
+  ctx.font = `${Math.round(cell*1.15)}px ui-monospace, Menlo, monospace`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let y=cell/2; y<H; y+=cell){
+    for(let x=cell/2; x<W; x+=cell){
+      const l = sampleLum(x/scale, y/scale, t);
+      const ch = chars[Math.min(n-1, Math.floor(l*n))];
+      if(ch!==' ') ctx.fillText(ch, x, y);
+    }
+  }
+}
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+function mosaicColor(l){
+  const L=state.levels, fg=hex2rgb(state.fg), bg=hex2rgb(state.bg);
+  const q=Math.round(l*(L-1))/(L-1);
+  if(q>=1) return null;
+  return [Math.round(fg[0]+(bg[0]-fg[0])*q),Math.round(fg[1]+(bg[1]-fg[1])*q),Math.round(fg[2]+(bg[2]-fg[2])*q)];
+}
+function renderMosaic(ctx,W,H,scale,t){
+  const cell=state.cell*scale;
+  for(let y=0;y<H;y+=cell){
+    for(let x=0;x<W;x+=cell){
+      const c=mosaicColor(sampleLum((x+cell/2)/scale,(y+cell/2)/scale,t));
+      if(!c) continue;
+      ctx.fillStyle=`rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.fillRect(x,y,cell+0.4,cell+0.4);
+    }
+  }
+}
+
+/* ==================== レンダリング ==================== */
+function renderTo(ctx,W,H,scale,t){
+  ctx.fillStyle = state.bg; ctx.fillRect(0,0,W,H);
+  if(state.source==='image' && !lumS) return;
+  if(state.effect==='halftone') renderHalftone(ctx,W,H,scale,t);
+  else if(state.effect==='dither') renderDither(ctx,W,H,scale,t);
+  else if(state.effect==='ascii') renderAscii(ctx,W,H,scale,t);
+  else renderMosaic(ctx,W,H,scale,t);
+}
+function render(t){ lastT=t||0; renderTo(vctx, srcW, srcH, 1, lastT); }
+const needLoop=()=> state.animOn || state.source!=='image';
+function loop(ts){ if(!needLoop()){raf=null;return;} render(ts/1000); raf=requestAnimationFrame(loop); }
+function kick(){ if(needLoop() && !raf) raf=requestAnimationFrame(loop); else if(!needLoop()) render(lastT); }
+
+/* ==================== ズーム / パン / 比較 ==================== */
+const canwrap=$('canwrap'), divider=$('divider'), divlabel=$('divlabel');
+let vz=1, vx=0, vy=0, compare=false, divP=0.5;
+function applyView(){
+  canwrap.style.transform=`translate(${vx}px,${vy}px) scale(${vz})`;
+  $('zPct').textContent=Math.round(vz*100)+'%';
+}
+function fitView(){
+  const r=stage.getBoundingClientRect();
+  if(!srcW||!r.width) return;
+  vz=Math.min(r.width/srcW, r.height/srcH)*0.94;
+  vx=(r.width-srcW*vz)/2; vy=(r.height-srcH*vz)/2;
+  applyView();
+}
+$('zIn').onclick=()=>{ zoomAt(1.25); };
+$('zOut').onclick=()=>{ zoomAt(0.8); };
+$('zFit').onclick=fitView;
+$('z100').onclick=()=>{ const r=stage.getBoundingClientRect(); vz=1; vx=(r.width-srcW)/2; vy=(r.height-srcH)/2; applyView(); };
+function zoomAt(f,px,py){
+  const r=stage.getBoundingClientRect();
+  if(px===undefined){ px=r.width/2; py=r.height/2; }
+  const nz=Math.min(12,Math.max(0.05,vz*f));
+  vx=px-(px-vx)*nz/vz; vy=py-(py-vy)*nz/vz; vz=nz; applyView();
+}
+stage.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=stage.getBoundingClientRect();
+  zoomAt(e.deltaY<0?1.12:0.89, e.clientX-r.left, e.clientY-r.top);
+},{passive:false});
+let panning=false,px0=0,py0=0;
+stage.addEventListener('pointerdown',e=>{
+  if(e.target===divider) return;
+  panning=true;px0=e.clientX-vx;py0=e.clientY-vy;
+  stage.classList.add('panning'); stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove',e=>{
+  if(!panning) return; vx=e.clientX-px0; vy=e.clientY-py0; applyView();
+});
+stage.addEventListener('pointerup',()=>{panning=false;stage.classList.remove('panning');});
+
+$('btnCompare').onclick=()=>{
+  compare=!compare;
+  $('btnCompare').classList.toggle('on',compare);
+  origCv.classList.toggle('hidden',!compare);
+  divider.classList.toggle('hidden',!compare);
+  divlabel.classList.toggle('hidden',!compare);
+  updateDivider();
+};
+function updateDivider(){
+  divider.style.left=(divP*100)+'%';
+  divlabel.style.left=`calc(${Math.min(divP*100,80)}% - 60px)`;
+  origCv.style.clipPath=`inset(0 ${(1-divP)*100}% 0 0)`;
+}
+divider.addEventListener('pointerdown',e=>{
+  e.stopPropagation();
+  const move=ev=>{
+    const r=canwrap.getBoundingClientRect();
+    divP=Math.min(0.98,Math.max(0.02,(ev.clientX-r.left)/r.width));
+    updateDivider();
+  };
+  const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+});
+updateDivider();
+
+/* ==================== SVG 書き出し ==================== */
+const exScale=()=> state.source==='image' ? original.width/srcW : 2;
+const exReady=()=> state.source!=='image' || !!original;
+function buildSVG(){
+  if(state.effect==='ascii' || !exReady()) return null;
+  if(state.source==='image' && !lumS) return null;
+  const scale = exScale();
+  const W=Math.round(srcW*scale), H=Math.round(srcH*scale);
+  const R=v=>Math.round(v*100)/100;
+  const parts=[`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    `<rect width="100%" height="100%" fill="${state.bg}"/>`];
+  if(state.effect==='halftone'){
+    parts.push(`<g fill="${state.fg}">`);
+    const cell=state.cell*scale, a=state.angle*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+    const cx=W/2, cy=H/2, n=Math.ceil(Math.hypot(W,H)/2/cell)+2;
+    const maxR=cell*0.7071*state.dotGain, shape=state.shape;
+    for(let j=-n;j<=n;j++) for(let i=-n;i<=n;i++){
+      const x=cx+(i*ca-j*sa)*cell, y=cy+(i*sa+j*ca)*cell;
+      if(x<-cell||y<-cell||x>W+cell||y>H+cell) continue;
+      const ink=1-sampleLum(x/scale,y/scale,lastT);
+      if(ink<=0.004) continue;
+      const r=maxR*Math.sqrt(ink); if(r<0.3) continue;
+      if(shape==='circle') parts.push(`<circle cx="${R(x)}" cy="${R(y)}" r="${R(r)}"/>`);
+      else if(shape==='square'){ const q=r*0.8862; parts.push(`<rect x="${R(x-q)}" y="${R(y-q)}" width="${R(q*2)}" height="${R(q*2)}"/>`); }
+      else parts.push(`<line x1="${R(x-ca*cell*0.55)}" y1="${R(y-sa*cell*0.55)}" x2="${R(x+ca*cell*0.55)}" y2="${R(y+sa*cell*0.55)}" stroke="${state.fg}" stroke-width="${R(Math.min(r*1.1,cell*0.98))}" stroke-linecap="round"/>`);
+    }
+    parts.push('</g>');
+  } else if(state.effect==='dither'){
+    const {dark,gw,gh}=ditherGrid(lastT);
+    const cs=state.cell*scale;
+    parts.push(`<g fill="${state.fg}">`);
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){
+      if(!dark[y*gw+x]) continue;
+      let x2=x; while(x2+1<gw && dark[y*gw+x2+1]) x2++;
+      parts.push(`<rect x="${R(x*cs)}" y="${R(y*cs)}" width="${R((x2-x+1)*cs)}" height="${R(cs)}"/>`);
+      x=x2;
+    }
+    parts.push('</g>');
+  } else { // mosaic: 色ごとにRLE
+    const cell=state.cell;
+    const gw=Math.ceil(srcW/cell), gh=Math.ceil(srcH/cell), cs=cell*scale;
+    const grid=[];
+    for(let y=0;y<gh;y++){ const row=[]; for(let x=0;x<gw;x++){
+      const c=mosaicColor(sampleLum((x+0.5)*cell,(y+0.5)*cell,lastT));
+      row.push(c?`rgb(${c[0]},${c[1]},${c[2]})`:null);
+    } grid.push(row);}
+    for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){
+      const c=grid[y][x]; if(!c) continue;
+      let x2=x; while(x2+1<gw && grid[y][x2+1]===c) x2++;
+      parts.push(`<rect x="${R(x*cs)}" y="${R(y*cs)}" width="${R((x2-x+1)*cs)}" height="${R(cs)}" fill="${c}"/>`);
+      x=x2;
+    }
+  }
+  parts.push('</svg>');
+  return parts.join('\n');
+}
+
+/* ==================== 書き出し ==================== */
+function renderExportCanvas(){
+  const scale=exScale();
+  const c=document.createElement('canvas');
+  c.width=Math.round(srcW*scale); c.height=Math.round(srcH*scale);
+  renderTo(c.getContext('2d'), c.width, c.height, scale, lastT);
+  return c;
+}
+const fmtKB=b=> b>1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(1)+' KB';
+let sizeTimer=null;
+function sizesDirty(){
+  $('szPng').textContent='…'; $('szSvg').textContent = state.effect==='ascii'?'非対応':'…';
+  $('btnSvg').disabled = state.effect==='ascii';
+  clearTimeout(sizeTimer);
+  sizeTimer=setTimeout(computeSizes, 600);
+}
+function computeSizes(){
+  if(!exReady()) return;
+  try{
+    renderExportCanvas().toBlob(b=>{ if(b) $('szPng').textContent=fmtKB(b.size); },'image/png');
+    if(state.effect!=='ascii'){
+      const s=buildSVG();
+      if(s) $('szSvg').textContent=fmtKB(new Blob([s]).size);
+    }
+  }catch(e){ $('szPng').textContent='—'; }
+}
+function dl(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+$('btnPng').onclick=()=>{ if(!exReady())return;
+  renderExportCanvas().toBlob(b=>dl(b,`halftone-lab_${state.effect}_${state.algo}.png`),'image/png');
+};
+$('btnSvg').onclick=()=>{ if(!exReady())return;
+  const s=buildSVG(); if(!s) return;
+  dl(new Blob([s],{type:'image/svg+xml'}),`halftone-lab_${state.effect}.svg`);
+};
+$('btnCopy').onclick=async()=>{ if(!exReady())return;
+  try{
+    const blob=await new Promise(res=>renderExportCanvas().toBlob(res,'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    $('btnCopy').querySelector('small').textContent='コピー済✓';
+    setTimeout(()=>$('btnCopy').querySelector('small').textContent='clipboard',1500);
+  }catch(e){ alert('クリップボード書き込みに失敗しました'); }
+};
+
+/* ==================== UIバインド ==================== */
+function bindRange(id,key,fmt,after){
+  const el=$(id), out=$(id+'V');
+  el.addEventListener('input',()=>{
+    state[key]=parseFloat(el.value);
+    if(out) out.textContent=fmt(el.value);
+    if(after) after();
+    else { if(!state.animOn) render(lastT); sizesDirty(); }
+  });
+}
+const fmts={
+  cell:v=>v+'px', angle:v=>v+'°', dotGain:v=>(+v).toFixed(2), levels:v=>v,
+  bright:v=>(+v).toFixed(2), contrast:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2),
+  waveAmp:v=>(+v).toFixed(2), waveLen:v=>v, waveSpeed:v=>(+v).toFixed(1),
+  errStrength:v=>v+'%', workRes:v=>v,
+  ringW:v=>v+'px', ringSpeed:v=>(+v).toFixed(1), srcCX:v=>(+v).toFixed(2), srcCY:v=>(+v).toFixed(2), ringFade:v=>(+v).toFixed(2),
+  shSize:v=>(+v).toFixed(2), shWidth:v=>(+v).toFixed(2), shRot:v=>(+v).toFixed(1), shPulse:v=>(+v).toFixed(1),
+  ledSize:v=>v+'px', ledTempo:v=>(+v).toFixed(1), ledDensity:v=>(+v).toFixed(2), ledBias:v=>(+v).toFixed(2),
+  auBarW:v=>v+'px', auDuty:v=>(+v).toFixed(2), auAmp:v=>(+v).toFixed(2), auTempo:v=>(+v).toFixed(1), auSpeed:v=>(+v).toFixed(1), auLines:v=>v,
+  maskAngle:v=>v+'°', maskWidth:v=>(+v).toFixed(2)
+};
+const RANGE_KEYS=['cell','angle','dotGain','levels','bright','contrast','gamma','waveAmp','waveLen','waveSpeed','errStrength',
+  'ringW','ringSpeed','srcCX','srcCY','ringFade','shSize','shWidth','shRot','shPulse',
+  'ledSize','ledTempo','ledDensity','ledBias','auBarW','auDuty','auAmp','auTempo','auSpeed','auLines','maskAngle','maskWidth'];
+for(const k of RANGE_KEYS) bindRange(k,k,fmts[k]);
+let wrTimer=null;
+bindRange('workRes','workRes',fmts.workRes,()=>{ clearTimeout(wrTimer); wrTimer=setTimeout(rebuildWorking,250); });
+
+function bindSimple(id,key,prop='value',isCheck=false){
+  $(id).addEventListener(isCheck?'change':'input',e=>{
+    state[key]=isCheck?e.target.checked:e.target[prop];
+    render(lastT); sizesDirty();
+  });
+}
+bindSimple('shape','shape'); bindSimple('charset','charset'); bindSimple('shapeKind','shapeKind'); bindSimple('auStyle','auStyle');
+$('maskType').addEventListener('change',e=>{
+  state.maskType=e.target.value;
+  $('maskOpts').classList.toggle('hidden', state.maskType==='none');
+  render(lastT); sizesDirty();
+});
+bindSimple('fg','fg'); bindSimple('bg','bg');
+bindSimple('invert','invert','checked',true);
+bindSimple('serpentine','serpentine','checked',true);
+$('linear').addEventListener('change',e=>{ state.linear=e.target.checked; render(lastT); sizesDirty(); });
+$('algo').addEventListener('change',e=>{
+  state.algo=e.target.value;
+  $('edOpts').classList.toggle('hidden', !ED_SET.has(state.algo));
+  render(lastT); sizesDirty();
+});
+$('animOn').addEventListener('change',e=>{ state.animOn=e.target.checked; kick(); });
+
+/* ソース切替 */
+const srcWrap=$('sources');
+function setSource(s){
+  state.source=s;
+  [...srcWrap.children].forEach(b=>b.classList.toggle('on', b.dataset.s===s));
+  document.querySelectorAll('.group[data-src]').forEach(g=>g.classList.toggle('hidden', g.dataset.src!==s));
+  const proc = s!=='image';
+  $('btnCompare').disabled=proc;
+  if(proc && compare) $('btnCompare').click();
+  rebuildWorking(); kick();
+}
+srcWrap.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setSource(b.dataset.s); });
+
+/* 録画 */
+let recActive=false;
+$('btnRec').onclick=()=>{
+  if(recActive || !exReady()) return;
+  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  const mime=(window.MediaRecorder && mimes.find(m=>MediaRecorder.isTypeSupported(m)));
+  if(!mime){ alert('この環境は録画に対応していません'); return; }
+  const dur=+$('recDur').value*1000;
+  const wasAnim=state.animOn;
+  if(!needLoop()){ state.animOn=true; $('animOn').checked=true; }
+  kick();
+  const stream=view.captureStream(30);
+  const rec=new MediaRecorder(stream,{mimeType:mime, videoBitsPerSecond:8e6});
+  const chunks=[];
+  rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  rec.onstop=()=>{
+    dl(new Blob(chunks,{type:mime.split(';')[0]}), `halftone-lab_${state.effect}.webm`);
+    $('btnRec').textContent='● WebM録画'; recActive=false;
+    if(!wasAnim){ state.animOn=false; $('animOn').checked=false; kick(); }
+  };
+  rec.start(250); recActive=true;
+  let left=Math.round(dur/1000);
+  $('btnRec').textContent=`録画中… ${left}s`;
+  const iv=setInterval(()=>{ left--; if(left>0) $('btnRec').textContent=`録画中… ${left}s`; },1000);
+  setTimeout(()=>{ clearInterval(iv); rec.stop(); }, dur);
+};
+
+const effWrap=$('effects');
+function setEffect(eff){
+  state.effect=eff;
+  [...effWrap.children].forEach(b=>b.classList.toggle('on', b.dataset.e===eff));
+  document.querySelectorAll('.group[data-for]').forEach(g=>g.classList.toggle('hidden', g.dataset.for!==eff));
+  render(lastT); sizesDirty();
+}
+effWrap.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setEffect(b.dataset.e); });
+
+function syncUI(){
+  for(const k of [...RANGE_KEYS,'workRes']){
+    $(k).value=state[k]; const o=$(k+'V'); if(o) o.textContent=fmts[k](state[k]);
+  }
+  $('shape').value=state.shape; $('algo').value=state.algo; $('charset').value=state.charset;
+  $('shapeKind').value=state.shapeKind; $('auStyle').value=state.auStyle; $('maskType').value=state.maskType;
+  $('maskOpts').classList.toggle('hidden', state.maskType==='none');
+  $('invert').checked=state.invert; $('serpentine').checked=state.serpentine;
+  $('linear').checked=state.linear;
+  $('fg').value=state.fg; $('bg').value=state.bg; $('animOn').checked=state.animOn;
+  $('edOpts').classList.toggle('hidden', !ED_SET.has(state.algo));
+  setEffect(state.effect); setSource(state.source);
+}
+
+/* ==================== プリセット / ランダム ==================== */
+const PRESETS={
+  sound:{source:'audio',auStyle:'waveform',effect:'dither',algo:'threshold',cell:4,fg:'#2ee66b',bg:'#140f0b',invert:false,contrast:1.1,gamma:1,bright:0,animOn:false,maskType:'none',auBarW:7,auDuty:0.65,auAmp:0.85,auTempo:4,auSpeed:0.8,auLines:2},
+  lumina:{source:'ripple',effect:'halftone',shape:'circle',cell:8,angle:30,dotGain:1.05,fg:'#f2f2f2',bg:'#0a0a0b',invert:false,contrast:1.25,gamma:1,bright:0,animOn:false,maskType:'band',maskAngle:30,maskWidth:0.5,ringW:70,ringSpeed:1.6,srcCX:0.62,srcCY:0.36,ringFade:1.1},
+  news:{source:'image',maskType:'none',effect:'halftone',shape:'circle',cell:7,angle:45,dotGain:1,fg:'#111111',bg:'#f2efe6',invert:false,contrast:1.15,gamma:1,bright:0,animOn:false},
+  retro:{source:'image',maskType:'none',effect:'dither',algo:'atkinson',cell:3,fg:'#e8e8e8',bg:'#111318',invert:false,contrast:1.15,gamma:1,bright:0,animOn:false,errStrength:100,serpentine:true},
+  led:{source:'led',effect:'halftone',shape:'circle',cell:12,angle:0,dotGain:0.9,fg:'#ffd166',bg:'#0a0a0b',invert:false,contrast:1.2,gamma:1,bright:0,animOn:false,maskType:'none',ledSize:64,ledTempo:3,ledDensity:0.35,ledBias:0.6,srcCY:0.45},
+  ascii:{source:'image',maskType:'none',effect:'ascii',charset:'@%#*+=-:. ',cell:9,fg:'#5ee0a8',bg:'#07100b',invert:false,contrast:1.3,gamma:1,bright:0,animOn:false},
+  bayer:{source:'image',maskType:'none',effect:'dither',algo:'bayer4',cell:4,fg:'#c8d3c0',bg:'#1b2420',invert:false,contrast:1.2,gamma:1,bright:0,animOn:false},
+  wave:{source:'image',maskType:'none',effect:'halftone',shape:'circle',cell:9,angle:30,dotGain:1.1,fg:'#f2f2f2',bg:'#0a0a0b',invert:false,contrast:1.2,gamma:1,bright:0,animOn:true,waveAmp:0.3,waveLen:150,waveSpeed:1.8}
+};
+$('presets').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  Object.assign(state, PRESETS[b.dataset.p]); syncUI(); sizesDirty();
+});
+const PALETTES=[
+  {bg:'#0a0a0b',fg:'#f7f7f2'},{bg:'#f2efe6',fg:'#111111'},{bg:'#001b2e',fg:'#7cc7ff'},
+  {bg:'#1a0b2e',fg:'#ffd166'},{bg:'#0b1f16',fg:'#5ee0a8'},{bg:'#2e0b12',fg:'#ff8fa3'},
+  {bg:'#101418',fg:'#ff6b35'},{bg:'#e8e4da',fg:'#c1121f'}
+];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+$('btnRandom').onclick=()=>{
+  const eff=pick(['halftone','halftone','dither','dither','ascii','mosaic']);
+  const pal=pick(PALETTES);
+  Object.assign(state,{
+    effect:eff, fg:pal.fg, bg:pal.bg,
+    cell:Math.round(rnd(3,18)), angle:Math.round(rnd(0,90)),
+    shape:pick(['circle','square','line']), dotGain:+rnd(0.7,1.4).toFixed(2),
+    algo:pick(['fs','atkinson','jjn','stucki','burkes','sierra','riemersma','bayer4','bayer8','bluenoise','ign']),
+    charset:pick(['@%#*+=-:. ','█▓▒░ ','01 ','◉●◐○∙ ']),
+    levels:Math.round(rnd(2,6)),
+    errStrength:Math.round(rnd(70,130)/5)*5,
+    contrast:+rnd(0.9,1.8).toFixed(2), gamma:+rnd(0.7,1.4).toFixed(2), bright:+rnd(-0.1,0.1).toFixed(2),
+    invert:Math.random()<0.3
+  });
+  syncUI(); sizesDirty();
+};
+
+/* ==================== マイプリセット ==================== */
+let memPresets=[];
+function loadPresets(){ try{ const v=localStorage.getItem('hl_presets'); if(v) memPresets=JSON.parse(v); }catch(e){} return memPresets; }
+function persistPresets(){ try{ localStorage.setItem('hl_presets', JSON.stringify(memPresets)); }catch(e){} }
+async function copyText(s){
+  try{ await navigator.clipboard.writeText(s); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=s; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); }catch(_){} ta.remove();
+  }
+}
+function renderPresetList(){
+  const wrap=$('presetList'); wrap.innerHTML='';
+  if(!memPresets.length){
+    wrap.innerHTML='<span style="font-size:11px;color:#6c6c78">保存したプリセットはここに並びます</span>';
+    return;
+  }
+  memPresets.forEach((p,i)=>{
+    const b=document.createElement('button'); b.className='chipbtn pchip';
+    const s=document.createElement('span'); s.textContent=p.name; b.appendChild(s);
+    const x=document.createElement('span'); x.textContent='✕'; x.className='pdel'; x.title='削除';
+    x.onclick=ev=>{ ev.stopPropagation(); memPresets.splice(i,1); persistPresets(); renderPresetList(); };
+    b.appendChild(x);
+    b.onclick=()=>{ Object.assign(state, JSON.parse(JSON.stringify(p.data))); syncUI(); sizesDirty(); };
+    wrap.appendChild(b);
+  });
+}
+$('btnSavePreset').onclick=()=>{
+  const name=$('presetName').value.trim() || `プリセット ${memPresets.length+1}`;
+  memPresets.push({name, data:JSON.parse(JSON.stringify(state))});
+  persistPresets(); renderPresetList(); $('presetName').value='';
+};
+const encTok=()=>btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+const decTok=s=>JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
+$('btnToken').onclick=async()=>{
+  const t=encTok(); $('tokenIn').value=t; await copyText(t);
+  const b=$('btnToken'); b.textContent='コピー済✓';
+  setTimeout(()=>b.textContent='トークン',1500);
+};
+$('btnShare').onclick=async()=>{
+  const url=location.href.split('#')[0]+'#s='+encodeURIComponent(encTok());
+  await copyText(url);
+  const b=$('btnShare'); b.textContent='コピー済✓';
+  setTimeout(()=>b.textContent='🔗 共有リンク',1500);
+};
+function parseShareHash(){
+  try{
+    if(location.hash.startsWith('#s=')) return decTok(decodeURIComponent(location.hash.slice(3)));
+  }catch(e){}
+  return null;
+}
+$('btnTokenLoad').onclick=()=>{
+  try{ Object.assign(state, decTok($('tokenIn').value)); syncUI(); sizesDirty(); $('tokenIn').value=''; }
+  catch(e){ alert('トークンを読み込めませんでした'); }
+};
+
+/* ==================== コード書き出し（コーダー用） ==================== */
+function buildEmbed(){
+  const cfg=JSON.parse(JSON.stringify(state));
+  const isImg = cfg.source==='image';
+  const animated = cfg.animOn || cfg.source!=='image';
+  const bnData = Array.from(BN.rank).map(v=>+v.toFixed(4));
+  const today = new Date().toISOString().slice(0,10);
+  const imageBoot = isImg ? `
+// ==== 画像の読み込み（IMAGE_URL を書き換えてください）====
+const IMAGE_URL = 'YOUR_IMAGE.jpg'; // ←あなたの画像パス
+const s2l = ${s2l.toString()};
+const _img = new Image(); _img.crossOrigin = 'anonymous';
+_img.onload = function(){
+  const r = Math.min(1, ${cfg.workRes}/Math.max(_img.width,_img.height));
+  srcW = Math.max(1, Math.round(_img.width*r));
+  srcH = Math.max(1, Math.round(_img.height*r));
+  _cv.width = srcW; _cv.height = srcH;
+  const c = document.createElement('canvas'); c.width=srcW; c.height=srcH;
+  const x = c.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,srcW,srcH); x.drawImage(_img,0,0,srcW,srcH);
+  const d = x.getImageData(0,0,srcW,srcH).data;
+  lumS = new Float32Array(srcW*srcH); lumL = new Float32Array(srcW*srcH);
+  for(let i=0,p=0;i<lumS.length;i++,p+=4){
+    lumS[i]=(0.2126*d[p]+0.7152*d[p+1]+0.0722*d[p+2])/255;
+    lumL[i]=0.2126*s2l(d[p])+0.7152*s2l(d[p+1])+0.0722*s2l(d[p+2]);
+  }
+  ${animated ? '' : 'render(0);'}
+};
+_img.src = IMAGE_URL;` : '';
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>HALFTONE LAB embed</title>
+<style>html,body{margin:0;background:${cfg.bg}}canvas{display:block;max-width:100%;height:auto;margin:0 auto}</style>
+</head>
+<body>
+<canvas id="halftone" width="${srcW}" height="${srcH}"></canvas>
+<script>
+/* =========================================================
+   HALFTONE LAB — コード書き出し（${today}）
+   エフェクト: ${cfg.effect} ／ ソース: ${cfg.source}${animated?' ／ アニメーション: あり':''}
+   - 冒頭の state の値を書き換えるだけで見た目を調整できます
+   - 依存ライブラリなし（Canvas 2D のみ）
+   ${isImg ? '- IMAGE_URL をあなたの画像パスに書き換えてください（CORS注意）' : '- プロシージャルソースのため画像は不要です'}
+========================================================= */
+"use strict";
+const state = ${JSON.stringify(cfg,null,2)};
+let srcW=${srcW}, srcH=${srcH}, lumS=null, lumL=null;
+const _cv=document.getElementById('halftone'), _ctx=_cv.getContext('2d');
+
+const ss=${ss.toString()};
+const hash3=${hash3.toString()};
+const hashT=${hashT.toString()};
+const ignT=${ignT.toString()};
+const hex2rgb=${hex2rgb.toString()};
+const KERNELS=${JSON.stringify(KERNELS)};
+${bayerMatrix.toString()}
+const BAYER={2:bayerMatrix(2),4:bayerMatrix(4),8:bayerMatrix(8),16:bayerMatrix(16)};
+const BN={n:32, rank:new Float32Array(${JSON.stringify(bnData)})};
+${hilbert.toString()}
+${procLum.toString()}
+${inMask.toString()}
+${sampleLum.toString()}
+${renderHalftone.toString()}
+${ditherGrid.toString()}
+${renderDither.toString()}
+${renderAscii.toString()}
+${mosaicColor.toString()}
+${renderMosaic.toString()}
+${renderTo.toString()}
+
+function render(t){ renderTo(_ctx, srcW, srcH, 1, t); }
+${imageBoot}
+${animated
+  ? 'requestAnimationFrame(function loop(ts){ render(ts/1000); requestAnimationFrame(loop); });'
+  : (isImg ? '// 描画は画像ロード後に実行されます' : 'render(0);')}
+<\/script>
+</body>
+</html>`;
+}
+$('btnCode').onclick=()=>{
+  const code=buildEmbed();
+  dl(new Blob([code],{type:'text/html'}), 'halftone-lab-embed.html');
+};
+
+/* ==================== 起動 ==================== */
+loadPresets(); renderPresetList();
+window.addEventListener('resize',fitView);
+const _shared=parseShareHash();
+demo(_shared ? ()=>{ Object.assign(state,_shared); syncUI(); sizesDirty(); } : null);
+</script>
+</body>
+</html>
