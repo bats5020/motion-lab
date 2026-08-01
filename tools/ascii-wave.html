@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ASCII Wave</title>
+<style>
+:root{
+  --bg:#0a0a0b; --panel:#141417; --panel2:#1c1c21; --line:#2a2a31;
+  --text:#e6e6ef; --sub:#9a9aa6; --faint:#6a6a74; --accent:#4f5cff;
+  --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);overflow:hidden}
+#app{display:flex;height:100vh;width:100vw}
+/* ---- stage ---- */
+#stage{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+#topbar{display:flex;align-items:baseline;gap:14px;padding:14px 20px 0;flex:0 0 auto}
+#topbar h1{font-size:13px;font-weight:700;letter-spacing:.28em;color:var(--text)}
+#topbar p{font-size:10px;color:var(--faint);letter-spacing:.06em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#view{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:20px;position:relative}
+#cv{display:block;background:#000;border:1px solid var(--panel2);box-shadow:0 8px 40px rgba(0,0,0,.55);cursor:crosshair}
+/* ---- panel ---- */
+#panel{flex:0 0 300px;width:300px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;overflow-x:hidden}
+#panel::-webkit-scrollbar{width:8px}
+#panel::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+#panel::-webkit-scrollbar-track{background:transparent}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;display:flex;align-items:center;justify-content:space-between;padding:11px 16px;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--sub);cursor:pointer;user-select:none;-webkit-user-select:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾";font-size:9px;color:var(--faint);transition:transform .15s}
+details:not([open]) summary::after{transform:rotate(-90deg)}
+summary:hover{color:var(--text)}
+.body{padding:4px 16px 14px}
+.row{display:flex;align-items:center;gap:8px;min-height:28px;margin:3px 0}
+.row>label{flex:0 0 84px;font-size:11px;color:var(--sub);letter-spacing:.02em}
+.row .val{flex:0 0 44px;text-align:right;font-size:10px;color:var(--faint);white-space:nowrap}
+/* range */
+input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;background:var(--line);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);transition:background .12s}
+input[type=range]:hover::-webkit-slider-thumb,input[type=range]:active::-webkit-slider-thumb{background:var(--accent)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
+input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:2px}
+/* select / text / number / color */
+select,input[type=text],input[type=number]{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);font:11px var(--mono);padding:5px 7px;border-radius:5px;outline:none}
+select:focus,input[type=text]:focus,input[type=number]:focus{border-color:var(--accent)}
+select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);background-position:calc(100% - 14px) 55%,calc(100% - 10px) 55%;background-size:4px 4px;background-repeat:no-repeat;padding-right:24px}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input[type=color]{flex:0 0 40px;width:40px;height:24px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2);cursor:pointer}
+input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+input[type=color]::-webkit-color-swatch{border:none;border-radius:3px}
+input[type=color]::-moz-color-swatch{border:none;border-radius:3px}
+.hex{flex:1;font-size:10px;color:var(--faint);letter-spacing:.05em}
+/* toggle switch */
+.sw{position:relative;flex:0 0 34px;width:34px;height:18px;cursor:pointer}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.sw i{position:absolute;inset:0;background:var(--panel2);border:1px solid var(--line);border-radius:999px;transition:background .15s,border-color .15s}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--faint);transition:transform .15s,background .15s}
+.sw input:checked+i{background:var(--accent);border-color:var(--accent)}
+.sw input:checked+i::after{transform:translateX(16px);background:#fff}
+/* buttons */
+button{background:var(--panel2);border:1px solid var(--line);color:var(--text);font:600 11px var(--mono);letter-spacing:.05em;padding:8px 10px;border-radius:6px;cursor:pointer;transition:border-color .12s,background .12s}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:active:not(:disabled){background:#22222a}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.rec-on{border-color:#ff4f5c;color:#ff4f5c}
+.btn-row{display:flex;gap:8px;margin:6px 0}
+.btn-row button{flex:1}
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+#btn-random{width:100%;margin-top:2px;border-style:dashed}
+#seed-label{display:block;text-align:center;font-size:10px;color:var(--faint);letter-spacing:.12em;margin-top:8px}
+.note{font-size:10px;color:var(--faint);margin:4px 0 2px;line-height:1.6}
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<div id="app">
+  <main id="stage">
+    <div id="topbar">
+      <h1>ASCII WAVE</h1>
+      <p>ノイズフィールドを文字群で描く、生成ASCII背景ジェネレーター</p>
+    </div>
+    <div id="view"><canvas id="cv"></canvas></div>
+  </main>
+  <aside id="panel">
+
+    <details open>
+      <summary>キャンバス</summary>
+      <div class="body">
+        <div class="row"><label>アスペクト</label>
+          <select id="i-aspect">
+            <option value="16:9">16:9</option><option value="4:3">4:3</option>
+            <option value="1:1">1:1</option><option value="9:16">9:16</option>
+            <option value="3:4">3:4</option><option value="custom">カスタム</option>
+          </select>
+        </div>
+        <div class="row"><label>サイズ px</label>
+          <input type="number" id="i-expw" min="200" max="4096" step="1">
+          <span style="color:var(--faint)">×</span>
+          <input type="number" id="i-exph" min="200" max="4096" step="1">
+        </div>
+        <div class="row"><label>背景色</label><input type="color" id="i-bg"><span class="hex" id="i-bg-v"></span></div>
+        <div class="row"><label>文字色</label><input type="color" id="i-fg"><span class="hex" id="i-fg-v"></span></div>
+        <div class="row"><label>アクセント色</label><input type="color" id="i-accent"><span class="hex" id="i-accent-v"></span></div>
+        <div class="row"><label>ピーク着色</label><label class="sw"><input type="checkbox" id="i-accenton"><i></i></label><span class="val"></span></div>
+        <div class="row"><label>色反転</label><label class="sw"><input type="checkbox" id="i-invert"><i></i></label><span class="val"></span></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>波</summary>
+      <div class="body">
+        <div class="row"><label>スケール</label><input type="range" id="i-scale" min="0.3" max="8" step="0.05"><span class="val" id="i-scale-v"></span></div>
+        <div class="row"><label>うねり速度</label><input type="range" id="i-speed" min="0" max="2" step="0.01"><span class="val" id="i-speed-v"></span></div>
+        <div class="row"><label>オクターブ</label><input type="range" id="i-octaves" min="1" max="4" step="1"><span class="val" id="i-octaves-v"></span></div>
+        <div class="row"><label>コントラスト</label><input type="range" id="i-contrast" min="0.4" max="3" step="0.05"><span class="val" id="i-contrast-v"></span></div>
+        <div class="row"><label>しきい値</label><input type="range" id="i-threshold" min="0" max="0.7" step="0.01"><span class="val" id="i-threshold-v"></span></div>
+        <div class="row"><label>流れの方向</label><input type="range" id="i-flowdir" min="0" max="360" step="1"><span class="val" id="i-flowdir-v"></span></div>
+        <div class="row"><label>流れの強さ</label><input type="range" id="i-flowstr" min="0" max="2" step="0.01"><span class="val" id="i-flowstr-v"></span></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>文字</summary>
+      <div class="body">
+        <div class="row"><label>プリセット</label>
+          <select id="i-charpreset">
+            <option value="default">デフォルト</option>
+            <option value="dots">ドット</option>
+            <option value="blocks">ブロック</option>
+            <option value="symbols">記号</option>
+            <option value="binary">バイナリ</option>
+            <option value="custom">カスタム</option>
+          </select>
+        </div>
+        <div class="row"><label>文字セット</label><input type="text" id="i-chars" spellcheck="false" autocomplete="off"></div>
+        <div class="row"><label>セルサイズ</label><input type="range" id="i-cell" min="6" max="36" step="1"><span class="val" id="i-cell-v"></span></div>
+        <div class="row"><label>字間</label><input type="range" id="i-lsp" min="0.6" max="2" step="0.05"><span class="val" id="i-lsp-v"></span></div>
+        <div class="row"><label>行間</label><input type="range" id="i-lht" min="0.6" max="2" step="0.05"><span class="val" id="i-lht-v"></span></div>
+        <div class="row"><label>太字</label><label class="sw"><input type="checkbox" id="i-bold"><i></i></label><span class="val"></span></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>インタラクション</summary>
+      <div class="body">
+        <div class="row"><label>カーソル連動</label><label class="sw"><input type="checkbox" id="i-inter"><i></i></label><span class="val"></span></div>
+        <div class="row"><label>モード</label>
+          <select id="i-mode">
+            <option value="repel">反発</option>
+            <option value="attract">引き寄せ</option>
+            <option value="swirl">渦</option>
+          </select>
+        </div>
+        <div class="row"><label>半径</label><input type="range" id="i-radius" min="40" max="420" step="5"><span class="val" id="i-radius-v"></span></div>
+        <div class="row"><label>強さ</label><input type="range" id="i-strength" min="0" max="2" step="0.05"><span class="val" id="i-strength-v"></span></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>書き出し</summary>
+      <div class="body">
+        <div class="btn-row"><button id="btn-png">PNG保存</button></div>
+        <div class="row"><label>録画長さ</label>
+          <select id="i-dur">
+            <option value="3">3秒</option><option value="4">4秒</option>
+            <option value="5" selected>5秒</option><option value="6">6秒</option>
+            <option value="8">8秒</option>
+          </select>
+        </div>
+        <div class="btn-row"><button id="btn-webm">WebM録画</button></div>
+        <div class="btn-row"><button id="btn-code">⟨/⟩ コード書き出し</button></div>
+        <p class="note">コード書き出し: 現在の設定を埋め込んだ単体HTML（全画面背景・カーソル連動つき）をダウンロードします。</p>
+      </div>
+    </details>
+
+    <details open>
+      <summary>プリセット</summary>
+      <div class="body">
+        <div class="preset-grid" id="preset-grid"></div>
+        <button id="btn-random">ランダム</button>
+        <span id="seed-label">SEED —</span>
+      </div>
+    </details>
+
+  </aside>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   ASCII WAVE — MOTION LAB
+   generative ASCII fluid-wave background generator
+   ========================================================= */
+
+/* ---------- core (shared with embed export via toString) ---------- */
+
+function makeNoise(seed){
+  // seeded 2D simplex noise -> fn(x,y) in ~[-1,1]
+  var s = (seed >>> 0) || 1;
+  function rnd(){ s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }
+  var perm = new Uint8Array(512), t8 = new Uint8Array(256), i, j, tmp;
+  for(i = 0; i < 256; i++) t8[i] = i;
+  for(i = 255; i > 0; i--){ j = (rnd() * (i + 1)) | 0; tmp = t8[i]; t8[i] = t8[j]; t8[j] = tmp; }
+  for(i = 0; i < 512; i++) perm[i] = t8[i & 255];
+  var F2 = 0.366025403784439, G2 = 0.211324865405187;
+  var gx = [1,-1,1,-1,1,-1,0,0], gy = [1,1,-1,-1,0,0,1,-1];
+  return function(xin, yin){
+    var sk = (xin + yin) * F2;
+    var ii = Math.floor(xin + sk), jj = Math.floor(yin + sk);
+    var tt = (ii + jj) * G2;
+    var x0 = xin - (ii - tt), y0 = yin - (jj - tt);
+    var i1, j1;
+    if(x0 > y0){ i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+    var x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    var x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    ii &= 255; jj &= 255;
+    var n = 0, t0 = 0.5 - x0 * x0 - y0 * y0, g;
+    if(t0 > 0){ t0 *= t0; g = perm[ii + perm[jj]] & 7; n += t0 * t0 * (gx[g] * x0 + gy[g] * y0); }
+    var t1 = 0.5 - x1 * x1 - y1 * y1;
+    if(t1 > 0){ t1 *= t1; g = perm[ii + i1 + perm[jj + j1]] & 7; n += t1 * t1 * (gx[g] * x1 + gy[g] * y1); }
+    var t2 = 0.5 - x2 * x2 - y2 * y2;
+    if(t2 > 0){ t2 *= t2; g = perm[ii + 1 + perm[jj + 1]] & 7; n += t2 * t2 * (gx[g] * x2 + gy[g] * y2); }
+    return 70 * n;
+  };
+}
+
+function fbm(n2, x, y, oct){
+  var a = 0.5, f = 1, sum = 0, norm = 0, o;
+  for(o = 0; o < oct; o++){
+    sum += a * n2(x * f, y * f);
+    norm += a; a *= 0.5; f *= 2.03;
+  }
+  return sum / norm;
+}
+
+function fieldValue(n2, fb, x, y, k, t, o){
+  // pointer displacement (px space)
+  if(o.pf > 0){
+    var dx = x - o.px, dy = y - o.py, R = o.pr, d2 = dx * dx + dy * dy;
+    if(d2 < R * R){
+      var d = Math.sqrt(d2) || 1e-4, f = 1 - d / R;
+      f = f * f * (3 - 2 * f) * o.pf;
+      var m = f * R * 0.6, ux = dx / d, uy = dy / d;
+      if(o.pmode === 0){ x -= ux * m; y -= uy * m; }               // 反発
+      else if(o.pmode === 1){ x += ux * m; y += uy * m; }          // 引き寄せ
+      else { x += (-uy * 1.25 + ux * 0.2) * m; y += (ux * 1.25 + uy * 0.2) * m; } // 渦
+    }
+  }
+  var nx = x * k + o.fox, ny = y * k + o.foy;
+  var q = fb(n2, nx * 0.5 + t * 0.7, ny * 0.5 - t * 0.55, 2);      // time-advected warp
+  var v = fb(n2, nx + q * 1.1, ny + q * 1.1 + t * 0.4, o.oct);
+  v = v * 0.5 + 0.52;
+  v = (v - 0.5) * o.contrast + 0.5;
+  if(v <= o.thr) return -1;
+  v = (v - o.thr) / (1 - o.thr);
+  return v >= 1 ? 1 : v;
+}
+
+function hex2rgb(h){
+  h = h.replace('#', '');
+  if(h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function mixHex(a, b, t){
+  var A = hex2rgb(a), B = hex2rgb(b);
+  return 'rgb(' + Math.round(A[0] + (B[0] - A[0]) * t) + ',' +
+                  Math.round(A[1] + (B[1] - A[1]) * t) + ',' +
+                  Math.round(A[2] + (B[2] - A[2]) * t) + ')';
+}
+
+/* ---------- state ---------- */
+
+var FONTS = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace';
+
+var state = {
+  aspect: '16:9', expW: 1920, expH: 1080,
+  bg: '#07080c', fg: '#7c86a8', accent: '#4f5cff', accentOn: true, invert: false,
+  scale: 1.7, speed: 0.5, octaves: 3, contrast: 1.35, threshold: 0.12,
+  flowDir: 20, flowStr: 0.3,
+  chars: ' .:-=+*#%@', cell: 14, letterSpacing: 1, lineHeight: 1, bold: false,
+  interactive: true, mode: 'repel', radius: 180, strength: 1,
+  seed: 1337, dur: 5
+};
+
+var ASPECTS = { '16:9':[1920,1080], '4:3':[1600,1200], '1:1':[1080,1080], '9:16':[1080,1920], '3:4':[1200,1600] };
+
+var CHAR_PRESETS = {
+  default: ' .:-=+*#%@',
+  dots: ' .·•●',            // " .·•●"
+  blocks: ' ░▒▓█',      // " ░▒▓█"
+  symbols: ' .,:;i!?+=*x%&#@',
+  binary: '01'
+};
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- derived render data ---------- */
+
+var noise2 = makeNoise(state.seed);
+var ramp = [], colors = [], eBg = '', fontStr = '';
+var cols = 0, rows = 0, xs = new Float32Array(0), ys = new Float32Array(0);
+var previewScale = 1;
+
+var cv = document.getElementById('cv');
+var pctx = cv.getContext('2d');
+var view = document.getElementById('view');
+
+function rebuildColors(){
+  var eFg = state.invert ? state.bg : state.fg;
+  eBg = state.invert ? state.fg : state.bg;
+  ramp = Array.from(state.chars);
+  if(ramp.length < 2) ramp = [' ', '@'];
+  colors = [];
+  var n = ramp.length - 1;
+  for(var i = 0; i <= n; i++){
+    var u = n ? i / n : 1;
+    var m = 0;
+    if(state.accentOn){
+      m = (u - 0.55) / 0.45;
+      m = m < 0 ? 0 : m > 1 ? 1 : m;
+      m = m * m * (3 - 2 * m);
+    }
+    colors[i] = mixHex(eFg, state.accent, m);
+  }
+}
+
+function rebuildGrid(){
+  var fs = state.cell;
+  var cw = fs * state.letterSpacing, ch = fs * state.lineHeight;
+  var W = state.expW, H = state.expH;
+  var tot = Math.ceil(W / cw) * Math.ceil(H / ch);
+  if(tot > 45000){                        // safety cap: keep 60fps
+    var f = Math.sqrt(tot / 45000);
+    cw *= f; ch *= f; fs *= f;
+  }
+  cols = Math.ceil(W / cw); rows = Math.ceil(H / ch);
+  xs = new Float32Array(cols); ys = new Float32Array(rows);
+  var x0 = (W - cols * cw) / 2 + cw / 2, y0 = (H - rows * ch) / 2 + ch / 2;
+  for(var c = 0; c < cols; c++) xs[c] = x0 + c * cw;
+  for(var r = 0; r < rows; r++) ys[r] = y0 + r * ch;
+  fontStr = (state.bold ? '700 ' : '500 ') + fs.toFixed(2) + 'px ' + FONTS;
+}
+
+function fitPreview(){
+  var b = view.getBoundingClientRect();
+  var aw = Math.max(60, b.width - 40), ah = Math.max(60, b.height - 40);
+  var s = Math.min(aw / state.expW, ah / state.expH);
+  var cssW = Math.max(40, state.expW * s), cssH = Math.max(40, state.expH * s);
+  cv.style.width = cssW + 'px';
+  cv.style.height = cssH + 'px';
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.max(2, Math.round(cssW * dpr));
+  cv.height = Math.max(2, Math.round(cssH * dpr));
+  previewScale = cv.width / state.expW;
+}
+
+function rebuildAll(){
+  rebuildColors();
+  rebuildGrid();
+  fitPreview();
+}
+
+/* ---------- render ---------- */
+
+var oShared = { fox:0, foy:0, oct:3, contrast:1, thr:0, px:0, py:0, pr:0, pf:0, pmode:0, k:0 };
+
+function renderField(ctx, sc, o, t){
+  ctx.setTransform(sc, 0, 0, sc, 0, 0);
+  ctx.fillStyle = eBg;
+  ctx.fillRect(0, 0, state.expW, state.expH);
+  ctx.font = fontStr;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  var n = ramp.length - 1, k = o.k, li = -1;
+  for(var r = 0; r < rows; r++){
+    var y = ys[r];
+    for(var c = 0; c < cols; c++){
+      var v = fieldValue(noise2, fbm, xs[c], y, k, t, o);
+      if(v < 0) continue;
+      var idx = (v * n + 0.5) | 0;
+      var chr = ramp[idx];
+      if(chr === ' ') continue;
+      if(idx !== li){ ctx.fillStyle = colors[idx]; li = idx; }
+      ctx.fillText(chr, xs[c], y);
+    }
+  }
+}
+
+/* ---------- pointer (inertia) ---------- */
+
+var ptrTX = -1e6, ptrTY = -1e6, ptrX = 0, ptrY = 0, ptrEnvT = 0, ptrEnv = 0, ptrInit = false;
+
+function toExport(e){
+  var r = cv.getBoundingClientRect();
+  ptrTX = (e.clientX - r.left) / r.width * state.expW;
+  ptrTY = (e.clientY - r.top) / r.height * state.expH;
+}
+cv.addEventListener('pointermove', function(e){
+  toExport(e); ptrEnvT = 1;
+  if(!ptrInit){ ptrX = ptrTX; ptrY = ptrTY; ptrInit = true; }
+});
+cv.addEventListener('pointerenter', function(e){ toExport(e); ptrEnvT = 1; ptrX = ptrTX; ptrY = ptrTY; ptrInit = true; });
+cv.addEventListener('pointerleave', function(){ ptrEnvT = 0; });
+
+/* ---------- main loop ---------- */
+
+var phase = 0, fox = 0, foy = 0, lastT = performance.now();
+var recording = false, recEnd = 0, recCv = null, rctx = null, recorder = null, recChunks = [];
+var DEG = Math.PI / 180;
+
+function tick(now){
+  requestAnimationFrame(tick);
+  var dt = (now - lastT) / 1000;
+  lastT = now;
+  if(dt > 0.05) dt = 0.05;
+  if(document.hidden || cv.width < 4) return;   // render only when visible
+
+  phase += dt * state.speed * 0.55;
+  var fa = state.flowDir * DEG;
+  fox += dt * state.flowStr * Math.cos(fa) * 0.18;
+  foy += dt * state.flowStr * Math.sin(fa) * 0.18;
+
+  var e1 = Math.min(1, dt * 8), e2 = Math.min(1, dt * 5);
+  ptrX += (ptrTX - ptrX) * e1;
+  ptrY += (ptrTY - ptrY) * e1;
+  ptrEnv += (ptrEnvT - ptrEnv) * e2;
+
+  var o = oShared;
+  o.fox = fox; o.foy = foy;
+  o.oct = state.octaves; o.contrast = state.contrast; o.thr = state.threshold;
+  o.k = state.scale / Math.min(state.expW, state.expH);
+  o.px = ptrX; o.py = ptrY; o.pr = state.radius;
+  o.pf = state.interactive ? ptrEnv * state.strength : 0;
+  o.pmode = state.mode === 'attract' ? 1 : state.mode === 'swirl' ? 2 : 0;
+
+  if(recording && rctx){
+    renderField(rctx, 1, o, phase);
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.drawImage(recCv, 0, 0, cv.width, cv.height);
+    var left = (recEnd - now) / 1000;
+    btnWebm.textContent = '● ' + Math.max(0, left).toFixed(1) + 's';
+    if(now >= recEnd) stopRec();
+  } else {
+    renderField(pctx, previewScale, o, phase);
+  }
+}
+
+/* ---------- export: PNG ---------- */
+
+function download(blob, name){
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+
+document.getElementById('btn-png').addEventListener('click', function(){
+  var c = document.createElement('canvas');
+  c.width = state.expW; c.height = state.expH;
+  renderField(c.getContext('2d'), 1, oShared, phase);
+  c.toBlob(function(b){ if(b) download(b, 'ascii-wave.png'); }, 'image/png');
+});
+
+/* ---------- export: WebM ---------- */
+
+var btnWebm = document.getElementById('btn-webm');
+var canRec = !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+var recMime = '';
+if(canRec){
+  var mimes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  for(var mi = 0; mi < mimes.length; mi++){
+    if(MediaRecorder.isTypeSupported(mimes[mi])){ recMime = mimes[mi]; break; }
+  }
+  if(!recMime) canRec = false;
+}
+if(!canRec){
+  btnWebm.disabled = true;
+  btnWebm.title = 'このブラウザはWebM録画（MediaRecorder）に対応していません';
+}
+
+function stopRec(){
+  if(recorder && recorder.state !== 'inactive') recorder.stop();
+}
+
+btnWebm.addEventListener('click', function(){
+  if(!canRec) return;
+  if(recording){ stopRec(); return; }
+  recCv = recCv || document.createElement('canvas');
+  recCv.width = state.expW; recCv.height = state.expH;
+  rctx = recCv.getContext('2d');
+  var stream = recCv.captureStream(60);
+  try {
+    recorder = new MediaRecorder(stream, { mimeType: recMime, videoBitsPerSecond: 12000000 });
+  } catch(err){
+    btnWebm.disabled = true;
+    btnWebm.title = '録画を開始できませんでした';
+    return;
+  }
+  recChunks = [];
+  recorder.ondataavailable = function(e){ if(e.data && e.data.size) recChunks.push(e.data); };
+  recorder.onstop = function(){
+    recording = false;
+    btnWebm.textContent = 'WebM録画';
+    btnWebm.classList.remove('rec-on');
+    stream.getTracks().forEach(function(t){ t.stop(); });
+    download(new Blob(recChunks, { type: 'video/webm' }), 'ascii-wave.webm');
+    recChunks = [];
+  };
+  recorder.start(200);
+  recording = true;
+  recEnd = performance.now() + state.dur * 1000;
+  btnWebm.classList.add('rec-on');
+});
+
+/* ---------- export: embed code ---------- */
+
+var EMBED_DRIVER =
+`(function(){
+  var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  var st = state;
+  var n2 = makeNoise((st.seed >>> 0) || 1);
+  var ramp = Array.from(st.chars); if(ramp.length < 2) ramp = [' ', '@'];
+  var eBg = st.invert ? st.fg : st.bg, eFg = st.invert ? st.bg : st.fg;
+  var colors = [], nR = ramp.length - 1;
+  for(var i = 0; i <= nR; i++){
+    var u = nR ? i / nR : 1, m = 0;
+    if(st.accentOn){ m = (u - 0.55) / 0.45; m = m < 0 ? 0 : m > 1 ? 1 : m; m = m * m * (3 - 2 * m); }
+    colors[i] = mixHex(eFg, st.accent, m);
+  }
+  var dpr = 1, W = 0, H = 0, cols = 0, rows = 0, xs = [], ys = [], fs = 0, fontStr = '';
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.width = Math.max(2, Math.floor(innerWidth * dpr));
+    H = cv.height = Math.max(2, Math.floor(innerHeight * dpr));
+    fs = st.cell * dpr;
+    var cw = fs * st.letterSpacing, ch = fs * st.lineHeight;
+    var tot = Math.ceil(W / cw) * Math.ceil(H / ch);
+    if(tot > 45000){ var f = Math.sqrt(tot / 45000); cw *= f; ch *= f; fs *= f; }
+    cols = Math.ceil(W / cw); rows = Math.ceil(H / ch);
+    xs = []; ys = [];
+    var x0 = (W - cols * cw) / 2 + cw / 2, y0 = (H - rows * ch) / 2 + ch / 2;
+    for(var c = 0; c < cols; c++) xs[c] = x0 + c * cw;
+    for(var r = 0; r < rows; r++) ys[r] = y0 + r * ch;
+    fontStr = (st.bold ? '700 ' : '500 ') + fs.toFixed(2) + 'px "SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace';
+  }
+  addEventListener('resize', resize); resize();
+  var ptx = -1e6, pty = -1e6, px = 0, py = 0, env = 0, envT = 0, inited = false;
+  addEventListener('pointermove', function(e){
+    ptx = e.clientX * dpr; pty = e.clientY * dpr; envT = 1;
+    if(!inited){ px = ptx; py = pty; inited = true; }
+  }, { passive: true });
+  document.addEventListener('pointerout', function(e){ if(!e.relatedTarget) envT = 0; });
+  var t = 0, fox = 0, foy = 0, last = performance.now(), DEG = Math.PI / 180;
+  var o = { fox:0, foy:0, oct:3, contrast:1, thr:0, px:0, py:0, pr:0, pf:0, pmode:0 };
+  function frame(now){
+    requestAnimationFrame(frame);
+    var dt = (now - last) / 1000; last = now;
+    if(dt > 0.05) dt = 0.05;
+    if(document.hidden) return;
+    t += dt * st.speed * 0.55;
+    var fa = st.flowDir * DEG;
+    fox += dt * st.flowStr * Math.cos(fa) * 0.18;
+    foy += dt * st.flowStr * Math.sin(fa) * 0.18;
+    var e1 = Math.min(1, dt * 8), e2 = Math.min(1, dt * 5);
+    px += (ptx - px) * e1; py += (pty - py) * e1; env += (envT - env) * e2;
+    var k = st.scale / Math.min(W, H);
+    o.fox = fox; o.foy = foy; o.oct = st.octaves; o.contrast = st.contrast; o.thr = st.threshold;
+    o.px = px; o.py = py; o.pr = st.radius * dpr;
+    o.pf = st.interactive ? env * st.strength : 0;
+    o.pmode = st.mode === 'attract' ? 1 : st.mode === 'swirl' ? 2 : 0;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = eBg; ctx.fillRect(0, 0, W, H);
+    ctx.font = fontStr; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    var li = -1;
+    for(var r = 0; r < rows; r++){
+      var y = ys[r];
+      for(var c = 0; c < cols; c++){
+        var v = fieldValue(n2, fbm, xs[c], y, k, t, o);
+        if(v < 0) continue;
+        var idx = (v * nR + 0.5) | 0, chr = ramp[idx];
+        if(chr === ' ') continue;
+        if(idx !== li){ ctx.fillStyle = colors[idx]; li = idx; }
+        ctx.fillText(chr, xs[c], y);
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+})();`;
+
+function buildEmbedHtml(){
+  var keys = ['seed','bg','fg','accent','accentOn','invert','scale','speed','octaves',
+              'contrast','threshold','flowDir','flowStr','chars','cell','letterSpacing',
+              'lineHeight','bold','interactive','mode','radius','strength'];
+  var s = {};
+  keys.forEach(function(k2){ s[k2] = state[k2]; });
+  var js = [
+    '/* ASCII Wave embed — generated by MOTION LAB / ASCII WAVE */',
+    '/* tweak the state object below to adjust the animation */',
+    'const state = ' + JSON.stringify(s, null, 2) + ';',
+    makeNoise.toString(),
+    fbm.toString(),
+    fieldValue.toString(),
+    hex2rgb.toString(),
+    mixHex.toString(),
+    EMBED_DRIVER
+  ].join('\n\n');
+  var bgCol = state.invert ? state.fg : state.bg;
+  return '<!doctype html>\n<html lang="ja">\n<head>\n<meta charset="utf-8">\n' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">\n' +
+    '<title>ASCII Wave BG</title>\n' +
+    '<style>html,body{margin:0;height:100%;overflow:hidden;background:' + bgCol + '}' +
+    'canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;display:block}</style>\n' +
+    '</head>\n<body>\n<canvas id="c"></canvas>\n<script>\n' + js + '\n<\/script>\n</body>\n</html>\n';
+}
+
+document.getElementById('btn-code').addEventListener('click', function(){
+  download(new Blob([buildEmbedHtml()], { type: 'text/html' }), 'ascii-wave-embed.html');
+});
+
+/* ---------- UI binding ---------- */
+
+function $(id){ return document.getElementById(id); }
+var syncFns = [];
+function syncUI(){ syncFns.forEach(function(f){ f(); }); }
+
+function bindRange(id, key, fmt, after){
+  var el = $(id), vv = $(id + '-v');
+  function upd(){ if(vv) vv.textContent = fmt ? fmt(state[key]) : state[key]; }
+  el.addEventListener('input', function(){
+    state[key] = parseFloat(el.value);
+    upd();
+    if(after) after();
+  });
+  syncFns.push(function(){ el.value = state[key]; upd(); });
+}
+function bindCheck(id, key, after){
+  var el = $(id);
+  el.addEventListener('change', function(){
+    state[key] = el.checked;
+    if(after) after();
+  });
+  syncFns.push(function(){ el.checked = state[key]; });
+}
+function bindColor(id, key, after){
+  var el = $(id), vv = $(id + '-v');
+  function upd(){ if(vv) vv.textContent = state[key]; }
+  el.addEventListener('input', function(){
+    state[key] = el.value;
+    upd();
+    if(after) after();
+  });
+  syncFns.push(function(){ el.value = state[key]; upd(); });
+}
+function bindSelect(id, key, parse, after){
+  var el = $(id);
+  el.addEventListener('change', function(){
+    state[key] = parse ? parse(el.value) : el.value;
+    if(after) after();
+  });
+  syncFns.push(function(){ el.value = String(state[key]); });
+}
+
+var f2 = function(v){ return (+v).toFixed(2); };
+var fint = function(v){ return String(Math.round(v)); };
+var fpx = function(v){ return Math.round(v) + 'px'; };
+var fdeg = function(v){ return Math.round(v) + '°'; };
+var fx = function(v){ return '×' + (+v).toFixed(2); };
+
+/* canvas group */
+var selAspect = $('i-aspect'), inW = $('i-expw'), inH = $('i-exph');
+selAspect.addEventListener('change', function(){
+  state.aspect = selAspect.value;
+  if(ASPECTS[state.aspect]){
+    state.expW = ASPECTS[state.aspect][0];
+    state.expH = ASPECTS[state.aspect][1];
+  }
+  syncUI(); rebuildAll();
+});
+function onSizeInput(){
+  var w = Math.max(200, Math.min(4096, Math.round(+inW.value || state.expW)));
+  var h = Math.max(200, Math.min(4096, Math.round(+inH.value || state.expH)));
+  state.expW = w; state.expH = h; state.aspect = 'custom';
+  selAspect.value = 'custom';
+  rebuildAll();
+}
+inW.addEventListener('change', onSizeInput);
+inH.addEventListener('change', onSizeInput);
+syncFns.push(function(){
+  selAspect.value = state.aspect;
+  inW.value = state.expW; inH.value = state.expH;
+});
+
+bindColor('i-bg', 'bg', rebuildColors);
+bindColor('i-fg', 'fg', rebuildColors);
+bindColor('i-accent', 'accent', rebuildColors);
+bindCheck('i-accenton', 'accentOn', rebuildColors);
+bindCheck('i-invert', 'invert', rebuildColors);
+
+/* wave group */
+bindRange('i-scale', 'scale', f2);
+bindRange('i-speed', 'speed', f2);
+bindRange('i-octaves', 'octaves', fint);
+bindRange('i-contrast', 'contrast', f2);
+bindRange('i-threshold', 'threshold', f2);
+bindRange('i-flowdir', 'flowDir', fdeg);
+bindRange('i-flowstr', 'flowStr', f2);
+
+/* chars group */
+var selChar = $('i-charpreset'), inChars = $('i-chars');
+selChar.addEventListener('change', function(){
+  if(selChar.value !== 'custom'){
+    state.chars = CHAR_PRESETS[selChar.value];
+    inChars.value = state.chars;
+    rebuildColors();
+  }
+});
+inChars.addEventListener('input', function(){
+  state.chars = inChars.value.length ? inChars.value : ' .';
+  var match = 'custom';
+  for(var k in CHAR_PRESETS){ if(CHAR_PRESETS[k] === state.chars) match = k; }
+  selChar.value = match;
+  rebuildColors();
+});
+syncFns.push(function(){
+  inChars.value = state.chars;
+  var match = 'custom';
+  for(var k in CHAR_PRESETS){ if(CHAR_PRESETS[k] === state.chars) match = k; }
+  selChar.value = match;
+});
+
+bindRange('i-cell', 'cell', fpx, rebuildGrid);
+bindRange('i-lsp', 'letterSpacing', fx, rebuildGrid);
+bindRange('i-lht', 'lineHeight', fx, rebuildGrid);
+bindCheck('i-bold', 'bold', rebuildGrid);
+
+/* interaction group */
+bindCheck('i-inter', 'interactive');
+bindSelect('i-mode', 'mode');
+bindRange('i-radius', 'radius', fpx);
+bindRange('i-strength', 'strength', f2);
+
+/* export group */
+bindSelect('i-dur', 'dur', parseFloat);
+
+/* ---------- presets ---------- */
+
+var seedLabel = $('seed-label');
+function setSeed(sd){
+  state.seed = sd >>> 0;
+  noise2 = makeNoise(state.seed);
+  seedLabel.textContent = 'SEED ' + state.seed;
+}
+
+var PRESETS = [
+  { name: '深海', seed: 31337, p: {   // 深海
+      bg:'#040d18', fg:'#39678f', accent:'#59d7e0', accentOn:true, invert:false,
+      scale:1.15, speed:0.32, octaves:3, contrast:1.55, threshold:0.16,
+      flowDir:200, flowStr:0.35, chars:' .:-~=+*#%@', cell:14, bold:false } },
+  { name: '砂嵐', seed: 777, p: {     // 砂嵐
+      bg:'#0a0a0b', fg:'#b9b9c2', accent:'#e6e6ef', accentOn:false, invert:false,
+      scale:6.5, speed:1.7, octaves:2, contrast:2.4, threshold:0.34,
+      flowDir:90, flowStr:0.1, chars:'01', cell:12, bold:false } },
+  { name: 'ネオン', seed: 4242, p: { // ネオン
+      bg:'#060609', fg:'#26263f', accent:'#4f5cff', accentOn:true, invert:false,
+      scale:1.9, speed:0.6, octaves:3, contrast:1.85, threshold:0.22,
+      flowDir:0, flowStr:0.25, chars:' .:-=+*#%@', cell:13, bold:true } },
+  { name: 'ミニマル', seed: 99, p: { // ミニマル
+      bg:'#0a0a0b', fg:'#9a9aa6', accent:'#e6e6ef', accentOn:false, invert:false,
+      scale:1.3, speed:0.28, octaves:2, contrast:1.35, threshold:0.42,
+      flowDir:250, flowStr:0.2, chars:' .·•', cell:20, bold:false } },
+  { name: '波紋', seed: 2025, p: {    // 波紋
+      bg:'#05070d', fg:'#6f7da3', accent:'#cdd7ff', accentOn:true, invert:false,
+      scale:2.3, speed:0.5, octaves:2, contrast:1.7, threshold:0.2,
+      flowDir:0, flowStr:0, chars:' .·:coC0@', cell:12, bold:false } },
+  { name: '溶岩', seed: 666, p: {     // 溶岩
+      bg:'#0d0402', fg:'#77301c', accent:'#ff8a3d', accentOn:true, invert:false,
+      scale:1.5, speed:0.45, octaves:3, contrast:1.75, threshold:0.14,
+      flowDir:270, flowStr:0.45, chars:' .:-=*%#@', cell:14, bold:true } }
+];
+
+var grid = $('preset-grid');
+PRESETS.forEach(function(def){
+  var b = document.createElement('button');
+  b.textContent = def.name;
+  b.addEventListener('click', function(){
+    Object.assign(state, def.p);
+    setSeed(def.seed);
+    syncUI();
+    rebuildAll();
+  });
+  grid.appendChild(b);
+});
+
+$('btn-random').addEventListener('click', function(){
+  var sd = (Math.random() * 0xFFFFFFFF) >>> 0;
+  var r = mulberry32(sd);
+  state.scale = +(0.6 + r() * 4.2).toFixed(2);
+  state.speed = +(0.15 + r() * 1.1).toFixed(2);
+  state.octaves = 2 + (r() < 0.5 ? 0 : 1);
+  state.contrast = +(0.9 + r() * 1.5).toFixed(2);
+  state.threshold = +(r() * 0.4).toFixed(2);
+  state.flowDir = Math.round(r() * 360);
+  state.flowStr = +(r() * 1.2).toFixed(2);
+  var rampKeys = ['default', 'dots', 'blocks', 'symbols', 'binary'];
+  state.chars = CHAR_PRESETS[rampKeys[(r() * rampKeys.length) | 0]];
+  state.cell = 9 + ((r() * 14) | 0);
+  state.bold = r() < 0.3;
+  setSeed(sd);
+  syncUI();
+  rebuildAll();
+});
+
+/* ---------- resize ---------- */
+
+if(typeof ResizeObserver !== 'undefined'){
+  new ResizeObserver(function(){ fitPreview(); }).observe(view);
+} else {
+  window.addEventListener('resize', fitPreview);
+}
+window.addEventListener('resize', fitPreview);
+
+/* ---------- boot ---------- */
+
+setSeed(state.seed);
+syncUI();
+rebuildAll();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

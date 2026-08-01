@@ -158,6 +158,62 @@ const TOOLS = [
     }
   },
   {
+    cat:"raster", name:"Grid Stretch",
+    desc:"画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きのグリッチ表現",
+    href:"tools/grid-stretch.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d");
+      const mk=(tag,at)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const k in at)e.setAttribute(k,at[k]);g.appendChild(e);return e;};
+      mk("rect",{x:34,y:10,width:52,height:30,rx:2,fill:"#3a5c46"});
+      mk("rect",{x:44,y:14,width:32,height:20,rx:2,fill:"#5ea877"});
+      for(const y of [42,47,52,57]){
+        const w=y===47?96:(y===52?70:44), x=60-w/2;
+        mk("rect",{x,y,width:w,height:3.4,fill:y===47?"#5ea877":"#3a5c46",opacity:0.95});
+      }
+      for(let x=12;x<=108;x+=16) mk("line",{x1:x,y1:6,x2:x,y2:60,stroke:"#3d3d46","stroke-width":0.5});
+      mk("text",{x:14,y:14,fill:"#9a9aa6","font-size":5,"font-family":"monospace"}).textContent="R07 34%";
+    }
+  },
+  {
+    cat:"motion", name:"ASCII Wave",
+    desc:"流体ノイズをASCII文字で描くアニメーション背景。カーソルで反発・引き寄せ・渦",
+    href:"tools/ascii-wave.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d" font-family="monospace" font-size="6"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"), chars=" .:-=+*#%@";
+      for(let y=6;y<66;y+=6.5)for(let x=3;x<118;x+=6){
+        const v=(Math.sin(x*0.09+y*0.13)+Math.sin(x*0.045-y*0.07)+2)/4;
+        const ch=chars[Math.min(9,Math.floor(v*10))];
+        if(ch===" ")continue;
+        const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("x",x);t.setAttribute("y",y);
+        t.setAttribute("fill",v>0.72?"#5c68ff":"#c9c9d4");t.setAttribute("opacity",(0.35+v*0.65).toFixed(2));
+        t.textContent=ch;g.appendChild(t);
+      }
+    }
+  },
+  {
+    cat:"raster", name:"Effect Stack",
+    desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。ランダマイズ＋スタック刻印",
+    href:"tools/effect-stack.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d");
+      const mk=(tag,at)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const k in at)e.setAttribute(k,at[k]);g.appendChild(e);return e;};
+      mk("rect",{x:0,y:0,width:120,height:66,fill:"#1c1430"});
+      for(let x=0;x<120;x+=3){
+        const h=20+18*Math.sin(x*0.12)+10*Math.sin(x*0.31+2);
+        mk("rect",{x,y:33-h/2,width:1.4,height:h,fill:x%12<6?"#b06cff":"#e8a0c8",opacity:0.55+0.4*Math.sin(x*0.2)**2});
+      }
+      const words=["+WARP","+SCANDRIFT","-REPEAT","+HALFTONE","+GRAIN"];
+      words.forEach((w,i)=>{
+        const t=mk("text",{x:5,y:10+i*7.2,fill:"#e6e6ef","font-size":5,"font-family":"monospace",opacity:w[0]==="+"?0.95:0.4});
+        t.textContent=w;
+      });
+    }
+  },
+  {
     cat:"motion", name:"Word Switcher",
     desc:"単語／SVGを切り替えるモーショングラフィック",
     href:"tools/word-switcher.html",

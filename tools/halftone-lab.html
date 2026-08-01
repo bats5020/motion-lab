@@ -284,6 +284,9 @@
     <div class="row"><label>コントラスト</label><input type="range" id="contrast" min="0.3" max="3" step="0.05" value="1.1"><output id="contrastV">1.10</output></div>
     <div class="row"><label>ガンマ</label><input type="range" id="gamma" min="0.3" max="2.5" step="0.05" value="1"><output id="gammaV">1.00</output></div>
     <label class="check"><input type="checkbox" id="invert">反転（ネガ）</label>
+    <div class="row"><label>メルト</label><input type="range" id="melt" min="0" max="100" step="1" value="0"><output id="meltV">0%</output></div>
+    <label class="check"><input type="checkbox" id="unlitOn"><span>消灯セル表示<small>ドットの無いセルもうっすら点で表示（ハーフトーン／ディザ）</small></span></label>
+    <div class="row"><label>消灯の濃さ</label><input type="range" id="unlitA" min="0.03" max="0.4" step="0.01" value="0.12"><output id="unlitAV">0.12</output></div>
 
     <div class="seclabel">カラー</div>
     <div class="colors">
@@ -382,6 +385,7 @@ const state = {
   algo:'fs', errStrength:100, serpentine:true,
   charset:'@%#*+=-:. ', levels:4,
   bright:0, contrast:1.1, gamma:1, invert:false, linear:false,
+  melt:0, unlitOn:false, unlitA:0.12,
   fg:'#f2f2f2', bg:'#0a0a0b',
   animOn:false, waveAmp:0.25, waveLen:140, waveSpeed:1.5, waveDir:45,
   workRes:1000,
@@ -783,10 +787,83 @@ function renderMosaic(ctx,W,H,scale,t){
   }
 }
 
+/* ==================== メルト / 消灯セル ==================== */
+// 消灯セル：ドットが無いセル位置にも小さな点を描いてグリッドを見せる（Otsu参照）
+function renderUnlit(ctx,W,H,scale){
+  const cell=state.cell*scale;
+  ctx.save(); ctx.globalAlpha=state.unlitA; ctx.fillStyle=state.fg;
+  ctx.beginPath();
+  if(state.effect==='halftone'){
+    const a=state.angle*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+    const cx=W/2, cy=H/2, n=Math.ceil(Math.hypot(W,H)/2/cell)+2, ur=Math.max(0.4,cell*0.08);
+    for(let j=-n;j<=n;j++) for(let i=-n;i<=n;i++){
+      const x=cx+(i*ca-j*sa)*cell, y=cy+(i*sa+j*ca)*cell;
+      if(x<-cell||y<-cell||x>W+cell||y>H+cell) continue;
+      ctx.moveTo(x+ur,y); ctx.arc(x,y,ur,0,6.2832);
+    }
+  } else {
+    const ur=Math.max(0.4,cell*0.1);
+    for(let y=cell/2;y<H;y+=cell) for(let x=cell/2;x<W;x+=cell){ ctx.moveTo(x+ur,y); ctx.arc(x,y,ur,0,6.2832); }
+  }
+  ctx.fill(); ctx.restore();
+}
+// ctx.filter非対応環境用：αチャンネルのみの分離box blur×3（ガウス近似）
+function boxBlurAlpha(d,W,H,r){
+  const w=Math.max(1,Math.round(r)), div=w*2+1, N=W*H;
+  const a=new Float32Array(N), b=new Float32Array(N);
+  for(let i=0;i<N;i++) a[i]=d[i*4+3];
+  for(let it=0;it<3;it++){
+    for(let y=0;y<H;y++){
+      const row=y*W; let sum=0;
+      for(let x=-w;x<=w;x++) sum+=a[row+Math.min(W-1,Math.max(0,x))];
+      for(let x=0;x<W;x++){
+        b[row+x]=sum/div;
+        sum+=a[row+Math.min(W-1,x+w+1)]-a[row+Math.max(0,x-w)];
+      }
+    }
+    for(let x=0;x<W;x++){
+      let sum=0;
+      for(let y=-w;y<=w;y++) sum+=b[Math.min(H-1,Math.max(0,y))*W+x];
+      for(let y=0;y<H;y++){
+        a[y*W+x]=sum/div;
+        sum+=b[Math.min(H-1,y+w+1)*W+x]-b[Math.max(0,y-w)*W+x];
+      }
+    }
+  }
+  for(let i=0;i<N;i++) d[i*4+3]=a[i];
+}
+// メルト：ドットを透明オフスクリーンに描画→ぼかし→αを再しきい値化（メタボール的融合）
+function meltPass(ctx,W,H,scale,t){
+  const M=meltPass;
+  if(!M._c){ M._c=document.createElement('canvas'); M._b=document.createElement('canvas'); }
+  if(M._c.width!==W||M._c.height!==H){ M._c.width=M._b.width=W; M._c.height=M._b.height=H; }
+  const cc=M._c.getContext('2d'), bc=M._b.getContext('2d');
+  cc.clearRect(0,0,W,H);
+  if(state.effect==='halftone') renderHalftone(cc,W,H,scale,t); else renderDither(cc,W,H,scale,t);
+  const r=state.melt/100*state.cell*scale*0.55;
+  bc.clearRect(0,0,W,H);
+  let blurred=false;
+  if('filter' in bc){ bc.filter='blur('+r.toFixed(2)+'px)'; bc.drawImage(M._c,0,0); bc.filter='none'; blurred=true; }
+  else bc.drawImage(M._c,0,0);
+  const img=bc.getImageData(0,0,W,H), d=img.data;
+  if(!blurred) boxBlurAlpha(d,W,H,r*0.6);
+  const fgc=hex2rgb(state.fg), lo=115, hi=141;
+  for(let i=0;i<d.length;i+=4){
+    const a=d[i+3];
+    d[i]=fgc[0]; d[i+1]=fgc[1]; d[i+2]=fgc[2];
+    d[i+3]=a<=lo?0:a>=hi?255:((a-lo)*255/(hi-lo))|0;
+  }
+  bc.putImageData(img,0,0);
+  ctx.drawImage(M._b,0,0);
+}
+
 /* ==================== レンダリング ==================== */
 function renderTo(ctx,W,H,scale,t){
   ctx.fillStyle = state.bg; ctx.fillRect(0,0,W,H);
   if(state.source==='image' && !lumS) return;
+  const cellFx = state.effect==='halftone' || state.effect==='dither';
+  if(state.unlitOn && cellFx) renderUnlit(ctx,W,H,scale);
+  if(cellFx && state.melt>0){ meltPass(ctx,W,H,scale,t); return; }
   if(state.effect==='halftone') renderHalftone(ctx,W,H,scale,t);
   else if(state.effect==='dither') renderDither(ctx,W,H,scale,t);
   else if(state.effect==='ascii') renderAscii(ctx,W,H,scale,t);
@@ -873,6 +950,24 @@ function buildSVG(){
   const R=v=>Math.round(v*100)/100;
   const parts=[`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
     `<rect width="100%" height="100%" fill="${state.bg}"/>`];
+  // 消灯セル（メルトはラスター専用のためSVGには非適用）
+  if(state.unlitOn && (state.effect==='halftone'||state.effect==='dither')){
+    const cell=state.cell*scale;
+    parts.push(`<g fill="${state.fg}" fill-opacity="${state.unlitA}">`);
+    if(state.effect==='halftone'){
+      const a=state.angle*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+      const cx=W/2, cy=H/2, n=Math.ceil(Math.hypot(W,H)/2/cell)+2, ur=Math.max(0.4,cell*0.08);
+      for(let j=-n;j<=n;j++) for(let i=-n;i<=n;i++){
+        const x=cx+(i*ca-j*sa)*cell, y=cy+(i*sa+j*ca)*cell;
+        if(x<-cell||y<-cell||x>W+cell||y>H+cell) continue;
+        parts.push(`<circle cx="${R(x)}" cy="${R(y)}" r="${R(ur)}"/>`);
+      }
+    } else {
+      const ur=Math.max(0.4,cell*0.1);
+      for(let y=cell/2;y<H;y+=cell) for(let x=cell/2;x<W;x+=cell) parts.push(`<circle cx="${R(x)}" cy="${R(y)}" r="${R(ur)}"/>`);
+    }
+    parts.push('</g>');
+  }
   if(state.effect==='halftone'){
     parts.push(`<g fill="${state.fg}">`);
     const cell=state.cell*scale, a=state.angle*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
@@ -985,11 +1080,12 @@ const fmts={
   shSize:v=>(+v).toFixed(2), shWidth:v=>(+v).toFixed(2), shRot:v=>(+v).toFixed(1), shPulse:v=>(+v).toFixed(1),
   ledSize:v=>v+'px', ledTempo:v=>(+v).toFixed(1), ledDensity:v=>(+v).toFixed(2), ledBias:v=>(+v).toFixed(2),
   auBarW:v=>v+'px', auDuty:v=>(+v).toFixed(2), auAmp:v=>(+v).toFixed(2), auTempo:v=>(+v).toFixed(1), auSpeed:v=>(+v).toFixed(1), auLines:v=>v,
-  maskAngle:v=>v+'°', maskWidth:v=>(+v).toFixed(2)
+  maskAngle:v=>v+'°', maskWidth:v=>(+v).toFixed(2),
+  melt:v=>v+'%', unlitA:v=>(+v).toFixed(2)
 };
 const RANGE_KEYS=['cell','angle','dotGain','levels','bright','contrast','gamma','waveAmp','waveLen','waveSpeed','errStrength',
   'ringW','ringSpeed','srcCX','srcCY','ringFade','shSize','shWidth','shRot','shPulse',
-  'ledSize','ledTempo','ledDensity','ledBias','auBarW','auDuty','auAmp','auTempo','auSpeed','auLines','maskAngle','maskWidth'];
+  'ledSize','ledTempo','ledDensity','ledBias','auBarW','auDuty','auAmp','auTempo','auSpeed','auLines','maskAngle','maskWidth','melt','unlitA'];
 for(const k of RANGE_KEYS) bindRange(k,k,fmts[k]);
 let wrTimer=null;
 bindRange('workRes','workRes',fmts.workRes,()=>{ clearTimeout(wrTimer); wrTimer=setTimeout(rebuildWorking,250); });
@@ -1008,6 +1104,7 @@ $('maskType').addEventListener('change',e=>{
 });
 bindSimple('fg','fg'); bindSimple('bg','bg');
 bindSimple('invert','invert','checked',true);
+bindSimple('unlitOn','unlitOn','checked',true);
 bindSimple('serpentine','serpentine','checked',true);
 $('linear').addEventListener('change',e=>{ state.linear=e.target.checked; render(lastT); sizesDirty(); });
 $('algo').addEventListener('change',e=>{
@@ -1074,6 +1171,7 @@ function syncUI(){
   $('shapeKind').value=state.shapeKind; $('auStyle').value=state.auStyle; $('maskType').value=state.maskType;
   $('maskOpts').classList.toggle('hidden', state.maskType==='none');
   $('invert').checked=state.invert; $('serpentine').checked=state.serpentine;
+  $('unlitOn').checked=state.unlitOn;
   $('linear').checked=state.linear;
   $('fg').value=state.fg; $('bg').value=state.bg; $('animOn').checked=state.animOn;
   $('edOpts').classList.toggle('hidden', !ED_SET.has(state.algo));
@@ -1093,7 +1191,7 @@ const PRESETS={
 };
 $('presets').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
-  Object.assign(state, PRESETS[b.dataset.p]); syncUI(); sizesDirty();
+  Object.assign(state, {melt:0, unlitOn:false}, PRESETS[b.dataset.p]); syncUI(); sizesDirty();
 });
 const PALETTES=[
   {bg:'#0a0a0b',fg:'#f7f7f2'},{bg:'#f2efe6',fg:'#111111'},{bg:'#001b2e',fg:'#7cc7ff'},
@@ -1114,7 +1212,9 @@ $('btnRandom').onclick=()=>{
     levels:Math.round(rnd(2,6)),
     errStrength:Math.round(rnd(70,130)/5)*5,
     contrast:+rnd(0.9,1.8).toFixed(2), gamma:+rnd(0.7,1.4).toFixed(2), bright:+rnd(-0.1,0.1).toFixed(2),
-    invert:Math.random()<0.3
+    invert:Math.random()<0.3,
+    melt:Math.random()<0.35?Math.round(rnd(15,65)):0,
+    unlitOn:Math.random()<0.25
   });
   syncUI(); sizesDirty();
 };
@@ -1245,6 +1345,9 @@ ${renderDither.toString()}
 ${renderAscii.toString()}
 ${mosaicColor.toString()}
 ${renderMosaic.toString()}
+${renderUnlit.toString()}
+${boxBlurAlpha.toString()}
+${meltPass.toString()}
 ${renderTo.toString()}
 
 function render(t){ renderTo(_ctx, srcW, srcH, 1, t); }
