@@ -195,7 +195,7 @@ const TOOLS = [
   },
   {
     cat:"raster", name:"Effect Stack",
-    desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。ランダマイズ＋スタック刻印",
+    desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応、ランダマイズ＋スタック刻印＋WebM録画",
     href:"tools/effect-stack.html",
     thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d"></g></svg>`,
     draw(svg){
@@ -211,6 +211,25 @@ const TOOLS = [
         const t=mk("text",{x:5,y:10+i*7.2,fill:"#e6e6ef","font-size":5,"font-family":"monospace",opacity:w[0]==="+"?0.95:0.4});
         t.textContent=w;
       });
+    }
+  },
+  {
+    cat:"motion", name:"Glass Lab",
+    desc:"グロー球体を型板ガラス越しに歪ませる fluted glass シェーダー。画像・動画ソース／WebM録画／設定URL共有",
+    href:"tools/glass-lab.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d");
+      const mk=(tag,at)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const k in at)e.setAttribute(k,at[k]);g.appendChild(e);return e;};
+      mk("rect",{x:0,y:0,width:120,height:66,fill:"#060606"});
+      const defs=document.createElementNS("http://www.w3.org/2000/svg","defs");
+      defs.innerHTML='<radialGradient id="glb" cx="0.5" cy="0.45" r="0.55"><stop offset="0%" stop-color="#ffb37a"/><stop offset="45%" stop-color="#ff6a1f"/><stop offset="100%" stop-color="#ff6a1f" stop-opacity="0"/></radialGradient>';
+      g.appendChild(defs);
+      for(let i=0;i<11;i++){
+        const y=6+i*5.2, sq=1-Math.abs(i-5)/5*0.55;
+        const w=52*Math.sqrt(Math.max(0.05,1-((i-5)/5.5)**2))*(0.85+0.3*Math.sin(i*2.1));
+        mk("ellipse",{cx:60+Math.sin(i*1.7)*3,cy:y,rx:w/2,ry:2.1*sq,fill:"url(#glb)",opacity:0.95});
+      }
     }
   },
   {

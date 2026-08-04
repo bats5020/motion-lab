@@ -130,7 +130,7 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
     <canvas id="view" width="880" height="1100"></canvas>
     <div id="ind">rendering…</div>
     <div id="meta"></div>
-    <div id="dropOv">画像をドロップ</div>
+    <div id="dropOv">画像 / 動画をドロップ</div>
   </main>
   <aside id="panel">
     <header>
@@ -155,9 +155,10 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
     </section>
     <section id="secExport"><h2><b>04</b>書き出し</h2>
       <div class="btnrow"><button class="btn" id="btnPng">PNG保存</button><button class="btn" id="btnCopy">コピー</button></div>
+      <div class="btnrow" id="recRow" style="display:none"><button class="btn" id="btnRec">&#9679; WebM録画（1ループ）</button></div>
       <div class="btnrow"><button class="btn" id="btnJsonOut">設定JSON書き出し</button><button class="btn" id="btnJsonIn">JSON読み込み</button></div>
       <input type="file" id="fileJson" accept="application/json" hidden>
-      <input type="file" id="fileImg" accept="image/*" hidden>
+      <input type="file" id="fileImg" accept="image/*,video/*" hidden>
     </section>
   </aside>
 </div>
@@ -282,13 +283,19 @@ const state={
   stamp:{on:true,pos:'tl',size:12}
 };
 let srcImage=null;          /* HTMLImageElement (画像ソース) */
+let srcVideo=null,srcVideoURL=null;   /* HTMLVideoElement (動画ソース) */
 let hist=[];                /* recent randomize seeds */
 function fullSize(){
   if(state.canvas.mode==='custom')return[clamp(state.canvas.w|0,64,4096),clamp(state.canvas.h|0,64,4096)];
   return SIZE_PRESETS[state.canvas.mode]||SIZE_PRESETS['45'];
 }
+let _vCap=720;              /* 動画時のプレビュー長辺（負荷に応じて自動調整） */
+let _recLockSize=null;      /* 録画中はサイズ固定（captureStream保護） */
 function previewSize(){
-  const[W,H]=fullSize(),sc=Math.min(1,1100/Math.max(W,H));
+  if(_recLockSize)return _recLockSize;
+  const[W,H]=fullSize();
+  const cap=videoActive()?_vCap:1100;
+  const sc=Math.min(1,cap/Math.max(W,H));
   return[Math.max(8,Math.round(W*sc)),Math.max(8,Math.round(H*sc))];
 }
 function seedFor(id){return(state.seed^strHash(id))>>>0}
@@ -703,6 +710,13 @@ function drawSource(W,H){
     ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
     ctx.drawImage(srcImage,(W-dw)/2,(H-dh)/2,dw,dh);
   }
+  else if(t==='video'&&srcVideo&&srcVideo.readyState>=2){
+    ctx.fillStyle='#0d0d10';ctx.fillRect(0,0,W,H);
+    const iw=srcVideo.videoWidth,ih=srcVideo.videoHeight;
+    const sc=Math.max(W/iw,H/ih),dw=iw*sc,dh=ih*sc;
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(srcVideo,(W-dw)/2,(H-dh)/2,dw,dh);
+  }
   else if(t==='noise')drawNoiseSrc(ctx,W,H);
   else if(t==='shape')drawShapeSrc(ctx,W,H);
   else drawMeshSrc(ctx,W,H);   /* mesh, and fallback when画像未設定 */
@@ -849,6 +863,7 @@ function renderInto(canvas,W,H){
 const view=$('#view'),ind=$('#ind'),meta=$('#meta');
 let _rt=0,_lastMs=0;
 function schedule(){
+  if(_vloop)return;   /* 動画再生ループ中は次フレームで反映される */
   clearTimeout(_rt);
   if(_lastMs>80)ind.classList.add('on');
   _rt=setTimeout(doRender,40);
@@ -861,6 +876,28 @@ function doRender(){
   ind.classList.remove('on');
   const[W,H]=fullSize();
   meta.textContent=W+'×'+H+'  ·  preview '+pw+'×'+ph+'  ·  '+Math.round(_lastMs)+'ms';
+}
+/* ============ video playback loop ============ */
+let _vloop=0,_vEma=0;
+function videoActive(){return state.src.type==='video'&&!!srcVideo&&srcVideo.readyState>=2}
+function videoLoop(){
+  if(!videoActive()||srcVideo.paused){_vloop=0;doRender();return}
+  _vloop=requestAnimationFrame(videoLoop);
+  const t0=performance.now();
+  const[pw,ph]=previewSize();
+  try{renderInto(view,pw,ph)}catch(e){console.error(e)}
+  _lastMs=performance.now()-t0;
+  _vEma=_vEma?_vEma*.9+_lastMs*.1:_lastMs;
+  /* 負荷に応じてプレビュー解像度を自動調整（録画中は固定） */
+  if(!_recLockSize){
+    if(_vEma>70&&_vCap>360)_vCap=Math.max(360,Math.round(_vCap*.85/80)*80);
+    else if(_vEma<28&&_vCap<1100)_vCap=Math.min(1100,Math.round(_vCap*1.1/80)*80);
+  }
+  const[W,H]=fullSize();
+  meta.textContent=W+'×'+H+'  ·  preview '+pw+'×'+ph+'  ·  '+Math.max(1,Math.round(1000/Math.max(1,_vEma)))+'fps';
+}
+function syncVideoLoop(){
+  if(videoActive()&&!srcVideo.paused&&!_vloop)_vloop=requestAnimationFrame(videoLoop);
 }
 /* ============ UI widgets ============ */
 function fmtv(v){return String(Math.round(v*10)/10)}
@@ -900,13 +937,16 @@ const UI={rows:{},src:{}};
 /* ============ source panel ============ */
 function buildSourceUI(){
   const seg=$('#srcSeg');
-  const types=[['img','画像'],['mesh','メッシュグラデ'],['noise','ノイズ'],['shape','図形']];
+  const types=[['img','画像'],['video','動画'],['mesh','メッシュ'],['noise','ノイズ'],['shape','図形']];
   UI.src.segBtns={};
   types.forEach(([t,lb])=>{
     const b=ce('button',null,lb);
     b.addEventListener('click',()=>{
       if(t==='img'&&!srcImage){$('#fileImg').click()}
-      state.src.type=t;refreshAll();schedule();
+      if(t==='video'&&!srcVideo){$('#fileImg').click()}
+      state.src.type=t;
+      if(srcVideo){if(t==='video')srcVideo.play().catch(()=>{});else srcVideo.pause()}
+      refreshAll();syncVideoLoop();schedule();
     });
     UI.src.segBtns[t]=b;seg.appendChild(b);
   });
@@ -917,6 +957,18 @@ function buildSourceUI(){
   pick.addEventListener('click',()=>$('#fileImg').click());
   oImg.appendChild(pick);
   oImg.appendChild(ce('div','hint','ドラッグ&ドロップ / ⌘V ペースト対応'));
+  /* video */
+  const oVid=ce('div','srcopt');oVid.dataset.for='video';
+  const pickV=ce('button','btn wide','動画を選択…');
+  pickV.addEventListener('click',()=>$('#fileImg').click());
+  const playV=ce('button','btn wide','&#9199; 再生 / 一時停止');
+  playV.addEventListener('click',()=>{
+    if(!srcVideo)return;
+    if(srcVideo.paused)srcVideo.play().catch(()=>{});
+    else{srcVideo.pause();schedule()}
+    syncVideoLoop();
+  });
+  oVid.append(pickV,playV,ce('div','hint','無音・ループで再生しながら全エフェクトをリアルタイム適用。プレビュー解像度は負荷に応じて自動調整されます'));
   /* mesh */
   const oMesh=ce('div','srcopt');oMesh.dataset.for='mesh';
   const shuf1=ce('button','btn wide','配置シャッフル');
@@ -936,7 +988,7 @@ function buildSourceUI(){
   const shuf3=ce('button','btn wide','配置シャッフル');
   shuf3.addEventListener('click',()=>{state.src.var=(Math.random()*1e9)>>>0;schedule()});
   oShape.appendChild(shuf3);
-  opts.append(oImg,oMesh,oNoise,oShape);
+  opts.append(oImg,oVid,oMesh,oNoise,oShape);
   /* palette */
   const pb=$('#palBlock');
   pb.appendChild(ce('div','hint','パレット'));
@@ -1064,7 +1116,8 @@ function refreshAll(){
   /* source seg + opts visibility */
   Object.entries(UI.src.segBtns).forEach(([t,b])=>b.classList.toggle('on',state.src.type===t));
   document.querySelectorAll('#srcOpts .srcopt').forEach(o=>o.style.display=o.dataset.for===state.src.type?'':'none');
-  $('#palBlock').style.display=state.src.type==='img'?'none':'';
+  $('#palBlock').style.display=(state.src.type==='img'||state.src.type==='video')?'none':'';
+  $('#recRow').style.display=state.src.type==='video'?'':'none';
   UI.src.palInputs.forEach((inp,i)=>inp.value=state.src.pal[i]||'#888888');
   UI.src.palN.set(state.src.n);
   UI.src.noiseScale.set(state.src.noiseScale);
@@ -1165,6 +1218,37 @@ $('#btnCopy').addEventListener('click',()=>{
       e=>toast('コピー失敗: '+e));
   }catch(e){toast('コピー失敗: '+e.message)}
 });
+/* ============ WebM録画（動画ソース） ============ */
+let _rec=null,_recIv=0,_recTo=0;
+$('#btnRec').addEventListener('click',()=>{
+  if(_rec){_rec.stop();return}
+  if(!videoActive()){toast('動画ソースを読み込んでください');return}
+  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
+  if(!mime){toast('この環境は録画に対応していません');return}
+  _recLockSize=previewSize();
+  srcVideo.currentTime=0;
+  srcVideo.play().catch(()=>{});
+  syncVideoLoop();
+  const stream=view.captureStream(30);
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8e6});
+  const chunks=[];
+  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  rec.onstop=()=>{
+    clearInterval(_recIv);clearTimeout(_recTo);
+    _rec=null;_recLockSize=null;
+    $('#btnRec').innerHTML='&#9679; WebM録画（1ループ）';
+    download(new Blob(chunks,{type:mime.split(';')[0]}),'effect-stack_'+state.seed+'.webm');
+    toast('WebMを保存しました');
+  };
+  rec.start(250);_rec=rec;
+  const dur=Math.min(60,srcVideo.duration&&isFinite(srcVideo.duration)?srcVideo.duration:10);
+  let left=Math.ceil(dur);
+  const lbl=()=>{$('#btnRec').textContent='録画中… '+left+'s（クリックで停止）'};
+  lbl();
+  _recIv=setInterval(()=>{left--;if(left>0&&_rec)lbl()},1000);
+  _recTo=setTimeout(()=>{if(_rec)_rec.stop()},dur*1000);
+});
 $('#btnJsonOut').addEventListener('click',()=>{
   const data={app:'effect-stack',v:1,seed:state.seed,
     canvas:{...state.canvas},src:{...state.src,pal:state.src.pal.slice()},
@@ -1196,7 +1280,7 @@ function applyConfig(o){
     if(Number.isFinite(o.canvas.h))state.canvas.h=clamp(o.canvas.h|0,64,4096);
   }
   if(o.src){
-    if(['img','mesh','noise','shape'].includes(o.src.type))state.src.type=o.src.type;
+    if(['img','video','mesh','noise','shape'].includes(o.src.type))state.src.type=o.src.type;
     if(Array.isArray(o.src.pal))state.src.pal=o.src.pal.slice(0,5).concat(state.src.pal).slice(0,5);
     if(Number.isFinite(o.src.n))state.src.n=clamp(o.src.n|0,2,5);
     if(Number.isFinite(o.src.var))state.src.var=o.src.var>>>0;
@@ -1220,9 +1304,34 @@ function applyConfig(o){
     if(Number.isFinite(o.stamp.size))state.stamp.size=clamp(o.stamp.size|0,8,22);
   }
   if(state.src.type==='img'&&!srcImage)toast('画像ソース: 画像を再度読み込んでください');
+  if(state.src.type==='video'&&!srcVideo)toast('動画ソース: 動画を再度読み込んでください');
   refreshAll();schedule();
 }
-/* ============ image input (file / drop / paste) ============ */
+/* ============ media input (file / drop / paste) ============ */
+function loadMediaFile(f){
+  if(!f)return;
+  if(f.type.startsWith('image/'))loadImageFile(f);
+  else if(f.type.startsWith('video/'))loadVideoFile(f);
+  else toast('画像または動画ファイルを選んでください');
+}
+function loadVideoFile(f){
+  const url=URL.createObjectURL(f);
+  const v=document.createElement('video');
+  v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';
+  v.addEventListener('loadeddata',()=>{
+    if(srcVideoURL)URL.revokeObjectURL(srcVideoURL);
+    if(srcVideo)srcVideo.pause();
+    srcVideo=v;srcVideoURL=url;
+    state.src.type='video';
+    refreshAll();
+    v.play().catch(()=>{});
+    syncVideoLoop();schedule();
+    toast('動画を読み込みました ('+v.videoWidth+'×'+v.videoHeight+' · '+(v.duration||0).toFixed(1)+'s)');
+  },{once:true});
+  v.addEventListener('play',syncVideoLoop);
+  v.addEventListener('error',()=>{URL.revokeObjectURL(url);toast('動画の読み込みに失敗しました')},{once:true});
+  v.src=url;
+}
 function loadImageFile(f){
   if(!f||!f.type.startsWith('image/')){toast('画像ファイルではありません');return}
   const rd=new FileReader();
@@ -1238,14 +1347,14 @@ function loadImageFile(f){
   };
   rd.readAsDataURL(f);
 }
-$('#fileImg').addEventListener('change',e=>{loadImageFile(e.target.files[0]);e.target.value=''});
+$('#fileImg').addEventListener('change',e=>{loadMediaFile(e.target.files[0]);e.target.value=''});
 const stage=$('#stage'),dropOv=$('#dropOv');
 ['dragover','dragenter'].forEach(ev=>window.addEventListener(ev,e=>{e.preventDefault();dropOv.classList.add('on')}));
 ['dragleave','dragend'].forEach(ev=>window.addEventListener(ev,e=>{if(e.target===document.documentElement||ev==='dragend'||!e.relatedTarget)dropOv.classList.remove('on')}));
 window.addEventListener('drop',e=>{
   e.preventDefault();dropOv.classList.remove('on');
   const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
-  if(f)loadImageFile(f);
+  if(f)loadMediaFile(f);
 });
 window.addEventListener('paste',e=>{
   const items=e.clipboardData&&e.clipboardData.items;
