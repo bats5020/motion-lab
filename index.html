@@ -158,6 +158,23 @@ const TOOLS = [
     }
   },
   {
+    cat:"raster", name:"Thermal Flow",
+    desc:"ドメインワープ×サーマルLUTで炎系グラデーションを生成。等温線バンド・スプレー溶解グレイン・最大8K PNG書き出し",
+    href:"tools/thermal-flow.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><filter id="tf-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5.5"/></filter></defs><rect width="120" height="66" fill="#0c0302"/><g id="d" filter="url(#tf-blur)"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"),NS="http://www.w3.org/2000/svg";
+      [["#3a0002",40],["#a01000",30],["#e84a00",21],["#ffb44e",13],["#fff3d0",6.5]].forEach(([col,r],i)=>{
+        const cx=54-i*4, cy=42+i*2.5;
+        const e=document.createElementNS(NS,"ellipse");
+        e.setAttribute("cx",cx);e.setAttribute("cy",cy);
+        e.setAttribute("rx",r*1.6);e.setAttribute("ry",r);
+        e.setAttribute("transform",`rotate(${-22+i*7} ${cx} ${cy})`);
+        e.setAttribute("fill",col);g.appendChild(e);
+      });
+    }
+  },
+  {
     cat:"raster", name:"Grid Stretch",
     desc:"画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きのグリッチ表現",
     href:"tools/grid-stretch.html",

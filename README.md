@@ -22,6 +22,7 @@ tools/              各ツール（1ツール＝1ファイル）
 | [Grid Stretch](tools/grid-stretch.html) | raster | 画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きグリッチ |
 | [Dither → SVG](tools/dither-svg.html) | raster | 画像を網点・ディザ・ドット化してSVG／PNGで書き出す |
 | [Pixel Gradient](tools/pixel-gradient.html) | raster | メッシュグラデを土台にピクセル化・ポスタライズ・グレインで生成 |
+| [Thermal Flow](tools/thermal-flow.html) | raster | ドメインワープ×サーマルLUTで炎系グラデーションを生成。LUT編集・等温線バンド・スプレー溶解グレイン・最大8K PNG（設計: [docs/thermal-flow-design.md](docs/thermal-flow-design.md)） |
 | [Glass Lab](tools/glass-lab.html) | motion | グロー球体を型板ガラス越しに歪ませる fluted glass シェーダー（WebGL）。画像・動画ソース、プリセット＋ランダマイズ、WebM録画、設定URL共有 |
 | [ASCII Wave](tools/ascii-wave.html) | motion | 流体ノイズをASCII文字で描くアニメーション背景。カーソルインタラクション＋コード書き出し |
 | [Word Switcher](tools/word-switcher.html) | motion | 単語／SVGを切り替えるモーショングラフィック |
