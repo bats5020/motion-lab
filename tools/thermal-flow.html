@@ -201,7 +201,12 @@ const LUT_PRESETS=[
  {name:'パターン04',dot:'#F80C24',stops:[S(0,'#49BCE6'),S(.14,'#22AEE4'),S(.3,'#EDF8CB',25),S(.4,'#E08B54'),S(.55,'#FC5424'),S(.74,'#F80C24'),S(.9,'#7E1E2C'),S(1,'#2A1220')]},
  {name:'P04ウォーム',dot:'#E08B54',stops:[S(0,'#6E1220'),S(.22,'#C81C1E'),S(.45,'#F0511F'),S(.7,'#E08B54'),S(1,'#F4E4C0')]},
  {name:'P04ロウ',dot:'#F2EFC9',stops:[S(0,'#89C9D3'),S(.14,'#54B6DF'),S(.3,'#F2EFC9'),S(.45,'#E6A06D'),S(.58,'#FF5A2A'),S(.74,'#F20C22'),S(.88,'#8B2632'),S(1,'#211821')]},
- {name:'P04反転',dot:'#54B6DF',stops:[S(0,'#211821'),S(.12,'#8B2632'),S(.26,'#F20C22'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]}
+ {name:'P04反転',dot:'#54B6DF',stops:[S(0,'#211821'),S(.12,'#8B2632'),S(.26,'#F20C22'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]},
+ /* 青系 */
+ {name:'青炎',dot:'#2FA6F2',stops:[S(0,'#050917'),S(.16,'#0E1D4E'),S(.32,'#1A3FB0'),S(.48,'#2568EE'),S(.62,'#2FA6F2'),S(.76,'#7FE0F5'),S(.9,'#D9F7F3'),S(1,'#F7FCEE')]},
+ {name:'深海',dot:'#1490A4',stops:[S(0,'#020611'),S(.28,'#07264C'),S(.5,'#0B4E78'),S(.68,'#1490A4'),S(.84,'#4CD8C4'),S(1,'#C9F6DF')]},
+ {name:'氷河',dot:'#5D9BD4',stops:[S(0,'#10294F'),S(.22,'#2D5CA6'),S(.45,'#5D9BD4'),S(.68,'#9CCDE8'),S(.86,'#D8EEF4'),S(1,'#F4FAFB')]},
+ {name:'宵',dot:'#5F3ACA',stops:[S(0,'#170E2E'),S(.18,'#3A1E6E'),S(.38,'#5F3ACA'),S(.56,'#4A7BE8'),S(.72,'#54C2E6'),S(.88,'#C6EFF4'),S(1,'#F2FBF6')]}
 ];
 /* ============ look presets ============ */
 const PRESETS=[
@@ -243,7 +248,12 @@ const PRESETS=[
   grain:{mode:'film',amount:40,size:1},finish:{bg:0},pins:[]},
  {name:'マーブル',dot:'#211821',lut:'パターン04',
   field:{mode:'warp',scale:34,octaves:5,warp1:66,warp2:62,aniso:-10,time:16,gamma:47,contrast:76,offset:3},
-  grain:{mode:'film',amount:34,size:1},finish:{bg:0},pins:[]}
+  grain:{mode:'film',amount:34,size:1},finish:{bg:0},pins:[]},
+ /* 青系カラーバリエーション — 模様はそのまま色だけ差し替え */
+ {name:'青炎',colorOnly:true,dot:'#2FA6F2',lut:'青炎'},
+ {name:'深海',colorOnly:true,dot:'#1490A4',lut:'深海'},
+ {name:'氷河',colorOnly:true,dot:'#5D9BD4',lut:'氷河'},
+ {name:'宵',colorOnly:true,dot:'#5F3ACA',lut:'宵'}
 ];
 /* ============ WebGL ============ */
 const view=$('#view'),meta=$('#meta');
