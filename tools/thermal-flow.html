@@ -19,6 +19,12 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #view{max-width:100%;max-height:100%;display:block;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329;background:#000}
 #meta{position:absolute;bottom:14px;right:16px;color:var(--faint);font-size:10px;letter-spacing:.06em;pointer-events:none}
 #ov{position:absolute;touch-action:none;cursor:crosshair}
+#txprev{position:absolute;display:none;pointer-events:none;z-index:3;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+#txprev.on{display:flex}
+#txprev .tx1{color:#F2EFC9;font:800 1em/1.05 'Helvetica Neue',Futura,sans-serif;letter-spacing:.04em}
+#txprev .tx2{color:#111111;font:700 26px/1.2 'Hiragino Sans','Noto Sans JP',sans-serif;letter-spacing:.3em}
+#txprev .tx3{color:#F2EFC9;font:600 13px/1.2 ui-monospace,monospace;letter-spacing:.24em;margin-top:18px}
 #panel{flex:0 0 320px;width:320px;height:100%;overflow-y:auto;background:var(--panel);
   border-left:1px solid var(--line);padding:0 0 60px}
 #panel::-webkit-scrollbar{width:8px}
@@ -90,6 +96,11 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
   <main id="stage">
     <canvas id="view" width="880" height="1100"></canvas>
     <canvas id="ov"></canvas>
+    <div id="txprev">
+      <div class="tx1">EK 2026</div>
+      <div class="tx2">下一歩 同止紀録</div>
+      <div class="tx3">MOTION LAB — THERMAL FLOW</div>
+    </div>
     <div id="meta"></div>
   </main>
   <aside id="panel">
@@ -163,7 +174,7 @@ const state={
   canvas:{mode:'45',w:1080,h:1350},
   field:{
     mode:'warp',
-    scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,
+    scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,ntype:'fbm',nchar:50,kal:0,kalRot:0,linAng:270,linShape:'line',linInv:false,linCx:50,linCy:50,
     peaks:3,sharp:45,peakH:75,sway:40,
     blobN:3,blobSize:52,blobSoft:55,
     gamma:50,contrast:56,offset:0
@@ -187,59 +198,52 @@ function previewSize(){
 /* ============ LUT presets ============ */
 function S(p,c,h){return{p,c,h:h||0}}
 const LUT_PRESETS=[
- {name:'FLAME',dot:'#ff6a00',stops:[S(0,'#050004'),S(.28,'#3a0002'),S(.5,'#c81400'),S(.68,'#ff6a00'),S(.84,'#ffc95e'),S(1,'#fff6dc')]},
- {name:'THERMAL',dot:'#5b2a86',stops:[S(0,'#00030f'),S(.18,'#141b66'),S(.36,'#5b2a86'),S(.54,'#c22e4c'),S(.72,'#ff7a1f'),S(.88,'#ffd53e'),S(1,'#fffbe8')]},
- {name:'AURA',dot:'#2e8fe0',stops:[S(0,'#020204'),S(.42,'#123a7a'),S(.6,'#4fa8e8'),S(.72,'#a8d8f2',35),S(.8,'#cf3b28',45),S(.92,'#e8842a'),S(1,'#f2c14e')]},
- {name:'CHROME',dot:'#7a2fe0',stops:[S(0,'#0b0b0e'),S(.36,'#111116'),S(.5,'#ff4d17',80),S(.6,'#2f55ff',60),S(.72,'#7a2fe0',40),S(1,'#0d0d12')]},
- {name:'BOMBA',dot:'#e83112',stops:[S(0,'#f2ead8'),S(.35,'#ffb54a'),S(.6,'#ff7a1f'),S(.8,'#e83112'),S(1,'#c81c08')]},
- {name:'TEAL FIRE',dot:'#0c3a38',stops:[S(0,'#06201f'),S(.3,'#0c3a38'),S(.55,'#3e5c48'),S(.72,'#e08a2a'),S(.86,'#f2551f'),S(1,'#b3130c')]},
- {name:'MAGMA',dot:'#d84f7e',stops:[S(0,'#1a1418'),S(.35,'#d84f7e'),S(.6,'#e8813c'),S(.8,'#f0a8b8'),S(1,'#f6d8c8')]},
- {name:'AURORA',dot:'#7fd8c8',stops:[S(0,'#2a0410'),S(.15,'#0b3ac8'),S(.3,'#7fd8c8'),S(.45,'#f2ef9e'),S(.6,'#c8b4f2'),S(.72,'#e83812',40),S(.85,'#101c3c'),S(1,'#e8d8e8')]},
- {name:'GHOST',dot:'#3e7d9e',stops:[S(0,'#04070c'),S(.4,'#0a2038'),S(.7,'#3e7d9e'),S(1,'#dcecec')]},
- {name:'INFERNO',dot:'#932667',stops:[S(0,'#000004'),S(.25,'#420a68'),S(.5,'#932667'),S(.75,'#dd513a'),S(.9,'#fca50a'),S(1,'#fcffa4')]},
- {name:'CURA',dot:'#b9aede',stops:[S(0,'#b3a6dc'),S(.3,'#eadbc2'),S(.55,'#e8973c'),S(.78,'#b43a10'),S(1,'#33100c')]},
- {name:'LICK',dot:'#e02818',stops:[S(0,'#15081a'),S(.36,'#43102e'),S(.5,'#e02818',55),S(.63,'#ffb45e',50),S(.82,'#ffe9b8'),S(1,'#fffef2')]},
- {name:'SURGE',dot:'#e02808',stops:[S(0,'#efe6d4'),S(.4,'#e85a18'),S(.66,'#c81c08'),S(.88,'#280604'),S(1,'#0c0304')]}
+ {name:'パターン04',dot:'#F80C24',stops:[S(0,'#49BCE6'),S(.14,'#22AEE4'),S(.3,'#EDF8CB',25),S(.4,'#E08B54'),S(.55,'#FC5424'),S(.74,'#F80C24'),S(.9,'#7E1E2C'),S(1,'#2A1220')]},
+ {name:'P04ウォーム',dot:'#E08B54',stops:[S(0,'#6E1220'),S(.22,'#C81C1E'),S(.45,'#F0511F'),S(.7,'#E08B54'),S(1,'#F4E4C0')]},
+ {name:'P04ロウ',dot:'#F2EFC9',stops:[S(0,'#89C9D3'),S(.14,'#54B6DF'),S(.3,'#F2EFC9'),S(.45,'#E6A06D'),S(.58,'#FF5A2A'),S(.74,'#F20C22'),S(.88,'#8B2632'),S(1,'#211821')]},
+ {name:'P04反転',dot:'#54B6DF',stops:[S(0,'#211821'),S(.12,'#8B2632'),S(.26,'#F20C22'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]}
 ];
 /* ============ look presets ============ */
 const PRESETS=[
- {name:'EMBER',dot:'#ff6a00',lut:'FLAME',
-  field:{mode:'blob',scale:36,octaves:4,warp1:42,warp2:30,aniso:0,time:0,blobN:2,blobSize:60,blobSoft:62,gamma:50,contrast:58,offset:0},
-  grain:{mode:'film',amount:14,size:1},finish:{}},
- {name:'LICKS',dot:'#ffd53e',lut:'THERMAL',
-  field:{mode:'warp',scale:24,octaves:4,warp1:64,warp2:58,aniso:44,time:12,curl:30,rise:22,gamma:44,contrast:68,offset:2},
-  grain:{mode:'off',amount:0,size:1},finish:{}},
- {name:'PLUME',dot:'#e02818',lut:'LICK',
-  field:{mode:'flame',scale:26,octaves:4,warp1:32,warp2:0,aniso:22,time:0,curl:28,rise:62,peaks:3,sharp:62,peakH:150,sway:28,gamma:52,contrast:60,offset:-4},
-  grain:{mode:'film',amount:8,size:1},finish:{bg:85,bgTop:'#d9c4a8',bgBot:'#26060f'},
-  pins:[{x:.3,y:.66,r:.15,a:230},{x:.72,y:.5,r:.13,a:-210}]},
- {name:'BLUE FLAME',dot:'#4fa8e8',lut:'AURA',
-  field:{mode:'flame',scale:40,octaves:4,warp1:48,warp2:0,aniso:22,time:4,curl:22,rise:18,peaks:2,sharp:38,peakH:95,sway:46,gamma:52,contrast:60,offset:0},
-  grain:{mode:'shadow',amount:62,size:1},finish:{}},
- {name:'CURA',dot:'#b9aede',lut:'CURA',
-  field:{mode:'flame',scale:36,octaves:3,warp1:26,warp2:0,aniso:10,time:0,peaks:2,sharp:30,peakH:88,sway:24,gamma:50,contrast:52,offset:0},
-  grain:{mode:'film',amount:26,size:1},finish:{}},
- {name:'CHROME',dot:'#7a2fe0',lut:'CHROME',
-  field:{mode:'warp',scale:16,octaves:3,warp1:62,warp2:38,aniso:24,time:8,gamma:50,contrast:58,offset:0},
-  grain:{mode:'film',amount:8,size:1},finish:{}},
- {name:'BOMBA',dot:'#e83112',lut:'BOMBA',
-  field:{mode:'warp',scale:12,octaves:3,warp1:32,warp2:22,aniso:-16,time:0,gamma:46,contrast:70,offset:6},
-  grain:{mode:'dissolve',amount:88,size:2,paper:'#f2ead8'},finish:{}},
- {name:'TEAL FIRE',dot:'#0c3a38',lut:'TEAL FIRE',
-  field:{mode:'flame',scale:44,octaves:4,warp1:34,warp2:0,aniso:30,time:6,curl:16,rise:24,peaks:3,sharp:26,peakH:105,sway:36,gamma:54,contrast:56,offset:0},
-  grain:{mode:'shadow',amount:40,size:1},finish:{}},
- {name:'AURORA',dot:'#7fd8c8',lut:'AURORA',
-  field:{mode:'warp',scale:30,octaves:4,warp1:52,warp2:58,aniso:52,time:16,gamma:50,contrast:58,offset:0},
-  grain:{mode:'film',amount:12,size:1},finish:{}},
- {name:'MAGMA',dot:'#d84f7e',lut:'MAGMA',
-  field:{mode:'warp',scale:26,octaves:5,warp1:64,warp2:52,aniso:-8,time:20,curl:38,rise:0,gamma:50,contrast:54,offset:0},
-  grain:{mode:'shadow',amount:70,size:2},finish:{}},
- {name:'GHOST',dot:'#3e7d9e',lut:'GHOST',
-  field:{mode:'blob',scale:32,octaves:3,warp1:36,warp2:24,aniso:0,time:0,blobN:3,blobSize:48,blobSoft:70,gamma:50,contrast:56,offset:0},
-  grain:{mode:'film',amount:34,size:1},finish:{}},
- {name:'SURGE',dot:'#e02808',lut:'SURGE',
-  field:{mode:'warp',scale:38,octaves:5,warp1:44,warp2:36,aniso:78,time:10,gamma:48,contrast:66,offset:0},
-  grain:{mode:'dissolve',amount:78,size:1,paper:'#efe6d4'},finish:{}}
+ /* パターン04 バリエーション — 全案同一パレット、模様のみ変更 */
+ {name:'グラデ',dot:'#E08B54',lut:'P04ウォーム',
+  field:{mode:'linear',linAng:270,scale:14,octaves:3,warp1:10,warp2:0,gamma:50,contrast:52,offset:0},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
+ {name:'セル',dot:'#F20C22',lut:'パターン04',
+  field:{mode:'warp',scale:22,octaves:3,warp1:60,warp2:26,aniso:-24,time:8,gamma:46,contrast:82,offset:2},
+  grain:{mode:'film',amount:42,size:1},finish:{bg:0},pins:[]},
+ {name:'フレイム',dot:'#FF5A2A',lut:'パターン04',
+  field:{mode:'flame',scale:26,octaves:4,warp1:36,warp2:0,aniso:22,time:0,curl:26,rise:55,peaks:3,sharp:58,peakH:150,sway:30,gamma:50,contrast:66,offset:0},
+  grain:{mode:'film',amount:38,size:1},finish:{bg:0},pins:[{x:.3,y:.66,r:.15,a:230},{x:.72,y:.5,r:.13,a:-210}]},
+ {name:'リング',dot:'#E6A06D',lut:'パターン04',
+  field:{mode:'warp',scale:20,octaves:3,warp1:55,warp2:20,aniso:-18,time:14,gamma:46,contrast:76,offset:0},
+  lutOpts:{bands:7},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
+ {name:'ストライプ',dot:'#8B2632',lut:'パターン04',
+  field:{mode:'warp',scale:30,octaves:4,warp1:48,warp2:30,aniso:88,time:6,gamma:48,contrast:74,offset:2},
+  grain:{mode:'film',amount:36,size:1},finish:{bg:0},pins:[]},
+ {name:'ブロブ',dot:'#54B6DF',lut:'パターン04',
+  field:{mode:'blob',scale:30,octaves:3,warp1:44,warp2:0,aniso:0,time:0,blobN:6,blobSize:22,blobSoft:58,gamma:50,contrast:70,offset:0},
+  grain:{mode:'film',amount:40,size:1},finish:{bg:0},pins:[]},
+ {name:'渦',dot:'#F20C22',lut:'パターン04',
+  field:{mode:'warp',scale:20,octaves:3,warp1:52,warp2:22,aniso:0,time:20,curl:34,gamma:46,contrast:80,offset:2},
+  grain:{mode:'film',amount:38,size:1},finish:{bg:0},
+  pins:[{x:.32,y:.62,r:.2,a:300},{x:.7,y:.34,r:.16,a:-280},{x:.62,y:.78,r:.12,a:240}]},
+ {name:'スプレー',dot:'#E6A06D',lut:'パターン04',
+  field:{mode:'warp',scale:18,octaves:3,warp1:50,warp2:18,aniso:-16,time:10,gamma:47,contrast:72,offset:-7},
+  grain:{mode:'dissolve',amount:82,size:2,paper:'#F2EFC9'},finish:{bg:0},pins:[]},
+ {name:'ボロノイ',dot:'#F20C22',lut:'パターン04',
+  field:{mode:'warp',scale:44,octaves:3,warp1:30,warp2:10,aniso:-12,time:4,ntype:'voro',nchar:14,gamma:44,contrast:78,offset:8},
+  grain:{mode:'film',amount:38,size:1},finish:{bg:0},pins:[]},
+ {name:'リッジ',dot:'#FF5A2A',lut:'パターン04',
+  field:{mode:'warp',scale:26,octaves:4,warp1:42,warp2:20,aniso:40,time:12,ntype:'ridge',nchar:55,gamma:50,contrast:72,offset:0},
+  grain:{mode:'film',amount:36,size:1},finish:{bg:0},pins:[]},
+ {name:'万華鏡',dot:'#54B6DF',lut:'パターン04',
+  field:{mode:'warp',scale:22,octaves:3,warp1:60,warp2:26,aniso:-24,time:8,kal:8,kalRot:15,gamma:46,contrast:82,offset:2},
+  grain:{mode:'film',amount:40,size:1},finish:{bg:0},pins:[]},
+ {name:'マーブル',dot:'#211821',lut:'パターン04',
+  field:{mode:'warp',scale:34,octaves:5,warp1:66,warp2:62,aniso:-10,time:16,gamma:47,contrast:76,offset:3},
+  grain:{mode:'film',amount:34,size:1},finish:{bg:0},pins:[]}
 ];
 /* ============ WebGL ============ */
 const view=$('#view'),meta=$('#meta');
@@ -251,7 +255,11 @@ uniform vec2 uRes;
 uniform int uMode;
 uniform float uScale;
 uniform int uOct;
-uniform float uW1,uW2,uTime,uCurl,uRise;
+uniform float uW1,uW2,uTime,uCurl,uRise,uLinAng;
+uniform int uLinShape,uLinInv;
+uniform vec2 uLinC;
+uniform int uNType;
+uniform float uNChar,uKal,uKalRot;
 uniform vec2 uAniso,uSeedOff;
 uniform float uPeaks,uSharp,uPeakH,uSway;
 uniform int uBlobN;
@@ -324,6 +332,30 @@ float fbm(vec3 p){
   }
   return sum/max(norm,1e-4);
 }
+vec2 hash22(vec2 p){vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.103,.0973));p3+=dot(p3,p3.yzx+33.33);return fract((p3.xx+p3.yz)*p3.zy);}
+float ridge(vec3 p){
+  float v=0.,a=.5,tot=0.;
+  float sh=1.+uNChar*6.;
+  for(int i=0;i<6;i++){
+    if(i>=uOct)break;
+    float n=1.-abs(snoise(p));
+    n=pow(clamp(n,0.,1.),sh);
+    v+=n*a;tot+=a;a*=.55;
+    p=vec3(p.xy*mat2(1.6,1.2,-1.2,1.6),p.z*1.9+3.7);
+  }
+  return v/max(tot,1e-4);
+}
+float vor(vec2 p){
+  vec2 ip=floor(p),fp=fract(p);
+  float f1=8.,f2=8.;
+  for(int j=-1;j<=1;j++)for(int i=-1;i<=1;i++){
+    vec2 nb=vec2(float(i),float(j));
+    vec2 rp=mix(vec2(.5),hash22(ip+nb),.9);
+    float d=length(nb+rp-fp);
+    if(d<f1){f2=f1;f1=d;}else if(d<f2){f2=d;}
+  }
+  return clamp(mix(f1/.7,(f2-f1)/.7,uNChar),0.,1.);
+}
 float fbm2(vec3 p){
   return .62*snoise(p)+.3*snoise(vec3(p.xy*2.1,p.z*1.7+3.1));
 }
@@ -345,6 +377,21 @@ vec2 advect(vec2 uv,vec2 asp){
   return p;
 }
 float field(vec2 uv,vec2 asp){
+  if(uMode==3){
+    float t;
+    if(uLinShape==1){
+      t=length((uv-uLinC)*asp)*1.3;
+    }else{
+      vec2 dir=vec2(cos(uLinAng),sin(uLinAng));
+      t=dot((uv-.5)*asp,dir)+.5;
+    }
+    if(uW1>0.001){
+      vec3 P=vec3((uv-.5)*asp*uScale*uAniso+uSeedOff,uTime);
+      t+=fbm(P)*uW1*.12;
+    }
+    t=clamp(t,0.,1.);
+    return uLinInv==1?1.-t:t;
+  }
   if(uMode==0){
     vec2 p=(uv-.5)*asp*uScale*uAniso;
     vec3 P=vec3(p+uSeedOff,uTime);
@@ -354,7 +401,11 @@ float field(vec2 uv,vec2 asp){
     float r1=fbm(P+vec3(w1,3.1)+vec3(1.7,9.2,0.));
     float r2=fbm(P+vec3(w1,3.1)+vec3(8.3,2.8,0.));
     vec2 w2=vec2(r1,r2)*uW2;
-    return fbm(P+vec3(w2,6.9))*.5+.5;
+    vec3 FP=P+vec3(w2,6.9);
+    if(uNType==1)return clamp(abs(fbm(FP))*1.7,0.,1.);
+    if(uNType==2)return ridge(FP);
+    if(uNType==3)return vor(FP.xy*1.4+vec2(FP.z*.31,-FP.z*.23));
+    return fbm(FP)*.5+.5;
   }
   if(uMode==1){
     vec2 p=(uv-.5)*asp*uScale*uAniso;
@@ -393,6 +444,13 @@ float field(vec2 uv,vec2 asp){
 void main(){
   vec2 asp=vec2(uRes.x/uRes.y,1.);
   vec2 pv=vUv;
+  if(uKal>=2.){
+    vec2 kd=(pv-.5)*asp;
+    float seg=6.28318530718/uKal;
+    float an=atan(kd.y,kd.x)+uKalRot;
+    an=mod(an,seg);an=abs(an-seg*.5);
+    pv=.5+vec2(cos(an),sin(an))*length(kd)/asp;
+  }
   for(int i=0;i<6;i++){
     if(i>=uPinN)break;
     vec2 d=(pv-uPinPos[i])*asp;
@@ -451,7 +509,7 @@ const aPos=gl.getAttribLocation(prog,'aPos');
 gl.enableVertexAttribArray(aPos);
 gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 const U={};
-['uRes','uMode','uScale','uOct','uW1','uW2','uTime','uCurl','uRise','uAniso','uSeedOff',
+['uRes','uMode','uScale','uOct','uW1','uW2','uTime','uCurl','uRise','uLinAng','uLinShape','uLinInv','uLinC','uNType','uNChar','uKal','uKalRot','uAniso','uSeedOff',
  'uPeaks','uSharp','uPeakH','uSway','uBlobN','uBlobPos[0]','uBlobR[0]','uBlobK',
  'uGamma','uContrast','uOffset','uLut','uBands','uGrainMode','uGrainAmt','uGrainPx',
  'uPaper','uBgAmt','uBgTop','uBgBot',
@@ -511,7 +569,11 @@ let _blobs=blobState();
 function setUniforms(W,H,exScale){
   const f=state.field;
   gl.uniform2f(U['uRes'],W,H);
-  gl.uniform1i(U['uMode'],{warp:0,flame:1,blob:2}[f.mode]||0);
+  gl.uniform1i(U['uMode'],{warp:0,flame:1,blob:2,linear:3}[f.mode]||0);
+  gl.uniform1f(U['uLinAng'],(f.linAng==null?270:f.linAng)*Math.PI/180);
+  gl.uniform1i(U['uLinShape'],f.linShape==='radial'?1:0);
+  gl.uniform1i(U['uLinInv'],f.linInv?1:0);
+  gl.uniform2f(U['uLinC'],(f.linCx==null?50:f.linCx)/100,(f.linCy==null?50:f.linCy)/100);
   gl.uniform1f(U['uScale'],.5*Math.pow(2,f.scale/25));
   gl.uniform1i(U['uOct'],clamp(f.octaves|0,1,6));
   gl.uniform1f(U['uW1'],f.warp1*.02);
@@ -519,6 +581,10 @@ function setUniforms(W,H,exScale){
   gl.uniform1f(U['uTime'],f.time*.08);
   gl.uniform1f(U['uCurl'],(f.curl||0)/100);
   gl.uniform1f(U['uRise'],(f.rise||0)/100);
+  gl.uniform1i(U['uNType'],{fbm:0,turb:1,ridge:2,voro:3}[f.ntype||'fbm']||0);
+  gl.uniform1f(U['uNChar'],(f.nchar==null?50:f.nchar)/100);
+  gl.uniform1f(U['uKal'],f.kal||0);
+  gl.uniform1f(U['uKalRot'],(f.kalRot||0)*Math.PI/180);
   const a=f.aniso/50;
   gl.uniform2f(U['uAniso'],Math.pow(2,a),Math.pow(2,-a));
   gl.uniform2f(U['uSeedOff'],(state.seed%1000)*.137,(Math.floor(state.seed/1000)%1000)*.113);
@@ -739,6 +805,16 @@ function saveUserLuts(l){try{localStorage.setItem('tf-user-luts',JSON.stringify(
 function renderUserLuts(){
   const c=$('#lutPresets');
   c.innerHTML='';
+  LUT_PRESETS.forEach(p=>{
+    const ch=ce('button','chip','<i style="background:'+p.dot+'"></i>'+p.name);
+    ch.addEventListener('click',()=>{
+      pushUndo();
+      state.lut.stops=p.stops.map(s=>({...s}));
+      selStop=0;buildLut();refreshStopCtl();redraw();
+      toast('カラー: '+p.name);
+    });
+    c.appendChild(ch);
+  });
   const luts=loadUserLuts();
   luts.forEach((p,idx)=>{
     const mid=p.stops[Math.floor(p.stops.length/2)];
@@ -779,13 +855,22 @@ function commitUserLut(){
   $('#lutSaveRow').style.display='none';
   renderUserLuts();
 }
-const DEFAULT_FIELD={mode:'warp',scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,
+const DEFAULT_FIELD={mode:'warp',scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,ntype:'fbm',nchar:50,kal:0,kalRot:0,
+  linAng:270,linShape:'line',linInv:false,linCx:50,linCy:50,
   peaks:3,sharp:45,peakH:75,sway:40,blobN:3,blobSize:52,blobSoft:55,gamma:50,contrast:56,offset:0};
 function applyPreset(p){
+  if(p.colorOnly){
+    const lp=LUT_PRESETS.find(l=>l.name===p.lut);
+    if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
+    if(p.grain)Object.assign(state.grain,p.grain);
+    if(p.finish)Object.assign(state.finish,p.finish);
+    selStop=0;buildLut();refreshAll();redraw();
+    return;
+  }
   Object.assign(state.field,DEFAULT_FIELD,p.field);
   const lp=LUT_PRESETS.find(l=>l.name===p.lut);
   if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
-  state.lut.bands=0;state.lut.invert=false;state.lut.shift=0;
+  state.lut.bands=(p.lutOpts&&p.lutOpts.bands)||0;state.lut.invert=false;state.lut.shift=0;
   Object.assign(state.grain,{paper:state.grain.paper},p.grain);
   Object.assign(state.finish,{bg:0,bgTop:'#d9c4a8',bgBot:'#26060f'},p.finish);
   state.pins=(p.pins||[]).map(x=>({...x}));
@@ -808,7 +893,7 @@ function buildCanvasSec(){
 }
 function buildField(){
   const f=state.field;
-  UI.mode=mkSeg([['warp','ワープ'],['flame','縦炎'],['blob','ブロブ']],f.mode,v=>{f.mode=v;refreshAll()});
+  UI.mode=mkSeg([['linear','リニア'],['warp','ワープ'],['flame','縦炎'],['blob','ブロブ']],f.mode,v=>{f.mode=v;refreshAll()});
   $('#modeSeg').replaceWith(UI.mode.row);UI.mode.row.id='modeSeg';
   UI.scale=mkRange('スケール',0,100,1,f.scale,v=>{f.scale=v});
   UI.oct=mkRange('オクターブ',1,6,1,f.octaves,v=>{f.octaves=v});
@@ -818,8 +903,30 @@ function buildField(){
   UI.rise=mkRange('上昇',0,100,1,f.rise,v=>{f.rise=v});
   UI.aniso=mkRange('縦横比',-100,100,1,f.aniso,v=>{f.aniso=v});
   UI.time=mkRange('ゆらぎ',0,100,.5,f.time,v=>{f.time=v});
-  $('#fCommon').append(UI.scale.row,UI.oct.row,UI.w1.row,UI.w2.row,UI.curl.row,UI.rise.row,UI.aniso.row,UI.time.row);
+  UI.kal=mkRange('万華鏡',0,12,1,f.kal||0,v=>{f.kal=v<2?0:v});
+  UI.kalRot=mkRange('万華鏡回転',0,360,1,f.kalRot||0,v=>{f.kalRot=v});
+  $('#fCommon').append(UI.scale.row,UI.oct.row,UI.w1.row,UI.w2.row,UI.curl.row,UI.rise.row,UI.aniso.row,UI.time.row,UI.kal.row,UI.kalRot.row);
   const fm=$('#fMode');
+  const oLin=ce('div');oLin.dataset.for='linear';
+  UI.linShape=mkSeg([['line','直線'],['radial','放射']],f.linShape||'line',v=>{f.linShape=v;refreshAll()});
+  const dirRow=ce('div','btnrow');
+  [['↓ 下へ',270],['↑ 上へ',90],['→ 右へ',0],['← 左へ',180]].forEach(([lb,ang])=>{
+    const b=ce('button','btn',lb);
+    b.addEventListener('click',()=>{pushUndo();f.linShape='line';f.linAng=ang;refreshAll()});
+    dirRow.appendChild(b);
+  });
+  const invB=ce('button','btn wide','⇅ グラデ反転');
+  invB.addEventListener('click',()=>{pushUndo();f.linInv=!f.linInv;redraw()});
+  UI.linAng=mkRange('角度',0,360,1,f.linAng==null?270:f.linAng,v=>{f.linAng=v});
+  UI.linCx=mkRange('中心X',0,100,1,f.linCx==null?50:f.linCx,v=>{f.linCx=v});
+  UI.linCy=mkRange('中心Y',0,100,1,f.linCy==null?50:f.linCy,v=>{f.linCy=v});
+  oLin.append(UI.linShape.row,dirRow,invB,UI.linAng.row,UI.linCx.row,UI.linCy.row,
+    ce('div','hint','直線＝角度で方向指定（ボタンでワンタッチ）。放射＝中心から開く円形グラデ。反転で向きを逆に。ワープ1でゆらぎ'));
+  const oWarp=ce('div');oWarp.dataset.for='warp';
+  UI.ntype=mkSeg([['fbm','スムーズ'],['turb','乱流'],['ridge','リッジ'],['voro','ボロノイ']],f.ntype||'fbm',v=>{f.ntype=v});
+  UI.nchar=mkRange('キャラクター',0,100,1,f.nchar==null?50:f.nchar,v=>{f.nchar=v});
+  oWarp.append(UI.ntype.row,UI.nchar.row,
+    ce('div','hint','キャラクター: リッジ＝稜線の鋭さ / ボロノイ＝セル塗り⇄セル境界'));
   const oFlame=ce('div');oFlame.dataset.for='flame';
   UI.peaks=mkRange('峰の数',1,9,1,f.peaks,v=>{f.peaks=v});
   UI.sharp=mkRange('峰の鋭さ',0,100,1,f.sharp,v=>{f.sharp=v});
@@ -833,7 +940,7 @@ function buildField(){
   const shf=ce('button','btn wide','配置シャッフル');
   shf.addEventListener('click',()=>{state.seed=(Math.random()*1e9)>>>0;_blobs=blobState();$('#seed').value=state.seed;redraw()});
   oBlob.append(UI.blobN.row,UI.blobSize.row,UI.blobSoft.row,shf);
-  fm.append(oFlame,oBlob);
+  fm.append(oLin,oWarp,oFlame,oBlob);
   UI.pinRad=mkRange('ピン半径',4,50,1,15,v=>{const p=selPinObj();if(p){p.r=v/100;drawOverlay()}});
   UI.pinAng=mkRange('回転角°',-360,360,5,200,v=>{const p=selPinObj();if(p)p.a=v});
   const pinDel=ce('button','btn','選択ピンを削除');
@@ -872,8 +979,9 @@ function buildFinish(){
   UI.bgAmt=mkRange('背景グラデ',0,100,1,f.bg||0,v=>{f.bg=v});
   UI.bgTop=mkColRow('背景・上',f.bgTop,v=>{f.bgTop=v});
   UI.bgBot=mkColRow('背景・下',f.bgBot,v=>{f.bgBot=v});
-  $('#finishOpts').append(UI.bgAmt.row,UI.bgTop.row,UI.bgBot.row,
-    ce('div','hint','背景グラデ＝炎の外側（低温部）を別の縦グラデーションに置き換え'));
+  UI.txprev=mkChk('テキストプレビュー',false,v=>{$('#txprev').classList.toggle('on',v)});
+  $('#finishOpts').append(UI.bgAmt.row,UI.bgTop.row,UI.bgBot.row,UI.txprev.row,
+    ce('div','hint','背景グラデ＝炎の外側（低温部）を別の縦グラデーションに置き換え。テキストプレビュー＝ロゴ色(クリーム)と黒の文字を重ねて視認性を確認（書き出しには含まれません）'));
 }
 function refreshAll(){
   const f=state.field;
@@ -881,6 +989,15 @@ function refreshAll(){
   document.querySelectorAll('#fMode [data-for]').forEach(o=>o.style.display=o.dataset.for===f.mode?'':'none');
   UI.scale.set(f.scale);UI.oct.set(f.octaves);UI.w1.set(f.warp1);UI.w2.set(f.warp2);
   UI.curl.set(f.curl||0);UI.rise.set(f.rise||0);
+  UI.ntype.set(f.ntype||'fbm');UI.nchar.set(f.nchar==null?50:f.nchar);
+  UI.linShape.set(f.linShape||'line');
+  UI.linAng.set(f.linAng==null?270:f.linAng);
+  UI.linCx.set(f.linCx==null?50:f.linCx);UI.linCy.set(f.linCy==null?50:f.linCy);
+  const isRad=f.linShape==='radial';
+  UI.linAng.row.style.display=isRad?'none':'';
+  UI.linCx.row.style.display=isRad?'':'none';
+  UI.linCy.row.style.display=isRad?'':'none';
+  UI.kal.set(f.kal||0);UI.kalRot.set(f.kalRot||0);
   UI.aniso.set(f.aniso);UI.time.set(f.time);
   UI.peaks.set(f.peaks);UI.sharp.set(f.sharp);UI.peakH.set(f.peakH);UI.sway.set(f.sway);
   UI.blobN.set(f.blobN);UI.blobSize.set(f.blobSize);UI.blobSoft.set(f.blobSoft);
@@ -908,13 +1025,18 @@ function applyRandom(seed){
   const r=mulberry32(seed);
   state.seed=seed;
   const f=state.field;
-  f.mode=['warp','warp','warp','flame','flame','blob'][(r()*6)|0];
+  f.mode=['warp','warp','warp','flame','flame','blob','linear'][(r()*7)|0];
+  f.linAng=(r()*360)|0;
   f.scale=18+r()*46;
   f.octaves=3+((r()*3)|0);
   f.warp1=25+r()*60;
   f.warp2=r()*70;
   f.aniso=(r()<.45?0:(r()*2-1)*80)|0;
   f.time=r()*40;
+  f.ntype=['fbm','fbm','turb','ridge','voro'][(r()*5)|0];
+  f.nchar=Math.round(r()*100);
+  f.kal=r()<.18?(2+2*((r()*5)|0)):0;
+  f.kalRot=Math.round(r()*360);
   f.curl=r()<.5?Math.round(r()*45):0;
   f.rise=r()<.45?Math.round(r()*50):0;
   f.peaks=1+((r()*5)|0);
@@ -1053,6 +1175,10 @@ function syncOverlay(){
   const w=Math.round(vb.width),h=Math.round(vb.height);
   ov.style.left=(vb.left-sb.left)+'px';
   ov.style.top=(vb.top-sb.top)+'px';
+  const tp=$('#txprev');
+  tp.style.left=ov.style.left;tp.style.top=ov.style.top;
+  tp.style.width=w+'px';tp.style.height=h+'px';
+  tp.style.fontSize=Math.round(w/8)+'px';
   if(ov.width!==w||ov.height!==h){ov.width=w;ov.height=h;drawOverlay()}
 }
 function drawOverlay(){
@@ -1205,9 +1331,12 @@ buildFinish();
 const qp=new URLSearchParams(location.search).get('p');
 if(qp){
   const p=PRESETS.find(x=>x.name.toLowerCase()===qp.toLowerCase());
-  if(p)applyPreset(p);
+  if(p){
+    if(p.colorOnly&&location.hash.length<=2)applyPreset(PRESETS[0]);
+    applyPreset(p);
+  }
 }else if(location.hash.length<=2){
-  applyPreset(PRESETS.find(x=>x.name==='PLUME'));
+  applyPreset(PRESETS[0]);
 }
 if(location.hash.length>2&&decodeState(location.hash.slice(1)))toast('URLから設定を復元しました');
 buildLut();
