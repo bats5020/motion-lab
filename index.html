@@ -211,6 +211,54 @@ const TOOLS = [
     }
   },
   {
+    cat:"motion", name:"Warp Type",
+    desc:"テキストをテクスチャ化しUVをパーリンノイズで揺らすスペースタイプ系ジェネレーター。プリセット・PNG／WebM書き出し",
+    href:"tools/warp-type.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><g id="d" font-family="Georgia,serif" font-size="15" font-weight="700"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"), word="WARP";
+      for(let r=0;r<4;r++){
+        for(let i=0;i<word.length;i++){
+          const x=28+i*18, y=16+r*13;
+          const dy=Math.sin(x*0.15+r*1.9)*3.2, sk=Math.sin(r*1.3+i)*9;
+          const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+          t.setAttribute("x",x);t.setAttribute("y",y+dy);
+          t.setAttribute("fill",r===1?"#5c68ff":"#e8e8f0");
+          t.setAttribute("opacity",(0.45+0.55*Math.abs(Math.sin(r+i))).toFixed(2));
+          t.setAttribute("transform",`skewX(${sk.toFixed(1)})`);
+          t.setAttribute("text-anchor","middle");
+          t.textContent=word[i];g.appendChild(t);
+        }
+      }
+    }
+  },
+  {
+    cat:"motion", name:"U19 Aberration",
+    desc:"FENNEL U19 esports選手権専用。ロゴ／テキストの輪郭にサーモグローを纏わせるSDFアニメーション。KV画像背景合成・シームレスループWebM書き出し",
+    href:"tools/u19-aberration.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><filter id="u19-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4.5"/></filter></defs><rect width="120" height="66" fill="#050004"/><g id="d" filter="url(#u19-blur)"></g><g id="t"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"),t=svg.querySelector("#t"),NS="http://www.w3.org/2000/svg";
+      [["#20000a",34],["#7a0410",26],["#e01414",18],["#ff4a1e",11],["#ffb37a",5.5]].forEach(([col,r],i)=>{
+        const cx=58+Math.sin(i*2.1)*10, cy=34+Math.cos(i*1.7)*8;
+        const e=document.createElementNS(NS,"ellipse");
+        e.setAttribute("cx",cx);e.setAttribute("cy",cy);
+        e.setAttribute("rx",r*1.7);e.setAttribute("ry",r);
+        e.setAttribute("transform",`rotate(${-30+i*16} ${cx} ${cy})`);
+        e.setAttribute("fill",col);g.appendChild(e);
+      });
+      const tx=document.createElementNS(NS,"text");
+      tx.setAttribute("x",60);tx.setAttribute("y",42);
+      tx.setAttribute("fill","#ffffff");tx.setAttribute("font-size","24");
+      tx.setAttribute("font-weight","900");tx.setAttribute("font-family","Helvetica,Arial,sans-serif");
+      tx.setAttribute("text-anchor","middle");tx.textContent="U19";t.appendChild(tx);
+      const fr=document.createElementNS(NS,"rect");
+      fr.setAttribute("x",6);fr.setAttribute("y",5);fr.setAttribute("width",108);fr.setAttribute("height",56);
+      fr.setAttribute("fill","none");fr.setAttribute("stroke","#ffffff");fr.setAttribute("stroke-width","0.6");
+      fr.setAttribute("opacity","0.5");t.appendChild(fr);
+    }
+  },
+  {
     cat:"raster", name:"Effect Stack",
     desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応、ランダマイズ＋スタック刻印＋WebM録画",
     href:"tools/effect-stack.html",

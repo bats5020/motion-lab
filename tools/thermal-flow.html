@@ -19,6 +19,7 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #view{max-width:100%;max-height:100%;display:block;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329;background:#000}
 #meta{position:absolute;bottom:14px;right:16px;color:var(--faint);font-size:10px;letter-spacing:.06em;pointer-events:none}
 #ov{position:absolute;touch-action:none;cursor:crosshair}
+#maskCv{position:absolute;pointer-events:none;display:none}
 #txprev{position:absolute;display:none;pointer-events:none;z-index:3;
   flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
 #txprev.on{display:flex}
@@ -95,6 +96,7 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
 <div id="app">
   <main id="stage">
     <canvas id="view" width="880" height="1100"></canvas>
+    <canvas id="maskCv"></canvas>
     <canvas id="ov"></canvas>
     <div id="txprev">
       <div class="tx1">EK 2026</div>
@@ -123,7 +125,10 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
       <div class="sub">渦ピン</div><div id="fPins"></div>
       <div class="sub">レベル</div><div id="fLevels"></div>
     </section>
-    <section><h2><b>04</b>カラー</h2>
+    <section><h2><b>04</b>モーション</h2>
+      <div id="motionOpts"></div>
+    </section>
+    <section><h2><b>05</b>カラー</h2>
       <div class="chips" id="lutPresets"></div>
       <div class="prow" id="lutSaveRow" style="display:none">
         <input type="text" id="lutSaveName" placeholder="プリセット名" maxlength="24"
@@ -135,14 +140,17 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
       <div id="stopCtl"></div>
       <div id="lutOpts"></div>
     </section>
-    <section><h2><b>05</b>グレイン</h2>
+    <section><h2><b>06</b>グレイン</h2>
       <div class="seg" id="grainSeg"></div>
       <div id="grainOpts"></div>
     </section>
-    <section><h2><b>06</b>仕上げ</h2>
+    <section><h2><b>07</b>仕上げ</h2>
       <div id="finishOpts"></div>
     </section>
-    <section><h2><b>07</b>書き出し</h2>
+    <section><h2><b>08</b>マスク</h2>
+      <div id="maskOpts"></div>
+    </section>
+    <section><h2><b>09</b>書き出し</h2>
       <div class="btnrow"><button class="btn" id="btnPng1">PNG ×1</button><button class="btn" id="btnPng2">PNG ×2</button><button class="btn" id="btnPng4">PNG ×4</button></div>
       <div class="btnrow"><button class="btn" id="btnCopy">クリップボードにコピー</button></div>
       <div class="btnrow"><button class="btn" id="btnUrl">設定URLコピー</button></div>
@@ -185,6 +193,8 @@ const state={
   },
   grain:{mode:'film',amount:22,size:1,paper:'#f2ead8'},
   finish:{bg:0,bgTop:'#d9c4a8',bgBot:'#26060f'},
+  mask:{on:false,src:'text',text:'U19',text2:'U19 eスポーツ選手権2026',size:38,size2:6,ls:0,gap:5,yoff:0,imgSize:70,bg:'#55BCE7',transparent:false},
+  motion:{on:false,loop:true,loopSec:8,evo:60,sway:12,speed:24,hue:0},
   pins:[]
 };
 function fullSize(){
@@ -197,77 +207,91 @@ function previewSize(){
 }
 /* ============ LUT presets ============ */
 function S(p,c,h){return{p,c,h:h||0}}
+/* U19決定パレット(青×クリーム×ピーチ×オレンジ)の比較検証セット — 全て同一構成の色違い */
 const LUT_PRESETS=[
- {name:'パターン04',dot:'#F80C24',stops:[S(0,'#49BCE6'),S(.14,'#22AEE4'),S(.3,'#EDF8CB',25),S(.4,'#E08B54'),S(.55,'#FC5424'),S(.74,'#F80C24'),S(.9,'#7E1E2C'),S(1,'#2A1220')]},
- {name:'P04ウォーム',dot:'#E08B54',stops:[S(0,'#6E1220'),S(.22,'#C81C1E'),S(.45,'#F0511F'),S(.7,'#E08B54'),S(1,'#F4E4C0')]},
- {name:'P04ロウ',dot:'#F2EFC9',stops:[S(0,'#89C9D3'),S(.14,'#54B6DF'),S(.3,'#F2EFC9'),S(.45,'#E6A06D'),S(.58,'#FF5A2A'),S(.74,'#F20C22'),S(.88,'#8B2632'),S(1,'#211821')]},
- {name:'P04反転',dot:'#54B6DF',stops:[S(0,'#211821'),S(.12,'#8B2632'),S(.26,'#F20C22'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]},
- /* 青系 */
- {name:'青炎',dot:'#2FA6F2',stops:[S(0,'#050917'),S(.16,'#0E1D4E'),S(.32,'#1A3FB0'),S(.48,'#2568EE'),S(.62,'#2FA6F2'),S(.76,'#7FE0F5'),S(.9,'#D9F7F3'),S(1,'#F7FCEE')]},
- {name:'深海',dot:'#1490A4',stops:[S(0,'#020611'),S(.28,'#07264C'),S(.5,'#0B4E78'),S(.68,'#1490A4'),S(.84,'#4CD8C4'),S(1,'#C9F6DF')]},
- {name:'氷河',dot:'#5D9BD4',stops:[S(0,'#10294F'),S(.22,'#2D5CA6'),S(.45,'#5D9BD4'),S(.68,'#9CCDE8'),S(.86,'#D8EEF4'),S(1,'#F4FAFB')]},
- {name:'宵',dot:'#5F3ACA',stops:[S(0,'#170E2E'),S(.18,'#3A1E6E'),S(.38,'#5F3ACA'),S(.56,'#4A7BE8'),S(.72,'#54C2E6'),S(.88,'#C6EFF4'),S(1,'#F2FBF6')]},
- /* ボード採取系 */
- {name:'白熱',dot:'#E8221E',stops:[S(0,'#0A0406'),S(.2,'#4A0A10'),S(.42,'#A50F1C'),S(.6,'#E8221E'),S(.78,'#FF6A4A'),S(.92,'#FFD9C8'),S(1,'#FFFFFF')]},
- {name:'焚火',dot:'#F0611A',stops:[S(0,'#0F0506'),S(.18,'#5E100C'),S(.36,'#B22610'),S(.54,'#F0611A'),S(.72,'#FFA426'),S(.88,'#FFE49A'),S(1,'#FFFDF2')]},
- {name:'サイケ',dot:'#4B3AF0',stops:[S(0,'#0B0B10'),S(.22,'#2226A8'),S(.4,'#4B3AF0'),S(.56,'#9048E0'),S(.72,'#FF6A22'),S(.86,'#FFB25A'),S(1,'#FFE9C6')]},
- {name:'ピンクヘイズ',dot:'#F6A9B8',stops:[S(0,'#160B10'),S(.22,'#6E2018'),S(.42,'#D2622E'),S(.6,'#EE8A50'),S(.78,'#F6A9B8'),S(1,'#FBDDE2')]},
- {name:'アシッド',dot:'#F0703A',stops:[S(0,'#8E1E4E'),S(.25,'#D63A50'),S(.5,'#F0703A'),S(.72,'#EEC23E'),S(1,'#D6DE60')]},
- {name:'サーモ',dot:'#D6402C',stops:[S(0,'#0A1026'),S(.18,'#2E2470'),S(.36,'#8E2860'),S(.52,'#D6402C'),S(.68,'#F2842A'),S(.84,'#FBCE3C'),S(1,'#FFF9E0')]}
+ {name:'基準',dot:'#FF5A2A',stops:[S(0,'#54B6DF'),S(.12,'#F2EFC9'),S(.315,'#E6A06D'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]},
+ {name:'ハイコントラスト',dot:'#F43D05',stops:[S(0,'#1E9BD8'),S(.12,'#FBF7DF'),S(.315,'#E88E4A'),S(.42,'#F43D05'),S(.55,'#E88E4A'),S(.7,'#FBF7DF'),S(.86,'#1E9BD8'),S(1,'#5FB8D8')]},
+ {name:'ホットコア',dot:'#FFD873',stops:[S(0,'#54B6DF'),S(.12,'#F2EFC9'),S(.3,'#E6A06D'),S(.37,'#FF5A2A'),S(.42,'#FFD873'),S(.47,'#FF5A2A'),S(.55,'#E6A06D'),S(.7,'#F2EFC9'),S(.86,'#54B6DF'),S(1,'#89C9D3')]},
+ {name:'サーモナイト',dot:'#1C3E5C',stops:[S(0,'#1C3E5C'),S(.1,'#54B6DF'),S(.22,'#F2EFC9'),S(.315,'#E6A06D'),S(.42,'#FF5A2A'),S(.55,'#E6A06D'),S(.68,'#F2EFC9'),S(.83,'#54B6DF'),S(1,'#16324A')]},
+ /* ---- 公式カラーシステム(2026-09-01支給) ----
+    公式フロー: フィールド調整版。承認フィールド(gamma33/offset-33)は値が低域集中のため熱源を.42中心のミラー構造に再配置。赤#E72F2Dは最高温コア限定(面積比: 赤5〜10%ルール)
+    公式フロー原典: ドキュメント記載位置そのまま(リニアグラデ用途) */
+ {name:'公式フロー',dot:'#FF6A3D',stops:[S(0,'#55BCE7'),S(.12,'#F8F0C9'),S(.3,'#FFB56B'),S(.38,'#FF6A3D'),S(.42,'#E72F2D'),S(.46,'#FF6A3D'),S(.54,'#FFB56B'),S(.7,'#F8F0C9'),S(.86,'#55BCE7'),S(1,'#BFE8FF')]},
+ {name:'公式フロー原典',dot:'#E72F2D',stops:[S(0,'#55BCE7'),S(.22,'#BFE8FF'),S(.43,'#F8F0C9'),S(.64,'#FFB56B'),S(.82,'#FF6A3D'),S(1,'#E72F2D')]},
+ {name:'A クールエナジー',dot:'#1E90FF',stops:[S(0,'#0D1B5E'),S(.5,'#1E90FF'),S(1,'#BFF2FF')]},
+ {name:'B サンライズ',dot:'#FFA066',stops:[S(0,'#FFF3D6'),S(.5,'#FFA066'),S(1,'#FF3B2E')]},
+ {name:'C ナイトアビス',dot:'#5333FF',stops:[S(0,'#0B0F2A'),S(.55,'#1A1F4D'),S(1,'#5333FF')]},
+ {name:'D エレクトリック',dot:'#7A3CFF',stops:[S(0,'#246BFF'),S(.5,'#7A3CFF'),S(1,'#FF6A00')]},
+ /* ---- ゲームタイトル別トンマナ(2026-09-02) — Riot公式ブランドカラー準拠 ----
+    LoL: ヘクステック(深紺#010A13/藍#005A82/魔法ティール#0AC8B9/金#C89B3C/淡金#F0E6D2)
+    VALORANT: 赤#FF4655 / オフホワイト#ECE8E1 / ダークネイビー#0F1923 */
+ {name:'LoL ヘクステック',dot:'#0AC8B9',stops:[S(0,'#010A13'),S(.22,'#0A323C'),S(.45,'#005A82'),S(.65,'#0AC8B9'),S(.85,'#C8AA6E'),S(1,'#F0E6D2')]},
+ {name:'LoL ゴールド',dot:'#C89B3C',stops:[S(0,'#010A13'),S(.3,'#32281E'),S(.55,'#785A28'),S(.78,'#C89B3C'),S(1,'#F0E6D2')]},
+ {name:'VALO レッド',dot:'#FF4655',stops:[S(0,'#0F1923'),S(.35,'#1F2A36'),S(.55,'#BD3944'),S(.75,'#FF4655'),S(1,'#ECE8E1')]},
+ {name:'VALO ペーパー',dot:'#ECE8E1',stops:[S(0,'#ECE8E1'),S(.45,'#FF4655'),S(.8,'#7A1F29'),S(1,'#0F1923')]}
 ];
-/* ============ look presets ============ */
+/* ============ look presets — U19 KV制作セット(全て決定パレット) ============ */
 const PRESETS=[
- /* パターン04 バリエーション — 全案同一パレット、模様のみ変更 */
- {name:'グラデ',dot:'#E08B54',lut:'P04ウォーム',
-  field:{mode:'linear',linAng:270,scale:14,octaves:3,warp1:10,warp2:0,gamma:50,contrast:52,offset:0},
+ /* 決定KVそのもの: リニア+渦ピン */
+ {name:'KVスワール',dot:'#FF5A2A',lut:'基準',
+  field:{mode:'linear',linAng:270,scale:0,octaves:4,warp1:51,warp2:0,aniso:-17,curl:74,gamma:33,contrast:28,offset:-33},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},
+  pins:[{x:.4913,y:.4663,r:.392,a:355}]},
+ {name:'公式スワール',dot:'#E72F2D',lut:'公式フロー原典',
+  field:{mode:'linear',linAng:270,scale:0,octaves:4,warp1:51,warp2:0,aniso:-17,curl:74,gamma:33,contrast:28,offset:-33,norm:true},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},
+  pins:[{x:.4913,y:.4663,r:.392,a:355}]},
+ {name:'スワール深',dot:'#E6A06D',lut:'基準',
+  field:{mode:'linear',linAng:270,scale:0,octaves:4,warp1:56,warp2:0,aniso:-17,curl:82,gamma:33,contrast:30,offset:-30},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},
+  pins:[{x:.49,y:.47,r:.42,a:480},{x:.22,y:.76,r:.16,a:-260}]},
+ {name:'グラデ',dot:'#54B6DF',lut:'基準',
+  field:{mode:'linear',linAng:270,scale:14,octaves:3,warp1:12,warp2:0,curl:0,gamma:40,contrast:36,offset:-20},
   grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
- {name:'セル',dot:'#F20C22',lut:'パターン04',
-  field:{mode:'warp',scale:22,octaves:3,warp1:60,warp2:26,aniso:-24,time:8,gamma:46,contrast:82,offset:2},
-  grain:{mode:'film',amount:42,size:1},finish:{bg:0},pins:[]},
- {name:'フレイム',dot:'#FF5A2A',lut:'パターン04',
-  field:{mode:'flame',scale:26,octaves:4,warp1:36,warp2:0,aniso:22,time:0,curl:26,rise:55,peaks:3,sharp:58,peakH:150,sway:30,gamma:50,contrast:66,offset:0},
-  grain:{mode:'film',amount:38,size:1},finish:{bg:0},pins:[{x:.3,y:.66,r:.15,a:230},{x:.72,y:.5,r:.13,a:-210}]},
- {name:'リング',dot:'#E6A06D',lut:'パターン04',
-  field:{mode:'warp',scale:20,octaves:3,warp1:55,warp2:20,aniso:-18,time:14,gamma:46,contrast:76,offset:0},
-  lutOpts:{bands:7},
+ {name:'ラジアル',dot:'#F2EFC9',lut:'基準',
+  field:{mode:'linear',linShape:'radial',linCx:50,linCy:56,scale:12,octaves:3,warp1:18,warp2:0,curl:20,gamma:38,contrast:32,offset:-24},
   grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
- {name:'ストライプ',dot:'#8B2632',lut:'パターン04',
-  field:{mode:'warp',scale:30,octaves:4,warp1:48,warp2:30,aniso:88,time:6,gamma:48,contrast:74,offset:2},
-  grain:{mode:'film',amount:36,size:1},finish:{bg:0},pins:[]},
- {name:'ブロブ',dot:'#54B6DF',lut:'パターン04',
-  field:{mode:'blob',scale:30,octaves:3,warp1:44,warp2:0,aniso:0,time:0,blobN:6,blobSize:22,blobSoft:58,gamma:50,contrast:70,offset:0},
-  grain:{mode:'film',amount:40,size:1},finish:{bg:0},pins:[]},
- {name:'渦',dot:'#F20C22',lut:'パターン04',
-  field:{mode:'warp',scale:20,octaves:3,warp1:52,warp2:22,aniso:0,time:20,curl:34,gamma:46,contrast:80,offset:2},
-  grain:{mode:'film',amount:38,size:1},finish:{bg:0},
-  pins:[{x:.32,y:.62,r:.2,a:300},{x:.7,y:.34,r:.16,a:-280},{x:.62,y:.78,r:.12,a:240}]},
- {name:'スプレー',dot:'#E6A06D',lut:'パターン04',
-  field:{mode:'warp',scale:18,octaves:3,warp1:50,warp2:18,aniso:-16,time:10,gamma:47,contrast:72,offset:-7},
-  grain:{mode:'dissolve',amount:82,size:2,paper:'#F2EFC9'},finish:{bg:0},pins:[]},
- {name:'ボロノイ',dot:'#F20C22',lut:'パターン04',
-  field:{mode:'warp',scale:44,octaves:3,warp1:30,warp2:10,aniso:-12,time:4,ntype:'voro',nchar:14,gamma:44,contrast:78,offset:8},
-  grain:{mode:'film',amount:38,size:1},finish:{bg:0},pins:[]},
- {name:'リッジ',dot:'#FF5A2A',lut:'パターン04',
-  field:{mode:'warp',scale:26,octaves:4,warp1:42,warp2:20,aniso:40,time:12,ntype:'ridge',nchar:55,gamma:50,contrast:72,offset:0},
-  grain:{mode:'film',amount:36,size:1},finish:{bg:0},pins:[]},
- {name:'万華鏡',dot:'#54B6DF',lut:'パターン04',
-  field:{mode:'warp',scale:22,octaves:3,warp1:60,warp2:26,aniso:-24,time:8,kal:8,kalRot:15,gamma:46,contrast:82,offset:2},
-  grain:{mode:'film',amount:40,size:1},finish:{bg:0},pins:[]},
- {name:'マーブル',dot:'#211821',lut:'パターン04',
-  field:{mode:'warp',scale:34,octaves:5,warp1:66,warp2:62,aniso:-10,time:16,gamma:47,contrast:76,offset:3},
-  grain:{mode:'film',amount:34,size:1},finish:{bg:0},pins:[]},
- /* 青系カラーバリエーション — 模様はそのまま色だけ差し替え */
- {name:'青炎',colorOnly:true,dot:'#2FA6F2',lut:'青炎'},
- {name:'深海',colorOnly:true,dot:'#1490A4',lut:'深海'},
- {name:'氷河',colorOnly:true,dot:'#5D9BD4',lut:'氷河'},
- {name:'宵',colorOnly:true,dot:'#5F3ACA',lut:'宵'},
- /* ボード採取系カラー */
- {name:'白熱',colorOnly:true,dot:'#E8221E',lut:'白熱'},
- {name:'焚火',colorOnly:true,dot:'#F0611A',lut:'焚火'},
- {name:'サイケ',colorOnly:true,dot:'#4B3AF0',lut:'サイケ'},
- {name:'ピンクヘイズ',colorOnly:true,dot:'#F6A9B8',lut:'ピンクヘイズ'},
- {name:'アシッド',colorOnly:true,dot:'#F0703A',lut:'アシッド'},
- {name:'サーモ',colorOnly:true,dot:'#D6402C',lut:'サーモ'}
+ {name:'マーブル',dot:'#E08B4E',lut:'基準',
+  field:{mode:'warp',scale:26,octaves:5,warp1:64,warp2:55,aniso:-10,time:16,gamma:44,contrast:52,offset:-6},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
+ {name:'ストライプ',dot:'#2E6E96',lut:'基準',
+  field:{mode:'warp',scale:26,octaves:4,warp1:46,warp2:24,aniso:80,time:6,gamma:44,contrast:56,offset:-6},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},pins:[]},
+ /* ---- Web背景(monopo.london参照: 暗場+淡ブルーム+強グレイン+スローループ) ---- */
+ {name:'Web宵',dot:'#2E6E96',
+  stops:[S(0,'#06070A'),S(.45,'#0A1120'),S(.7,'#16324A'),S(.88,'#2E6E96'),S(1,'#6FB8D8')],
+  field:{mode:'blob',scale:18,octaves:2,warp1:24,warp2:0,aniso:0,time:4,blobN:3,blobSize:70,blobSoft:96,gamma:50,contrast:32,offset:0,norm:true},
+  motion:{on:true,loop:true,loopSec:16,evo:28,sway:8},
+  grain:{mode:'film',amount:50,size:1},finish:{bg:0},pins:[]},
+ {name:'Webフロー',dot:'#3E7FA0',
+  stops:[S(0,'#07080C'),S(.4,'#0E1B2A'),S(.62,'#16324A'),S(.8,'#3E7FA0'),S(.92,'#C88A5A'),S(1,'#E8C9A0')],
+  field:{mode:'warp',scale:10,octaves:2,warp1:62,warp2:28,aniso:-12,time:6,gamma:44,contrast:34,offset:-14,norm:true},
+  motion:{on:true,loop:true,loopSec:16,evo:28,sway:8},
+  grain:{mode:'film',amount:50,size:1},finish:{bg:0},pins:[]},
+ {name:'Web残火',dot:'#B05A32',
+  stops:[S(0,'#08070A'),S(.5,'#120E14'),S(.72,'#3A1F1C'),S(.88,'#B05A32'),S(1,'#E8A06D')],
+  field:{mode:'blob',scale:14,octaves:2,warp1:26,warp2:0,aniso:0,time:4,blobN:2,blobSize:62,blobSoft:98,gamma:50,contrast:36,offset:0,norm:true},
+  motion:{on:true,loop:true,loopSec:16,evo:28,sway:8},
+  grain:{mode:'film',amount:50,size:1},finish:{bg:0},pins:[]},
+ /* ---- ゲームタイトル別(LoL/VALORANT) — スワールは承認KV構図、Webは monopo系スローループ ---- */
+ {name:'LoLスワール',dot:'#C89B3C',lut:'LoL ヘクステック',
+  field:{mode:'linear',linAng:270,scale:0,octaves:4,warp1:51,warp2:0,aniso:-17,curl:74,gamma:33,contrast:28,offset:-33,norm:true},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},
+  pins:[{x:.4913,y:.4663,r:.392,a:355}]},
+ {name:'VALOスワール',dot:'#FF4655',lut:'VALO レッド',
+  field:{mode:'linear',linAng:270,scale:0,octaves:4,warp1:51,warp2:0,aniso:-17,curl:74,gamma:33,contrast:28,offset:-33,norm:true},
+  grain:{mode:'film',amount:30,size:1},finish:{bg:0},
+  pins:[{x:.4913,y:.4663,r:.392,a:355}]},
+ {name:'Web LoL',dot:'#0AC8B9',
+  stops:[S(0,'#02060C'),S(.45,'#071522'),S(.7,'#0A323C'),S(.84,'#5E4C28'),S(1,'#1E8478')],
+  field:{mode:'blob',scale:14,octaves:2,warp1:24,warp2:0,aniso:0,time:4,blobN:3,blobSize:52,blobSoft:98,gamma:50,contrast:30,offset:0,norm:true},
+  motion:{on:true,loop:true,loopSec:16,evo:28,sway:8},
+  grain:{mode:'film',amount:50,size:1},finish:{bg:0},pins:[]},
+ {name:'Web VALO',dot:'#FF4655',
+  stops:[S(0,'#0A111A'),S(.5,'#0F1923'),S(.74,'#2A161D'),S(.9,'#6E232C'),S(1,'#C23540')],
+  field:{mode:'blob',scale:14,octaves:2,warp1:26,warp2:0,aniso:0,time:4,blobN:2,blobSize:62,blobSoft:98,gamma:50,contrast:36,offset:0,norm:true},
+  motion:{on:true,loop:true,loopSec:16,evo:28,sway:8},
+  grain:{mode:'film',amount:50,size:1},finish:{bg:0},pins:[]}
 ];
 /* ============ WebGL ============ */
 const view=$('#view'),meta=$('#meta');
@@ -292,6 +316,7 @@ uniform float uBlobR[8];
 uniform float uBlobK;
 uniform float uGamma,uContrast,uOffset;
 uniform sampler2D uLut;
+uniform float uHue;
 uniform float uBands;
 uniform int uGrainMode;
 uniform float uGrainAmt,uGrainPx;
@@ -302,6 +327,8 @@ uniform int uPinN;
 uniform vec2 uPinPos[6];
 uniform float uPinRad[6];
 uniform float uPinAng[6];
+uniform vec2 uNormV;
+uniform int uOutField;
 float hash1(float n){return fract(sin(n*127.1)*43758.5453);}
 float hash2(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
@@ -490,10 +517,17 @@ void main(){
   float T=field(advect(pv,asp),asp);
   T=pow(clamp(T,0.,1.),uGamma);
   T=clamp((T-.5)*uContrast+.5+uOffset,0.,1.);
+  if(uOutField==1){gl_FragColor=vec4(T,T,T,1.);return;}
+  T=clamp((T-uNormV.x)/max(uNormV.y-uNormV.x,1e-4),0.,1.);
   if(uBands>1.5)T=clamp(floor(T*uBands)/(uBands-1.),0.,1.);
   float dn=hash2(gl_FragCoord.xy+vec2(13.7,71.3));
   float Ts=clamp(T+(uBands>1.5?0.:(dn-.5)/196.),0.,1.);
   vec3 col=texture2D(uLut,vec2(Ts*.99609375+.001953125,.5)).rgb;
+  if(abs(uHue)>.001){
+    const vec3 kk=vec3(.57735026919);
+    float ca=cos(uHue),sa=sin(uHue);
+    col=clamp(col*ca+cross(kk,col)*sa+kk*dot(kk,col)*(1.-ca),0.,1.);
+  }
   if(uBgAmt>0.){
     vec3 bg=mix(uBgBot,uBgTop,vUv.y);
     col=mix(col,mix(bg,col,smoothstep(.04,.3,T)),uBgAmt);
@@ -537,7 +571,7 @@ const U={};
  'uPeaks','uSharp','uPeakH','uSway','uBlobN','uBlobPos[0]','uBlobR[0]','uBlobK',
  'uGamma','uContrast','uOffset','uLut','uBands','uGrainMode','uGrainAmt','uGrainPx',
  'uPaper','uBgAmt','uBgTop','uBgBot',
- 'uPinN','uPinPos[0]','uPinRad[0]','uPinAng[0]']
+ 'uPinN','uPinPos[0]','uPinRad[0]','uPinAng[0]','uNormV','uOutField','uHue']
  .forEach(k=>U[k]=gl.getUniformLocation(prog,k));
 /* LUT texture (256x1) */
 const lutTex=gl.createTexture();
@@ -602,7 +636,7 @@ function setUniforms(W,H,exScale){
   gl.uniform1i(U['uOct'],clamp(f.octaves|0,1,6));
   gl.uniform1f(U['uW1'],f.warp1*.02);
   gl.uniform1f(U['uW2'],f.warp2*.02);
-  gl.uniform1f(U['uTime'],f.time*.08);
+  gl.uniform1f(U['uTime'],f.time*.08+_animT.z);
   gl.uniform1f(U['uCurl'],(f.curl||0)/100);
   gl.uniform1f(U['uRise'],(f.rise||0)/100);
   gl.uniform1i(U['uNType'],{fbm:0,turb:1,ridge:2,voro:3}[f.ntype||'fbm']||0);
@@ -611,7 +645,7 @@ function setUniforms(W,H,exScale){
   gl.uniform1f(U['uKalRot'],(f.kalRot||0)*Math.PI/180);
   const a=f.aniso/50;
   gl.uniform2f(U['uAniso'],Math.pow(2,a),Math.pow(2,-a));
-  gl.uniform2f(U['uSeedOff'],(state.seed%1000)*.137,(Math.floor(state.seed/1000)%1000)*.113);
+  gl.uniform2f(U['uSeedOff'],(state.seed%1000)*.137+_animT.x,(Math.floor(state.seed/1000)%1000)*.113);
   gl.uniform1f(U['uPeaks'],f.peaks);
   gl.uniform1f(U['uSharp'],f.sharp/100);
   gl.uniform1f(U['uPeakH'],f.peakH/100);
@@ -649,22 +683,68 @@ function setUniforms(W,H,exScale){
   gl.uniform2fv(U['uPinPos[0]'],pp);
   gl.uniform1fv(U['uPinRad[0]'],pr);
   gl.uniform1fv(U['uPinAng[0]'],pa);
+  gl.uniform2f(U['uNormV'],_norm[0],_norm[1]);
+  gl.uniform1i(U['uOutField'],0);
+  gl.uniform1f(U['uHue'],_animT.h||0);
 }
+/* モーション: ノイズ空間を楕円軌道(z=evo・x=sway)でサンプリング。1周=ループ秒で完全ループ */
+let _animT={z:0,x:0,h:0};
+function setAnimPhase(sec){
+  const m=state.motion,th=2*Math.PI*(sec/m.loopSec);
+  if(m.loop){
+    _animT.z=(m.evo/100)*1.5*Math.cos(th);
+    _animT.x=(m.sway/100)*.4*Math.sin(th);
+    _animT.h=(m.hue||0)*Math.PI/180*Math.sin(th);
+  }else{
+    _animT.z=sec*(m.speed/100)*.12;_animT.x=0;
+    _animT.h=sec*(m.hue||0)*Math.PI/180*.5;
+  }
+}
+/* フルレンジ: トーン後のフィールド値を縮小パスで実測し、1〜99%点を0〜1へストレッチ。
+   渦や強いオフセットで値域が偏ってもLUT全色が必ず出る */
+let _norm=[0,1];
+function measureNorm(W,H){
+  const mw=Math.min(160,view.width),mh=Math.min(Math.max(8,Math.round(mw*H/W)),view.height);
+  setUniforms(W,H,1);
+  gl.uniform2f(U['uNormV'],0,1);
+  gl.uniform1i(U['uOutField'],1);
+  gl.viewport(0,0,mw,mh);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  const px=new Uint8Array(mw*mh*4);
+  gl.readPixels(0,0,mw,mh,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  const hist=new Uint32Array(256);
+  for(let i=0;i<mw*mh;i++)hist[px[i*4]]++;
+  const cut=mw*mh*.01;
+  let lo=0,hi=255,acc=0;
+  for(let i=0;i<256;i++){acc+=hist[i];if(acc>=cut){lo=i;break}}
+  acc=0;
+  for(let i=255;i>=0;i--){acc+=hist[i];if(acc>=cut){hi=i;break}}
+  if(hi-lo<4)return[0,1];
+  return[lo/255,hi/255];
+}
+let _normKey='';
 function renderGL(W,H,exScale){
   if(view.width!==W||view.height!==H){view.width=W;view.height=H}
+  if(state.field.norm){
+    const key=JSON.stringify([state.field,state.pins,state.seed,+(W/H).toFixed(4)]);
+    if(key!==_normKey){_norm=measureNorm(W,H);_normKey=key}
+  }else{_norm=[0,1];_normKey=''}
   gl.viewport(0,0,W,H);
   setUniforms(W,H,exScale);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
-let _dirty=true,_ms=0;
+let _dirty=true,_ms=0,_recording=false;
 function loop(){
   requestAnimationFrame(loop);
+  if(_recording)return;
   syncOverlay();
+  if(state.motion.on){setAnimPhase(performance.now()/1000);_dirty=true}
   if(!_dirty)return;
   _dirty=false;
   const t0=performance.now();
   const[pw,ph]=previewSize();
   renderGL(pw,ph,1);
+  drawMaskPreview();
   _ms=performance.now()-t0;
   const[W,H]=fullSize();
   meta.textContent=W+'×'+H+'  ·  preview '+pw+'×'+ph+'  ·  '+_ms.toFixed(1)+'ms';
@@ -881,7 +961,7 @@ function commitUserLut(){
 }
 const DEFAULT_FIELD={mode:'warp',scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,ntype:'fbm',nchar:50,kal:0,kalRot:0,
   linAng:270,linShape:'line',linInv:false,linCx:50,linCy:50,
-  peaks:3,sharp:45,peakH:75,sway:40,blobN:3,blobSize:52,blobSoft:55,gamma:50,contrast:56,offset:0};
+  peaks:3,sharp:45,peakH:75,sway:40,blobN:3,blobSize:52,blobSoft:55,gamma:50,contrast:56,offset:0,norm:false};
 function applyPreset(p){
   if(p.colorOnly){
     const lp=LUT_PRESETS.find(l=>l.name===p.lut);
@@ -892,8 +972,12 @@ function applyPreset(p){
     return;
   }
   Object.assign(state.field,DEFAULT_FIELD,p.field);
-  const lp=LUT_PRESETS.find(l=>l.name===p.lut);
-  if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
+  if(p.stops)state.lut.stops=p.stops.map(s=>({...s}));
+  else{
+    const lp=LUT_PRESETS.find(l=>l.name===p.lut);
+    if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
+  }
+  if(p.motion)Object.assign(state.motion,p.motion);
   state.lut.bands=(p.lutOpts&&p.lutOpts.bands)||0;state.lut.invert=false;state.lut.shift=0;
   Object.assign(state.grain,{paper:state.grain.paper},p.grain);
   Object.assign(state.finish,{bg:0,bgTop:'#d9c4a8',bgBot:'#26060f'},p.finish);
@@ -979,7 +1063,9 @@ function buildField(){
   UI.gamma=mkRange('ガンマ',0,100,1,f.gamma,v=>{f.gamma=v});
   UI.contrast=mkRange('コントラスト',0,100,1,f.contrast,v=>{f.contrast=v});
   UI.offset=mkRange('オフセット',-50,50,1,f.offset,v=>{f.offset=v});
-  $('#fLevels').append(UI.gamma.row,UI.contrast.row,UI.offset.row);
+  UI.norm=mkChk('フルレンジ',f.norm,v=>{f.norm=v});
+  $('#fLevels').append(UI.gamma.row,UI.contrast.row,UI.offset.row,UI.norm.row,
+    ce('div','hint','フルレンジ＝場の明暗を実測して自動で引き伸ばし、カラーの全ストップを必ず使う。渦などで色が偏って端の色が出ないときにオン'));
 }
 function buildLutOpts(){
   const c=$('#lutOpts');
@@ -1025,7 +1111,9 @@ function refreshAll(){
   UI.aniso.set(f.aniso);UI.time.set(f.time);
   UI.peaks.set(f.peaks);UI.sharp.set(f.sharp);UI.peakH.set(f.peakH);UI.sway.set(f.sway);
   UI.blobN.set(f.blobN);UI.blobSize.set(f.blobSize);UI.blobSoft.set(f.blobSoft);
-  UI.gamma.set(f.gamma);UI.contrast.set(f.contrast);UI.offset.set(f.offset);
+  UI.gamma.set(f.gamma);UI.contrast.set(f.contrast);UI.offset.set(f.offset);UI.norm.set(f.norm);
+  if(UI.maskOn)refreshMaskUI();
+  if(UI.motOn)refreshMotionUI();
   UI.bands.set(state.lut.bands);UI.shift.set(state.lut.shift);
   const g=state.grain;
   UI.grainMode.set(g.mode);
@@ -1096,7 +1184,7 @@ function encodeState(){
   const o={v:1,seed:state.seed,canvas:state.canvas,
     field:{...state.field},
     lut:{stops:state.lut.stops.map(s=>({p:+s.p.toFixed(4),c:s.c,h:s.h||0})),bands:state.lut.bands,invert:state.lut.invert,shift:state.lut.shift},
-    grain:{...state.grain},finish:{...state.finish},
+    grain:{...state.grain},finish:{...state.finish},mask:{...state.mask},motion:{...state.motion},
     pins:(state.pins||[]).map(p=>({x:+p.x.toFixed(4),y:+p.y.toFixed(4),r:+p.r.toFixed(3),a:Math.round(p.a)}))};
   return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))));
 }
@@ -1116,6 +1204,8 @@ function decodeState(hash){
     }
     if(o.grain)Object.assign(state.grain,o.grain);
     if(o.finish)Object.assign(state.finish,o.finish);
+    if(o.mask)Object.assign(state.mask,o.mask);
+    if(o.motion)Object.assign(state.motion,o.motion);
     state.pins=Array.isArray(o.pins)?o.pins.slice(0,6).map(p=>({
       x:clamp(+p.x||0,0,1),y:clamp(+p.y||0,0,1),r:clamp(+p.r||.15,.04,.5),a:clamp(+p.a||0,-360,360)})):[];
     selPin=state.pins.length-1;
@@ -1124,10 +1214,208 @@ function decodeState(hash){
   }catch(e){return false}
 }
 $('#btnUrl').addEventListener('click',()=>{
-  location.hash=encodeState();
+  history.replaceState(null,'','#'+encodeState());
   if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>toast('設定URLをコピーしました'),()=>toast('コピーできませんでした'));
   else toast('URLバーからコピーしてください');
 });
+/* 設定変更をアドレスバーへ自動反映 — いつコピーしても現在の状態が共有される */
+let _lastShareHash='';
+setInterval(()=>{
+  const h=encodeState();
+  if(h!==_lastShareHash){_lastShareHash=h;history.replaceState(null,'','#'+h);}
+},800);
+/* ============ motion UI / WebM ============ */
+function buildMotion(){
+  const m=state.motion,c=$('#motionOpts');
+  UI.motOn=mkChk('再生',m.on,v=>{m.on=v;if(!v){_animT.z=0;_animT.x=0;_animT.h=0}refreshAll()});
+  UI.motLoop=mkChk('シームレスループ',m.loop,v=>{m.loop=v;refreshAll()});
+  UI.motLoopSec=mkRange('ループ秒',2,30,1,m.loopSec,v=>{m.loopSec=v});
+  UI.motEvo=mkRange('変化量',5,100,1,m.evo,v=>{m.evo=v});
+  UI.motSway=mkRange('漂い',0,60,1,m.sway,v=>{m.sway=v});
+  UI.motSpeed=mkRange('速度',1,100,1,m.speed,v=>{m.speed=v});
+  UI.motHue=mkRange('色相シフト',0,180,1,m.hue||0,v=>{m.hue=v});
+  const rec=ce('button','btn','WebM書き出し(1ループ)');
+  rec.addEventListener('click',recordLoopWebM);
+  const recRow=ce('div','btnrow');recRow.append(rec);UI.motRecRow=recRow;
+  c.append(UI.motOn.row,UI.motLoop.row,UI.motLoopSec.row,UI.motEvo.row,UI.motSway.row,UI.motSpeed.row,UI.motHue.row,recRow,
+    ce('div','hint','ノイズ空間を楕円軌道で1周して完全ループ。変化量＝進化の深さ / 漂い＝横方向のゆらぎ。色相シフト＝ループ中は±角度まで色が往復(継ぎ目なし)、非ループ時は連続回転。マスクON中の録画は文字で切り抜いた状態で書き出されます'));
+}
+function refreshMotionUI(){
+  const m=state.motion;
+  UI.motOn.set(m.on);UI.motLoop.set(m.loop);
+  UI.motLoopSec.set(m.loopSec);UI.motEvo.set(m.evo);UI.motSway.set(m.sway);UI.motSpeed.set(m.speed);UI.motHue.set(m.hue||0);
+  UI.motLoop.row.style.display=m.on?'':'none';
+  UI.motLoopSec.row.style.display=m.on&&m.loop?'':'none';
+  UI.motEvo.row.style.display=m.on&&m.loop?'':'none';
+  UI.motSway.row.style.display=m.on&&m.loop?'':'none';
+  UI.motSpeed.row.style.display=m.on&&!m.loop?'':'none';
+  UI.motHue.row.style.display=m.on?'':'none';
+  UI.motRecRow.style.display=m.on&&m.loop?'':'none';
+}
+function recordLoopWebM(){
+  const m=state.motion;
+  if(!m.on||!m.loop){toast('再生+シームレスループON時に録画できます');return}
+  if(_recording)return;
+  if(!window.MediaRecorder){toast('この環境ではWebM録画に対応していません');return}
+  let[W,H]=fullSize();
+  const mx=maxRenderSize();
+  if(W>mx||H>mx){const sc=mx/Math.max(W,H);W=Math.floor(W*sc);H=Math.floor(H*sc)}
+  const rc=document.createElement('canvas');rc.width=W;rc.height=H;
+  const rx=rc.getContext('2d');
+  const stream=rc.captureStream(30);
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  const recd=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:24e6});
+  const chunks=[];
+  recd.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  recd.onstop=()=>{
+    _recording=false;
+    download(new Blob(chunks,{type:'video/webm'}),'thermal-flow_'+state.seed+'_loop'+m.loopSec+'s.webm');
+    toast('WebMを保存しました ('+W+'×'+H+' / '+m.loopSec+'s)');
+    const[pw,ph]=previewSize();renderGL(pw,ph,1);
+  };
+  _recording=true;
+  toast('録画中… 1ループ('+m.loopSec+'s)で自動保存します');
+  recd.start();
+  const t0=performance.now();
+  (function frame(){
+    const el=(performance.now()-t0)/1000;
+    if(el>=m.loopSec){recd.stop();return}
+    setAnimPhase(el);
+    renderGL(W,H,1);
+    rx.clearRect(0,0,W,H);
+    rx.drawImage(state.mask.on?composeMasked(W,H):view,0,0);
+    requestAnimationFrame(frame);
+  })();
+}
+/* ============ mask preview ============ */
+const maskCv=$('#maskCv'),mctx=maskCv.getContext('2d');
+const MASK_FONT="'Helvetica Neue',Futura,'Hiragino Sans','Noto Sans JP',sans-serif";
+let _maskImg=null;
+(function(){
+  try{
+    const d=localStorage.getItem('tf_mask_img');
+    if(d){const im=new Image();im.onload=()=>{_maskImg=im;redraw()};im.src=d}
+  }catch(e){}
+})();
+function drawMaskShape(c,w,h){
+  const m=state.mask;
+  c.fillStyle='#fff';
+  if(m.src==='image'){
+    if(!_maskImg)return;
+    const mw=w*m.imgSize/100,s=mw/_maskImg.width,mh=_maskImg.height*s;
+    c.drawImage(_maskImg,(w-mw)/2,(h-mh)/2+h*m.yoff/100,mw,mh);
+    return;
+  }
+  c.textAlign='center';
+  const f1=w*m.size/100,f2=w*m.size2/100,gap=h*m.gap/100;
+  const h1=m.text?f1*.74:0,h2=m.text2?f2*.9:0;
+  const total=h1+(h1&&h2?gap:0)+h2;
+  let y=(h-total)/2+h*m.yoff/100;
+  if(m.text){
+    c.font='900 '+f1+'px '+MASK_FONT;
+    if('letterSpacing'in c)c.letterSpacing=(f1*m.ls/100)+'px';
+    c.fillText(m.text,w/2,y+h1);
+    y+=h1+gap;
+  }
+  if(m.text2){
+    c.font='800 '+f2+'px '+MASK_FONT;
+    if('letterSpacing'in c)c.letterSpacing=(f2*m.ls/100)+'px';
+    c.fillText(m.text2,w/2,y+h2*.82);
+  }
+  if('letterSpacing'in c)c.letterSpacing='0px';
+}
+function drawMaskPreview(){
+  const m=state.mask;
+  maskCv.style.display=m.on?'block':'none';
+  if(!m.on)return;
+  const w=maskCv.width,h=maskCv.height;
+  if(!w||!h)return;
+  mctx.clearRect(0,0,w,h);
+  if(m.transparent){
+    const s=9;
+    for(let y=0;y<h;y+=s)for(let x=0;x<w;x+=s){
+      mctx.fillStyle=((x+y)/s)%2?'#26262c':'#333339';
+      mctx.fillRect(x,y,s,s);
+    }
+  }else{mctx.fillStyle=m.bg;mctx.fillRect(0,0,w,h)}
+  mctx.globalCompositeOperation='destination-out';
+  drawMaskShape(mctx,w,h);
+  mctx.globalCompositeOperation='source-over';
+}
+/* 書き出し用: グラデをマスク形状で切り抜き(透過) or 背景色と合成 */
+function composeMasked(w,h){
+  const out=document.createElement('canvas');out.width=w;out.height=h;
+  const c=out.getContext('2d');
+  c.drawImage(view,0,0,w,h);
+  c.globalCompositeOperation='destination-in';
+  const mc=document.createElement('canvas');mc.width=w;mc.height=h;
+  drawMaskShape(mc.getContext('2d'),w,h);
+  c.drawImage(mc,0,0);
+  if(!state.mask.transparent){
+    c.globalCompositeOperation='destination-over';
+    c.fillStyle=state.mask.bg;c.fillRect(0,0,w,h);
+  }
+  c.globalCompositeOperation='source-over';
+  return out;
+}
+function buildMask(){
+  const m=state.mask,c=$('#maskOpts');
+  function mkText(lbl,val,cb){
+    const row=ce('div','prow');
+    const inp=document.createElement('input');inp.type='text';inp.value=val;inp.maxLength=40;
+    inp.style.cssText='flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--text);font:12px var(--mono);padding:5px 8px;min-width:0';
+    inp.addEventListener('input',()=>{cb(inp.value);redraw()});
+    row.append(ce('span',null,lbl),inp);
+    return{row,set:v=>{inp.value=v}};
+  }
+  UI.maskOn=mkChk('マスクON',m.on,v=>{m.on=v;refreshAll()});
+  UI.maskSrc=mkSeg([['text','テキスト'],['image','画像']],m.src,v=>{m.src=v;refreshAll()});
+  UI.maskText=mkText('テキスト1',m.text,v=>{m.text=v});
+  UI.maskText2=mkText('テキスト2',m.text2,v=>{m.text2=v});
+  UI.maskSize=mkRange('サイズ1 %',5,90,.5,m.size,v=>{m.size=v});
+  UI.maskSize2=mkRange('サイズ2 %',0,40,.25,m.size2,v=>{m.size2=v});
+  UI.maskLs=mkRange('字間',-10,40,.5,m.ls,v=>{m.ls=v});
+  UI.maskGap=mkRange('行間 %',0,20,.5,m.gap,v=>{m.gap=v});
+  UI.maskImgSize=mkRange('画像幅 %',10,100,1,m.imgSize,v=>{m.imgSize=v});
+  UI.maskYoff=mkRange('縦位置 %',-40,40,.5,m.yoff,v=>{m.yoff=v});
+  const up=ce('button','btn','マスク画像を読み込む');
+  const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.style.display='none';
+  fi.addEventListener('change',()=>{
+    const f=fi.files&&fi.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const im=new Image();
+      im.onload=()=>{_maskImg=im;try{localStorage.setItem('tf_mask_img',rd.result)}catch(e){}m.src='image';refreshAll();redraw();toast('マスク画像を読み込みました')};
+      im.src=rd.result;
+    };
+    rd.readAsDataURL(f);fi.value='';
+  });
+  up.addEventListener('click',()=>fi.click());
+  const upRow=ce('div','btnrow');upRow.append(up,fi);UI.maskUpRow=upRow;
+  UI.maskBg=mkColRow('背景色',m.bg,v=>{m.bg=v});
+  UI.maskTrans=mkChk('背景を透過',m.transparent,v=>{m.transparent=v;refreshAll()});
+  c.append(UI.maskOn.row,UI.maskSrc.row,UI.maskText.row,UI.maskText2.row,
+    UI.maskSize.row,UI.maskSize2.row,UI.maskLs.row,UI.maskGap.row,UI.maskImgSize.row,upRow,UI.maskYoff.row,
+    UI.maskBg.row,UI.maskTrans.row,
+    ce('div','hint','グラデーションを文字/画像(透過PNG・SVG)で切り抜いてプレビュー。マスクON中はPNG書き出しもマスク適用後の画像になります(透過ONでアルファ付き)。文字サイズはキャンバス幅基準'));
+}
+function refreshMaskUI(){
+  const m=state.mask;
+  UI.maskOn.set(m.on);UI.maskSrc.set(m.src);
+  UI.maskText.set(m.text);UI.maskText2.set(m.text2);
+  UI.maskSize.set(m.size);UI.maskSize2.set(m.size2);
+  UI.maskLs.set(m.ls);UI.maskGap.set(m.gap);UI.maskImgSize.set(m.imgSize);UI.maskYoff.set(m.yoff);
+  UI.maskBg.set(m.bg);UI.maskTrans.set(m.transparent);
+  const isTx=m.src==='text';
+  [UI.maskText.row,UI.maskText2.row,UI.maskSize.row,UI.maskSize2.row,UI.maskLs.row,UI.maskGap.row]
+    .forEach(r=>r.style.display=m.on&&isTx?'':'none');
+  UI.maskImgSize.row.style.display=m.on&&!isTx?'':'none';
+  UI.maskUpRow.style.display=m.on&&!isTx?'':'none';
+  UI.maskYoff.row.style.display=m.on?'':'none';
+  UI.maskSrc.row.style.display=m.on?'':'none';
+  UI.maskBg.row.style.display=m.on&&!m.transparent?'':'none';
+  UI.maskTrans.row.style.display=m.on?'':'none';
+}
 /* ============ export ============ */
 function maxRenderSize(){
   return Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)||8192,gl.getParameter(gl.MAX_TEXTURE_SIZE)||8192,10000);
@@ -1142,9 +1430,11 @@ function exportPng(mult){
     toast('GPU上限のため '+w+'×'+h+' に縮小して書き出します');
   }
   renderGL(w,h,mult);
-  view.toBlob(b=>{
+  const src=state.mask.on?composeMasked(w,h):view;
+  const suffix=state.mask.on?'_mask':'';
+  src.toBlob(b=>{
     const[pw,ph]=previewSize();renderGL(pw,ph,1);
-    if(b){download(b,'thermal-flow_'+state.seed+'_'+w+'x'+h+'.png');toast('PNGを保存しました ('+w+'×'+h+')')}
+    if(b){download(b,'thermal-flow_'+state.seed+'_'+w+'x'+h+suffix+'.png');toast('PNGを保存しました ('+w+'×'+h+')')}
     else toast('書き出しに失敗しました');
   },'image/png');
 }
@@ -1155,8 +1445,9 @@ $('#btnCopy').addEventListener('click',()=>{
   if(!navigator.clipboard||!window.ClipboardItem){toast('この環境ではコピーできません');return}
   const[W,H]=fullSize();
   renderGL(W,H,1);
+  const cpSrc=state.mask.on?composeMasked(W,H):view;
   try{
-    const item=new ClipboardItem({'image/png':new Promise(res=>{view.toBlob(b=>res(b),'image/png')})});
+    const item=new ClipboardItem({'image/png':new Promise(res=>{cpSrc.toBlob(b=>res(b),'image/png')})});
     navigator.clipboard.write([item]).then(
       ()=>toast('クリップボードにコピーしました'),
       e=>toast('コピー失敗: '+e));
@@ -1168,7 +1459,7 @@ const UNDO=[];
 function pushUndo(){
   UNDO.push(JSON.stringify({seed:state.seed,canvas:state.canvas,field:state.field,
     lut:{stops:state.lut.stops,bands:state.lut.bands,invert:state.lut.invert,shift:state.lut.shift},
-    grain:state.grain,finish:state.finish,pins:state.pins}));
+    grain:state.grain,finish:state.finish,mask:state.mask,motion:state.motion,pins:state.pins}));
   if(UNDO.length>60)UNDO.shift();
 }
 function undo(){
@@ -1181,6 +1472,8 @@ function undo(){
   state.lut.invert=o.lut.invert;state.lut.shift=o.lut.shift;
   Object.assign(state.grain,o.grain);
   Object.assign(state.finish,o.finish);
+  if(o.mask)Object.assign(state.mask,o.mask);
+  if(o.motion)Object.assign(state.motion,o.motion);
   state.pins=o.pins||[];
   selPin=state.pins.length-1;selStop=0;_blobs=blobState();
   buildLut();refreshAll();
@@ -1203,6 +1496,10 @@ function syncOverlay(){
   tp.style.left=ov.style.left;tp.style.top=ov.style.top;
   tp.style.width=w+'px';tp.style.height=h+'px';
   tp.style.fontSize=Math.round(w/8)+'px';
+  maskCv.style.left=ov.style.left;maskCv.style.top=ov.style.top;
+  maskCv.style.width=vb.width+'px';maskCv.style.height=vb.height+'px';
+  const mdpr=Math.min(window.devicePixelRatio||1,2),mw=Math.ceil(vb.width*mdpr),mh=Math.ceil(vb.height*mdpr);
+  if(maskCv.width!==mw||maskCv.height!==mh){maskCv.width=mw;maskCv.height=mh;drawMaskPreview()}
   if(ov.width!==w||ov.height!==h){ov.width=w;ov.height=h;drawOverlay()}
 }
 function drawOverlay(){
@@ -1352,6 +1649,8 @@ buildStopCtl();
 buildLutOpts();
 buildGrain();
 buildFinish();
+buildMotion();
+buildMask();
 const qp=new URLSearchParams(location.search).get('p');
 if(qp){
   const p=PRESETS.find(x=>x.name.toLowerCase()===qp.toLowerCase());
