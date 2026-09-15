@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MOTION LAB — animation &amp; graphics tools</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="shared/tokens.css">
 <style>
   *{box-sizing:border-box;}
@@ -105,6 +106,24 @@ const CATEGORIES = [
 ];
 
 const TOOLS = [
+  {
+    cat:"motion", name:"Egg Glass",
+    desc:"卵形3Dの柄・ロゴ・光沢を編集。スクロールキーフレームと画像・動画・単体HTMLの書き出し。",
+    href:"tools/egg-glass/",
+    thumb:`<svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="egg-glass-fill" x1="0" y1="1" x2=".8" y2="0"><stop stop-color="#1e9bd8"/><stop offset=".36" stop-color="#fbf7df"/><stop offset=".65" stop-color="#e88e4a"/><stop offset="1" stop-color="#f43d05"/></linearGradient>
+        <radialGradient id="egg-glass-shine" cx=".29" cy=".22" r=".8"><stop stop-color="#fff" stop-opacity=".8"/><stop offset=".32" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#071e39" stop-opacity=".42"/></radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="#141417"/>
+      <path d="M18 28V18h28M354 18h28v10M18 212v10h28M354 222h28v-10" fill="none" stroke="#3d3d46"/>
+      <path d="M200 25C165 25 138 83 138 132C138 184 164 211 200 211C236 211 262 184 262 132C262 83 235 25 200 25Z" fill="url(#egg-glass-fill)"/>
+      <path d="M200 25C165 25 138 83 138 132C138 184 164 211 200 211C236 211 262 184 262 132C262 83 235 25 200 25Z" fill="url(#egg-glass-shine)"/>
+      <path d="M182 49C167 65 156 93 154 115" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round"/>
+      <path d="M30 190h69m202 0h69" stroke="#3d3d46"/>
+      <circle cx="58" cy="190" r="4" fill="#4f5cff"/><circle cx="343" cy="190" r="4" fill="#4f5cff"/>
+    </svg>`
+  },
   {
     cat:"raster", name:"Halftone Lab",
     desc:"画像・プロシージャルソースをハーフトーン／ディザ／ASCII化。アニメーション＋WebM録画・SVG／コード書き出し対応",
@@ -268,7 +287,7 @@ const TOOLS = [
       const mk=(tag,at)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const k in at)e.setAttribute(k,at[k]);g.appendChild(e);return e;};
       mk("rect",{x:0,y:0,width:120,height:66,fill:"#1c1430"});
       for(let x=0;x<120;x+=3){
-        const h=20+18*Math.sin(x*0.12)+10*Math.sin(x*0.31+2);
+        const h=Math.max(0,20+18*Math.sin(x*0.12)+10*Math.sin(x*0.31+2));
         mk("rect",{x,y:33-h/2,width:1.4,height:h,fill:x%12<6?"#b06cff":"#e8a0c8",opacity:0.55+0.4*Math.sin(x*0.2)**2});
       }
       const words=["+WARP","+SCANDRIFT","-REPEAT","+HALFTONE","+GRAIN"];

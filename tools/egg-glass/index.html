@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Egg Glass — Motion Lab</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a href="../../index.html" id="mlab-home" title="MOTION LAB ホームへ">◆ MOTION LAB</a>
+  <main class="scroll-space">
+    <section class="stage" aria-label="卵形の3D素材。マウスとスクロールで動きます。">
+      <div id="preview-workspace"><div id="scene" aria-label="3Dプレビュー"></div></div>
+      <div id="preview-label" role="group" aria-label="プレビューの描画サイズ">
+        <select id="preview-preset" aria-label="画面サイズのプリセット"><option value="window">ウィンドウ</option><option value="1440x900">1440 × 900</option><option value="1920x1080">1920 × 1080</option><option value="390x844">390 × 844</option><option value="768x1024">768 × 1024</option><option value="custom">カスタム</option></select>
+        <label>W <input id="preview-width" type="number" min="240" max="3840" step="1" aria-label="プレビューの幅（CSS px）"></label>
+        <label>H <input id="preview-height" type="number" min="240" max="3840" step="1" aria-label="プレビューの高さ（CSS px）"></label>
+        <button id="preview-swap" aria-label="幅と高さを入れ替える" title="縦横を入れ替え">⇄</button>
+        <span id="preview-size"></span><button id="pattern-open" aria-expanded="false" aria-controls="pattern-panel">柄・画像</button><button id="export-open">Export</button><span class="preview-key-hint">@ 全画面</span>
+      </div>
+      <header><span class="mark">EGG GLASS / MOTION LAB</span><span class="edition">U19 · @ 編集／全画面</span></header>
+      <div id="light-hit" hidden aria-hidden="true"><span>ハイライト</span></div>
+      <div id="light-edit-hint" hidden>卵をドラッグしてハイライトを移動 <span>Escで終了</span></div>
+      <details id="lighting-panel" class="lighting-panel" open>
+        <summary>ライト調整 <span aria-hidden="true">⌄</span></summary>
+        <div class="lighting-body">
+          <div class="light-section-heading">ハイライトの位置 <span>正面から見た卵</span></div>
+          <div id="light-direction" class="light-direction" role="group" tabindex="0" aria-label="卵をドラッグしてハイライトを移動"><canvas id="light-preview" width="468" height="292" aria-hidden="true"></canvas><i id="light-dot" aria-hidden="true"></i></div>
+          <p class="light-instruction">光らせたい場所をクリック／ドラッグ</p>
+          <div class="light-presets" role="group" aria-label="ハイライト位置のプリセット"><button data-light-preset="left">左上</button><button data-light-preset="top">上</button><button data-light-preset="right">右上</button><button data-light-preset="front">中央</button></div>
+          <p id="light-feedback">ハイライトの位置を確認中</p>
+          <button id="light-edit" aria-pressed="false">卵の上で位置を指定</button>
+          <p class="light-instruction">画面上での調整中は回転を一時固定</p>
+          <details class="light-advanced"><summary>光源の方向 <span id="light-source-feedback"></span></summary>
+            <label class="light-control">水平角 <output data-light-value="azimuth"></output><input data-light="azimuth" type="range" min="-180" max="180" step="any" value="0"></label>
+            <label class="light-control">仰角 <output data-light-value="elevation"></output><input data-light="elevation" type="range" min="-90" max="90" step="any" value="0"></label>
+            <p class="light-instruction">水平角0°は手前、±180°は奥。仰角＋は上。</p>
+          </details>
+          <label class="light-control">全体の明るさ <output data-light-value="strength">100%</output><input data-light="strength" type="range" min="0" max="250" value="100"></label>
+          <label class="light-control">反射の強さ <output data-light-value="reflection">100%</output><input data-light="reflection" type="range" min="0" max="250" value="100"></label>
+          <label class="light-control">反射のぼかし <output data-light-value="softness">100%</output><input data-light="softness" type="range" min="0" max="300" value="100"></label>
+          <label class="light-control">艶感 <output data-light-value="gloss">70%</output><input data-light="gloss" type="range" min="0" max="100" value="70"></label>
+          <div class="lighting-actions"><button id="light-reset">元に戻す</button><button id="light-copy">設定URLをコピー</button></div>
+          <p id="lighting-status" role="status">変更はこのブラウザに保存されます</p>
+          <input id="lighting-url" type="text" readonly hidden aria-label="設定URL">
+        </div>
+      </details>
+      <div id="transform-box" hidden aria-hidden="false"><button data-axis="scale" aria-label="ドラッグして大きさを調整" title="大きさ">↗</button></div>
+      <div id="transform-gizmo" hidden><span class="axis-line axis-x"></span><span class="axis-line axis-y"></span><button data-axis="x" aria-label="左右に移動">X</button><button data-axis="y" aria-label="上下に移動">Y</button><button data-axis="xy" aria-label="自由に移動">✥</button><span id="object-pose"></span></div>
+      <div id="object-edit-hint" hidden>卵をドラッグして位置を編集 <span>Escで終了</span></div>
+      <details id="scroll-panel" class="lighting-panel motion-panel">
+        <summary>アニメーション <span aria-hidden="true">⌄</span></summary>
+        <div class="lighting-body">
+          <div class="track-tabs" role="group" aria-label="アニメーションの編集対象"><button data-track="egg" aria-pressed="true">卵</button><button data-track="background" aria-pressed="false">SVG背景</button></div>
+          <label class="number-row">スクロール位置 <span><input id="scroll-percent" type="number" min="0" max="100" step="0.1" value="0"> %</span></label>
+          <div class="key-actions"><button id="keyframe-add">＋ キーを追加</button><button id="keyframe-delete">削除</button></div>
+          <label class="number-row key-picker">キーフレーム<select id="keyframe-select" aria-label="キーフレームを選択"></select></label>
+          <p id="keyframe-selection"></p>
+          <label class="number-row">キーの時点 <span><input id="keyframe-at" type="number" min="0" max="100" step="0.1" value="0"> %</span></label>
+          <button data-egg-field id="object-edit" aria-pressed="false">卵をドラッグして編集</button>
+          <div class="transform-fields" data-egg-field>
+            <label class="transform-row"><span class="x-color">X 左右</span><span><input data-transform="x" type="number" min="-45" max="45" step="0.1" value="0"> %</span><input data-transform="x" aria-label="左右位置のスライダー" type="range" min="-45" max="45" step="0.1" value="0"></label>
+            <label class="transform-row"><span class="y-color">Y 上下</span><span><input data-transform="y" type="number" min="-45" max="45" step="0.1" value="0"> %</span><input data-transform="y" aria-label="上下位置のスライダー" type="range" min="-45" max="45" step="0.1" value="0"></label>
+            <label class="transform-row"><span>大きさ</span><span><input data-transform="scale" type="number" min="20" max="200" step="0.1" value="100"> %</span><input data-transform="scale" aria-label="大きさのスライダー" type="range" min="20" max="200" step="0.1" value="100"></label>
+          </div>
+          <p class="light-instruction" data-egg-field>位置の＋は右・上。キーのない時点で編集すると、自動でキーを追加します。</p>
+          <div class="background-fields" data-background-field hidden>
+            <label class="transform-row"><span>背景の大きさ</span><span><input data-background="scale" type="number" min="50" max="200" step="0.1" value="100"> %</span><input data-background="scale" aria-label="背景の大きさのスライダー" type="range" min="50" max="200" step="0.1" value="100"></label>
+            <label class="transform-row"><span>グラデーションの位置</span><span><input data-background="shift" type="number" min="-100" max="100" step="0.1" value="0"> %</span><input data-background="shift" aria-label="グラデーションの位置のスライダー" type="range" min="-100" max="100" step="0.1" value="0"></label>
+            <label class="transform-row"><span>グラデーションの幅</span><span><input data-background="spread" type="number" min="20" max="250" step="0.1" value="100"> %</span><input data-background="spread" aria-label="グラデーションの幅のスライダー" type="range" min="20" max="250" step="0.1" value="100"></label>
+            <label class="transform-row"><span>グラデーションの角度</span><span><input data-background="angle" type="number" min="-180" max="180" step="0.1" value="0"> °</span><input data-background="angle" aria-label="グラデーションの角度のスライダー" type="range" min="-180" max="180" step="0.1" value="0"></label>
+            <p class="light-instruction">卵と同じスクロール%で再生します。背景のキーは独立して追加・変更できます。</p>
+            <details class="background-layout"><summary>余白と画面への合わせ方</summary>
+              <label class="number-row">四辺の余白 <span><input id="background-margin" type="number" min="0" max="120" step="1" value="32"> px</span></label>
+              <label class="motion-easing">合わせ方<select id="background-fit"><option value="edges">四辺固定</option><option value="contain">比率優先</option></select></label>
+              <p class="light-instruction">四辺固定：画面に合わせて縦横別に変形。比率優先：元の縦横比を保ち、余白は変動します。拡大時は余白枠の内側で切り抜き、100%未満への縮小時は余白が増えます。</p>
+              <p class="light-instruction">余白と合わせ方は全キーフレーム共通です。</p>
+            </details>
+          </div>
+          <label class="motion-easing" for="scroll-easing">次のキーまで<select id="scroll-easing"><option value="smooth">滑らかに</option><option value="linear">一定の速さ</option><option value="hold">位置を維持</option></select></label>
+          <div class="key-actions"><button id="scroll-undo">↶ 元に戻す</button><button id="scroll-redo">↷ やり直す</button></div>
+          <details class="motion-presets" data-egg-field><summary>動きのプリセット</summary><div class="light-presets"><button data-scroll-preset="shrink">右へ小さく</button><button data-scroll-preset="grow">大きく</button><button data-scroll-preset="return">3点で往復</button></div></details>
+          <p id="scroll-feedback"></p>
+          <button id="scroll-live" hidden>ページスクロールに戻る</button>
+          <div class="lighting-actions"><button id="scroll-reset">初期化</button><button id="scroll-copy">設定URLをコピー</button></div>
+          <p id="scroll-status" role="status">変更は自動保存されます</p>
+          <input id="scroll-url" type="text" readonly hidden aria-label="スクロール設定URL">
+        </div>
+      </details>
+      <section id="keyframe-timeline" hidden aria-label="スクロールのキーフレームタイムライン">
+        <div class="timeline-title"><span>SCROLL TIMELINE / <b id="timeline-target">EGG</b></span><span>◆ キーを選択 / ドラッグで時点を移動</span></div>
+        <div class="timeline-track"><div class="timeline-ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div><input id="scroll-preview" aria-label="スクロール位置をプレビュー" type="range" min="0" max="100" step="0.1" value="0"><div id="keyframe-marks"></div><i id="timeline-playhead"></i></div>
+      </section>
+      <div class="caption">
+        <div class="surfaces" role="group" aria-label="素材の選択">
+          <button data-surface="pattern" aria-pressed="true">模様ガラス</button>
+          <button data-surface="clear" aria-pressed="false">クリア</button>
+          <button data-surface="tint" aria-pressed="false">淡色</button>
+          <button data-surface="painted" aria-pressed="false">塗装</button>
+        </div>
+        <button id="backdrop" aria-pressed="true">SVG背景</button>
+        <label class="transparency" for="transparency"><span>透け感</span><input id="transparency" type="range" min="0" max="100" value="58"><output id="transparency-value" for="transparency">58%</output></label>
+      </div>
+      <section id="pattern-panel" aria-labelledby="pattern-title" hidden>
+        <div class="pattern-heading"><h2 id="pattern-title">卵の柄・画像</h2><button id="pattern-close" aria-label="柄の編集を閉じる">×</button></div>
+        <div class="appearance-tabs" role="group" aria-label="編集対象"><button data-appearance="pattern" aria-pressed="true">柄</button><button data-appearance="logo" aria-pressed="false">ロゴ画像</button></div>
+        <div id="pattern-settings">
+        <label class="pattern-source">柄の種類<select id="pattern-source"><option value="original">元の渦模様</option><option value="flame">立ち上がる炎</option><option value="marble">渦・マーブルを生成</option><option value="gradient">下から上のグラデーション</option><option value="image">読み込んだ画像</option></select></label>
+        <div class="flame-presets" role="group" aria-label="炎のプリセット"><button data-flame-preset="red">炎・赤と白</button><button data-flame-preset="warm">炎・暖色</button><button data-flame-preset="pink">炎・粒子</button></div>
+        <p class="pattern-note" data-flame hidden>下から伸びる形・色のにじみ・粒子感を調整できます。柄の動きは静止で、卵の回転・スクロールに追従します。</p>
+        <label class="pattern-upload">画像を読み込む<input id="pattern-upload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+        <p id="pattern-image-name">画像未選択</p>
+        <label id="pattern-recolor-row" hidden><input id="pattern-recolor" type="checkbox">画像を下の配色で色替え</label>
+        <fieldset id="pattern-palette"><legend>配色 · 左から色1〜4</legend><button id="pattern-thermal-colors" type="button">指定グラデーションを使う</button><div id="pattern-gradient-strip" aria-hidden="true"></div><div class="pattern-colors"><input data-pattern-color="0" type="color" aria-label="柄の色1"><input data-pattern-color="1" type="color" aria-label="柄の色2"><input data-pattern-color="2" type="color" aria-label="柄の色3"><input data-pattern-color="3" type="color" aria-label="柄の色4"></div></fieldset>
+<label class="pattern-control" data-flame hidden><span>炎の立ち上がり</span><span><input data-pattern="height" type="number" aria-label="炎の立ち上がり" min="20" max="200" step="1"> %</span><input data-pattern="height" type="range" aria-label="炎の立ち上がりのスライダー" min="20" max="200" step="1"></label>
+<label class="pattern-control" data-flame hidden><span>色のにじみ</span><span><input data-pattern="softness" type="number" aria-label="色のにじみ" min="0" max="100" step="1"> %</span><input data-pattern="softness" type="range" aria-label="色のにじみのスライダー" min="0" max="100" step="1"></label>
+<label class="pattern-control" data-flame hidden><span>粒子感</span><span><input data-pattern="grain" type="number" aria-label="粒子感" min="0" max="100" step="1"> %</span><input data-pattern="grain" type="range" aria-label="粒子感のスライダー" min="0" max="100" step="1"></label>
+<label class="pattern-control" ><span>柄の大きさ</span><span><input data-pattern="scale" type="number" aria-label="柄の大きさ" min="25" max="300" step="1"> %</span><input data-pattern="scale" type="range" aria-label="柄の大きさのスライダー" min="25" max="300" step="1"></label>
+<label class="pattern-control" ><span>柄の向き</span><span><input data-pattern="angle" type="number" aria-label="柄の向き" min="-180" max="180" step="1"> °</span><input data-pattern="angle" type="range" aria-label="柄の向きのスライダー" min="-180" max="180" step="1"></label>
+<label class="pattern-control" ><span>柄の左右位置</span><span><input data-pattern="x" type="number" aria-label="柄の左右位置" min="-100" max="100" step="1"> %</span><input data-pattern="x" type="range" aria-label="柄の左右位置のスライダー" min="-100" max="100" step="1"></label>
+<label class="pattern-control" ><span>柄の上下位置</span><span><input data-pattern="y" type="number" aria-label="柄の上下位置" min="-100" max="100" step="1"> %</span><input data-pattern="y" type="range" aria-label="柄の上下位置のスライダー" min="-100" max="100" step="1"></label>
+<label class="pattern-control" data-generated hidden><span>渦のうねり</span><span><input data-pattern="warp" type="number" aria-label="渦のうねり" min="0" max="300" step="1"> %</span><input data-pattern="warp" type="range" aria-label="渦のうねりのスライダー" min="0" max="300" step="1"></label>
+<label class="pattern-control" data-generated hidden><span>柄のバリエーション</span><span><input data-pattern="seed" type="number" aria-label="柄のバリエーション" min="1" max="999" step="1"> </span><input data-pattern="seed" type="range" aria-label="柄のバリエーションのスライダー" min="1" max="999" step="1"></label>
+        <div class="pattern-actions"><button id="pattern-shuffle" data-generated hidden>別の渦を生成</button><button id="pattern-reset">最初の柄に戻す</button></div>
+        <p class="pattern-note">変更は模様ガラスへ反映します。画像は柄として立体になじませます。ロゴや文字の正確な配置には向きません。PNG・JPEG・WebP / 20MBまで。長辺2048pxに縮小し、透明部分は白になります。</p>
+        <p id="pattern-status" role="status">色や柄を変えると、その場で卵に反映されます。</p>
+        </div>
+        <div id="logo-settings" hidden>
+          <label class="logo-enabled"><input id="logo-enabled" type="checkbox" checked>ロゴを表示</label>
+          <div class="logo-image-preview"><img id="logo-thumbnail" alt="卵に配置するロゴ画像"></div>
+          <p id="logo-image-name"></p>
+          <label class="pattern-upload">ロゴ画像を読み込む<input id="logo-upload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <button id="logo-front" class="logo-front">正面で確認・一時停止</button>
+<label class="pattern-control"><span>左右位置</span><span><input data-logo="x" type="number" min="-45" max="45" step="0.1" aria-label="ロゴの左右位置"> %</span><input data-logo="x" type="range" min="-45" max="45" step="0.1" aria-label="ロゴの左右位置のスライダー"></label>
+<label class="pattern-control"><span>上下位置</span><span><input data-logo="y" type="number" min="-45" max="45" step="0.1" aria-label="ロゴの上下位置"> %</span><input data-logo="y" type="range" min="-45" max="45" step="0.1" aria-label="ロゴの上下位置のスライダー"></label>
+<label class="pattern-control"><span>画像サイズ</span><span><input data-logo="size" type="number" min="10" max="140" step="0.1" aria-label="ロゴの画像サイズ"> %</span><input data-logo="size" type="range" min="10" max="140" step="0.1" aria-label="ロゴの画像サイズのスライダー"></label>
+<label class="pattern-control"><span>ロゴの濃さ</span><span><input data-logo="opacity" type="number" min="0" max="100" step="1" aria-label="ロゴの濃さ"> %</span><input data-logo="opacity" type="range" min="0" max="100" step="1" aria-label="ロゴの濃さのスライダー"></label>
+          <div class="pattern-actions"><button id="logo-center">中央・初期サイズへ</button><button id="logo-original">提供画像に戻す</button></div>
+          <p class="pattern-note">＋は右・上。サイズは卵の幅に対する割合です。画像の縦横比と透明部分を保ち、卵の表面の色として合成し、同じ光沢・陰影で表示します。卵の外側は切り抜かれ、回転すると画像も一緒に回ります。</p>
+          <p class="pattern-note">PNG・JPEG・WebP / 20MBまで。長辺2048pxまで。位置・サイズは全キーフレーム共通です。</p>
+          <p id="logo-status" role="status">画像の位置とサイズを調整できます。</p>
+        </div>
+      </section>
+      <dialog id="export-dialog" aria-labelledby="export-title">
+        <div class="export-heading"><h2 id="export-title">書き出し</h2><button id="export-close" aria-label="閉じる">×</button></div>
+        <p class="export-note">出力サイズ <strong id="export-size"></strong> · 編集UIを除く</p>
+        <section class="export-section"><h3>画像 · PNG</h3>
+          <label>保存するフレーム <span><input id="export-frame" data-label="保存位置" type="number" min="0" max="100" step="0.1" value="0"> %</span></label>
+          <div class="export-actions"><button id="export-frame-current">現在の％を使う</button><button id="export-frame-preview">フレームを確認</button><button id="export-png" class="export-primary">PNGを保存</button></div>
+        </section>
+        <section class="export-section"><h3>動画</h3>
+          <div class="export-grid"><label>開始 %<input id="export-start" data-label="開始位置" type="number" min="0" max="100" step="0.1" value="0"></label><label>終了 %<input id="export-end" data-label="終了位置" type="number" min="0" max="100" step="0.1" value="100"></label><label>秒数<input id="export-duration" data-label="秒数" type="number" min="1" max="30" step="1" value="8"></label></div>
+          <div class="export-actions"><select id="export-video-format" aria-label="動画形式"></select><select id="export-fps" aria-label="フレームレート"><option value="30">30 fps 目安</option><option value="60">60 fps 目安</option></select><button id="export-video" class="export-primary">動画を保存</button></div>
+          <p id="video-support" class="export-note">キーフレームを指定の秒数で再生して実時間で収録します。描画負荷によってフレーム数は変わります。対応形式のみ表示します。</p>
+        </section>
+        <section class="export-section"><h3>HTML</h3><p class="export-note">3D・素材・設定を1ファイルにまとめます。単体で開いてスクロールやマウスで動かせます。</p><button id="export-html" class="export-primary">HTMLを保存</button></section>
+        <progress id="export-progress" max="1" value="0" hidden></progress><p id="export-status" role="status"></p><button id="export-cancel" hidden>中止</button>
+      </dialog>
+      <div id="fallback" role="status" hidden>3D表示を開始できませんでした。WebGL対応のブラウザで開いてください。</div>
+      <footer>
+        <div class="controls" role="group" aria-label="動きの選択">
+          <button data-mode="blend" aria-pressed="true">組み合わせ</button>
+          <button data-mode="auto" aria-pressed="false">自動回転</button>
+          <button data-mode="scroll" aria-pressed="false">スクロール</button>
+          <button id="pause" aria-pressed="false">一時停止</button>
+        </div>
+        <div class="hint"><span id="hint">マウスを動かす / 下にスクロール</span><span aria-hidden="true">↓</span></div>
+        <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+      </footer>
+    </section>
+  </main>
+  <script type="module" src="./egg.js"></script>
+</body>
+</html>

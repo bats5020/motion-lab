@@ -1,7 +1,7 @@
 # MOTION LAB
 
 アニメーション＆グラフィックツールの統合プラットフォーム。
-すべて**ビルド不要・依存ゼロの単体HTML**で、ブラウザ内処理のみ（サーバー送信なし）。
+すべて**ビルド不要**で、画像・動画の処理はブラウザ内で完結（サーバー送信なし）。基本は単体HTML、Three.jsを使うEgg Glassは専用フォルダに依存ファイルを同梱しています。
 
 **→ 公開URL: https://bats5020.github.io/motion-lab/**
 
@@ -10,13 +10,14 @@
 ```
 index.html          ハブ画面 — 全ツールをカード表示。ここが入り口
 shared/tokens.css   共通デザイントークン（配色・フォント）
-tools/              各ツール（1ツール＝1ファイル）
+tools/              各ツール（基本は単体HTML、egg-glass/ はモジュール構成）
 ```
 
 ## ツール一覧
 
 | ツール | カテゴリ | 何をするか |
 |---|---|---|
+| [Egg Glass](tools/egg-glass/) | motion | 卵形3Dの柄・ロゴ・照明・SVG背景を編集。スクロールキーフレーム、PNG／動画／単体HTML書き出し（[使い方・正本](tools/egg-glass/README.md)） |
 | [Halftone Lab](tools/halftone-lab.html) | raster | 画像・プロシージャルソースをハーフトーン／ディザ／ASCII化。メルト・消灯セル・アニメ＋WebM録画・SVG／コード書き出し |
 | [Effect Stack](tools/effect-stack.html) | raster | 14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応（リアルタイム適用＋WebM録画）、ランダマイズ＋スタック刻印 |
 | [Grid Stretch](tools/grid-stretch.html) | raster | 画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きグリッチ |
@@ -28,7 +29,7 @@ tools/              各ツール（1ツール＝1ファイル）
 | [Word Switcher](tools/word-switcher.html) | motion | 単語／SVGを切り替えるモーショングラフィック |
 | [Wireframe](tools/wireframe.html) | motion | ジオメトリックなワイヤーフレーム系モーショングラフィック |
 
-各ツールの左下に **◆ MOTION LAB** ピルが常駐し、ハブに戻れます。
+各ツールの左下の **◆ MOTION LAB** ピルからハブに戻れます。Egg Glassは `@` で編集UIと一緒に非表示になります。
 
 ## ツールを追加する
 
@@ -36,7 +37,7 @@ tools/              各ツール（1ツール＝1ファイル）
 2. `index.html` の `TOOLS` 配列に1件追加（名前・説明・カテゴリ・サムネSVG）
 3. `<body>` 直後にホームピル（既存ツールからコピー）を入れる
 4. このREADMEの一覧に1行追記
-5. `git add -A && git commit && git push` — GitHub Pagesに自動反映
+5. 最新mainから作業ブランチを作り、レビュー・検証後にPRをマージ — GitHub Pagesに自動反映（mainへの直接push禁止）
 
 新カテゴリは「出力の種類」で足す（例: `type`＝文字組み、`color`＝配色）。
 
