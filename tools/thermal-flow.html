@@ -179,6 +179,7 @@ details>summary:hover{color:var(--text)}
 #sizeBlock>.prow>span:first-child{flex-basis:62px;font-size:10px;white-space:nowrap}
 #sizeBlock select{font-size:10px;padding:5px 6px}
 #btnPng1{flex:1;background:var(--accent);border-color:var(--accent);font-weight:700;padding:12px;font-size:12px;letter-spacing:.03em}
+#btnHtml{flex:1;font-size:12px;padding:12px 8px;white-space:nowrap}
 .export-primary{display:flex;gap:8px;align-items:stretch}
 #exportMore>summary{display:block;padding:12px 13px;border:1px solid var(--line);border-radius:5px;font-size:12px;color:var(--text)}
 #exportMore>summary:before{display:none}
@@ -300,7 +301,7 @@ details>summary:hover{color:var(--text)}
     </div>
     <footer id="exportBar">
       <div id="sizeBlock"></div>
-      <div class="export-primary"><button class="btn" id="btnPng1">PNGを保存</button>
+      <div class="export-primary"><button class="btn" id="btnPng1">PNGを保存</button><button class="btn" id="btnHtml" title="動き・透過・画像を含む単体HTMLを保存">HTMLを保存</button>
       <details id="exportMore"><summary aria-label="その他の書き出し方法">•••</summary><div class="export-popover">
       <h2>書き出し・共有</h2>
       <div class="btnrow"><button class="btn" id="btnPng2">PNG ×2</button><button class="btn" id="btnPng4">PNG ×4</button></div>
@@ -495,7 +496,7 @@ const gl=view.getContext('webgl',{preserveDrawingBuffer:true,antialias:false,pre
 const LUT_SIZE=Math.min(4096,gl.getParameter(gl.MAX_TEXTURE_SIZE));
 const VSH=`attribute vec2 aPos;varying vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}`;
 const normalDerivatives=gl.getExtension('OES_standard_derivatives');
-const FSH=`${normalDerivatives?'#extension GL_OES_standard_derivatives : enable':''}
+function fragmentShaderSource(){return `${normalDerivatives?'#extension GL_OES_standard_derivatives : enable':''}
 precision highp float;
 varying vec2 vUv;
 uniform vec2 uRes;
@@ -1038,13 +1039,15 @@ void main(){
     coverage=1.-smoothstep(uFrameBoundary.y-aa,uFrameBoundary.y+aa,r);
   }
   gl_FragColor=vec4(coverage>0.?col:vec3(0.),coverage);
-}`;
+}`;}
+const FSH=fragmentShaderSource();
 function mkShader(type,src){
   const s=gl.createShader(type);
   gl.shaderSource(s,src);gl.compileShader(s);
   if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));
   return s;
 }
+function initThermalGL(){
 const prog=gl.createProgram();
 gl.attachShader(prog,mkShader(gl.VERTEX_SHADER,VSH));
 gl.attachShader(prog,mkShader(gl.FRAGMENT_SHADER,FSH));
@@ -1074,6 +1077,9 @@ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
 gl.uniform1i(U['uLut'],0);
+return {prog,U,lutTex};
+}
+const {prog,U,lutTex}=initThermalGL();
 /* ============ LUT build ============ */
 const lutData=new Uint8Array(LUT_SIZE*4),lutPacked=new Uint8Array(LUT_SIZE*8);
 function sstep(a,b,x){x=clamp((x-a)/Math.max(1e-6,b-a),0,1);return x*x*(3-2*x)}
@@ -1090,7 +1096,7 @@ function sampleStops(t){
   const ca=hex2rgbF(a.c),cb=hex2rgbF(b.c);
   return[ca[0]+(cb[0]-ca[0])*u,ca[1]+(cb[1]-ca[1])*u,ca[2]+(cb[2]-ca[2])*u];
 }
-function buildLut(){
+function uploadLut(){
   state.lut._sorted=[...state.lut.stops].sort((a,b)=>a.p-b.p);
   const shift=state.lut.shift/100;
   for(let i=0;i<LUT_SIZE;i++){
@@ -1109,8 +1115,8 @@ function buildLut(){
   }
   gl.bindTexture(gl.TEXTURE_2D,lutTex);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,LUT_SIZE,2,0,gl.RGBA,gl.UNSIGNED_BYTE,lutPacked);
-  drawLutBar();
 }
+function buildLut(){uploadLut();drawLutBar()}
 /* ============ blobs ============ */
 function blobState(){
   const r=mulberry32((state.seed^0x9e3779b9)>>>0);
@@ -1495,7 +1501,7 @@ function refreshQuickUI(){
   if(radial)$('#quickHint').textContent='中心位置と配色を保って、放射の広がりを変えられます。';
   if(plain)$('#quickHint').textContent='方向・幅・位置を調整できます。うねりは詳細設定から。';
   const[w,h]=fullSize(),mx=maxRenderSize(),s=Math.min(1,mx/Math.max(w,h));
-  $('#exportSize').textContent=isCircularFrame()?'円の外側は透過・余白を自動トリミング':hasExportMask()?'マスク外の余白を自動トリミング':Math.floor(w*s)+' × '+Math.floor(h*s)+' px · PNG';
+  $('#exportSize').textContent=isCircularFrame()?'円の外側は透過・PNGは余白をトリミング':hasExportMask()?'PNGはマスク外の余白をトリミング':Math.floor(w*s)+' × '+Math.floor(h*s)+' px';
   $('#exportSize').title='キャンバス '+Math.floor(w*s)+' × '+Math.floor(h*s)+' px';
   syncHistoryUI();
   refreshFramePreview();
@@ -3118,10 +3124,101 @@ function loadProject(project){
   }catch(e){restoreRecord(backup);throw e}
 }
 function exportName(){return (state.studio.output.name||'thermal-flow').replace(/[\\/:*?"<>|\x00-\x1f]/g,'-').trim().slice(0,80)||'thermal-flow'}
+/* Standalone HTML uses the editor's shader and render functions directly.
+   Keep the explicit dependency list here so the player never includes editor UI,
+   local storage, reference assets, network requests or a second rendering algorithm. */
+function buildStandaloneHTML(){
+  const project=projectSnapshot();delete project.quick;delete project.previewText;
+  const [width,height]=renderSize();
+  const data={project,width,height,time:playback.time,phase:_frameTime,anim:{..._animT},norm:[..._norm],normKey:_normKey,playing:state.motion.on&&playback.playing};
+  const json=value=>JSON.stringify(value).replace(/</g,'\\u003c');
+  const functions={clamp,ce,mulberry32,hex2rgbF,rgb2hex,fullSize,isThermalFrame,isCircularFrame,
+    fragmentShaderSource,mkShader,initThermalGL,sstep,legacySampleStops,sampleStops,buildLut:uploadLut,
+    blobState,cornerProfile,setUniforms,setAnimPhase,measureNorm,studioBaseRenderGL,renderGL,
+    pathGet,pathSet,validTrackPath,radians,makeTexture,updateWarpMap,sampleBezier,setStudioUniforms,
+    matrix,toLinear,fromLinear,rgbToSpace,spaceToRgb,tightenColorTransition,
+    drawMaskShape,composeMasked,composeArtwork,clipCircularArtwork,composeGlow,
+    easeValue,interpolateKey,trackValue,remapTime,maxRenderSize};
+  const source=Object.entries(functions).map(([name,fn])=>'const '+name+' = '+fn.toString()+';').join('\n');
+  return `<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thermal Flow</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{display:grid;place-items:center}canvas{display:block;max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}button{position:fixed;right:12px;bottom:12px;padding:8px 12px;border:1px solid #3d3d46;border-radius:5px;background:#141417dd;color:#e6e6ef;font:12px system-ui;cursor:pointer;opacity:0}button:focus-visible,button:hover,body.controls button,button[data-paused=true]{opacity:1}button:focus-visible{outline:2px solid #4f5cff;outline-offset:3px}[hidden]{display:none!important}#status{position:fixed;inset:0;display:grid;place-items:center;padding:24px;font:14px system-ui;color:#888;text-align:center}</style></head>
+<body><canvas id="artwork" role="img" aria-label="Thermal Flowのグラデーション"></canvas><button id="play" type="button" hidden>一時停止</button><div id="status" role="status">読み込み中…</div>
+<script id="thermal-data" type="application/json">${json(data)}<\/script>
+<script>
+(async()=>{
+'use strict';
+const data=JSON.parse(document.getElementById('thermal-data').textContent),state=data.project;
+const SIZE_PRESETS=${json(SIZE_PRESETS)},FRAME_SIDE_PARAMS=${json(FRAME_SIDE_PARAMS)},MASK_FONT=${json(MASK_FONT)};
+${source}
+const view=document.createElement('canvas'),gl=view.getContext('webgl',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+if(!gl)throw Error('WebGLを利用できません。ブラウザの設定を確認してください。');
+const LUT_SIZE=Math.min(4096,gl.getParameter(gl.MAX_TEXTURE_SIZE)),normalDerivatives=gl.getExtension('OES_standard_derivatives');
+const VSH=${json(VSH)},FSH=fragmentShaderSource(),{prog,U,lutTex}=initThermalGL();
+const lutData=new Uint8Array(LUT_SIZE*4),lutPacked=new Uint8Array(LUT_SIZE*8),_thumbRendering=false;
+let _animT=data.anim,_frameTime=data.phase,_norm=data.norm,_normKey=data.normKey,_blobs=blobState(),_cornerSeed=-1,_cornerProfile=new Float32Array(16);
+const warpTexture=makeTexture(1),slitTexture=makeTexture(2),postWarpTexture=makeTexture(3);
+let warpKey='',postWarpKey='',slitImage=null,overlayImage=null,_maskImg=null;
+await (${standalonePlayback.toString()})(data);
+})().catch(error=>{const status=document.getElementById('status');status.hidden=false;status.textContent='表示できませんでした: '+error.message;});
+<\/script></body></html>`;
+}
+async function standalonePlayback(data){
+  const canvas=document.getElementById('artwork'),context=canvas.getContext('2d'),button=document.getElementById('play'),status=document.getElementById('status');
+  document.title=state.studio.output.name||'Thermal Flow';
+  async function loadImage(src){
+    if(!src)return null;if(!src.startsWith('data:image/'))throw Error('埋め込み画像の形式が不正です');
+    const image=new Image();image.src=src;await image.decode();return image;
+  }
+  [overlayImage,slitImage,_maskImg]=await Promise.all([loadImage(state.studio.image.data),loadImage(state.studio.slit.imageData),loadImage(state.maskImage)]);
+  if(state.mask.on&&state.mask.src==='image'&&!_maskImg||state.studio.image.on&&state.studio.image.mode==='mask'&&!overlayImage)throw Error('マスク画像がありません');
+  if(slitImage){gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,slitTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,slitImage);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,lutTex);}
+  const scale=Math.min(1,maxRenderSize()/Math.max(data.width,data.height));
+  canvas.width=Math.max(1,Math.floor(data.width*scale));canvas.height=Math.max(1,Math.floor(data.height*scale));
+  buildLut();
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let time=clamp(data.time,0,state.motion.loopSec),playing=data.playing&&!reduced.matches,last=performance.now(),lastDraw=-Infinity,raf=0,controlsTimer=0;
+  function label(){button.textContent=playing?'一時停止':time>=state.motion.loopSec?'もう一度':'再生';button.dataset.paused=String(!playing);button.setAttribute('aria-label',button.textContent);}
+  function render(){renderGL(canvas.width,canvas.height,1);context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(composeArtwork(canvas.width,canvas.height),0,0);}
+  function schedule(){if(playing&&!document.hidden&&!raf)raf=requestAnimationFrame(tick);}
+  function pause(){playing=false;cancelAnimationFrame(raf);raf=0;label();}
+  function seek(seconds){pause();time=clamp(Number(seconds)||0,0,state.motion.loopSec);if(state.motion.on)setAnimPhase(remapTime(time));render();label();}
+  function play(){if(!state.motion.on)return;if(time>=state.motion.loopSec)time=0;playing=true;last=performance.now();lastDraw=-Infinity;label();schedule();}
+  function tick(now){
+    raf=0;if(!playing||document.hidden)return;
+    const dt=Math.min(.1,(now-last)/1000);last=now;time+=dt*state.studio.animation.rate;
+    if(time>=state.motion.loopSec){if(state.motion.loop)time%=state.motion.loopSec;else{time=state.motion.loopSec;playing=false;}}
+    if(!playing||now-lastDraw>=1000/state.studio.animation.fps){setAnimPhase(remapTime(time));render();lastDraw=now;}
+    if(!playing){label();canvas.dispatchEvent(new CustomEvent('thermal-flow:complete',{bubbles:true}));}else schedule();
+  }
+  button.hidden=!state.motion.on;button.onclick=()=>playing?pause():play();
+  document.addEventListener('keydown',event=>{if(event.code==='Space'&&event.target!==button&&state.motion.on){event.preventDefault();playing?pause():play();}});
+  document.addEventListener('pointermove',()=>{document.body.classList.add('controls');clearTimeout(controlsTimer);controlsTimer=setTimeout(()=>document.body.classList.remove('controls'),1400);});
+  document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);raf=0;last=performance.now();schedule();});
+  reduced.addEventListener('change',()=>{if(reduced.matches)pause();});
+  window.addEventListener('pagehide',()=>{cancelAnimationFrame(raf);raf=0;});
+  window.addEventListener('pageshow',()=>{last=performance.now();schedule();});
+  view.addEventListener('webglcontextlost',event=>{event.preventDefault();pause();status.hidden=false;status.textContent='描画が停止しました。ページを再読み込みしてください。';});
+  window.thermalFlow={play,pause,seek,get time(){return time},get playing(){return playing},get duration(){return state.motion.loopSec}};
+  render();label();status.hidden=true;canvas.dataset.ready='true';schedule();
+}
+async function exportHTML(){
+  if(_recording)return;_recording=true;
+  try{
+    if(state.mask.on&&state.mask.src==='image'&&!_maskImg)throw Error('マスク画像を読み込んでください');
+    if(state.studio.image.on&&state.studio.image.mode==='mask'&&!overlayImage)throw Error('マスク画像を読み込んでください');
+    renderGL(...renderSize(),1);
+    await saveStudioBlob(new Blob([buildStandaloneHTML()],{type:'text/html;charset=utf-8'}),exportName()+'.html');
+    toast('HTMLを保存しました。ブラウザで開くと作品を再生できます');
+  }catch(e){toast('書き出しに失敗しました: '+e.message)}
+  finally{_recording=false;playback.last=performance.now();renderGL(...previewSize(),1);redraw();}
+}
+$('#btnHtml').addEventListener('click',exportHTML);
 let exportDirectory=null,exportCancelled=false;
 async function saveStudioBlob(blob,name){if(exportDirectory){const handle=await exportDirectory.getFileHandle(name,{create:true}),w=await handle.createWritable();await w.write(blob);await w.close()}else download(blob,name)}
 function buildExportUI(){
   const box=$('#exportMore .export-popover');
+  box.append(ce('p','hint','HTMLは動き・透過・読み込んだ画像を1ファイルに保存します。ブラウザで開くか、Webサイトに埋め込んで使えます。'));
   const name=ce('input');name.type='text';name.value=state.studio.output.name;name.setAttribute('aria-label','書き出しファイル名');name.id='exportFileName';name.style.cssText='width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px';name.addEventListener('change',()=>{pushUndo();state.studio.output.name=name.value||'thermal-flow'});box.prepend(name);
   const images=ce('div','studio-actions');images.append(studioButton('JPG',()=>exportStill('jpeg')),studioButton('WebP',()=>exportStill('webp')));box.append(images);
   studioRange(box,'JPG / WebPの品質','studio.output.quality',.1,1,.01);

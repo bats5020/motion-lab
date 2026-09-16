@@ -1,0 +1,25 @@
+{
+  "v": 1,
+  "seed": 20260816,
+  "canvas": {"mode":"custom","w":1376,"h":260},
+  "field": {
+    "frameShape":"rect","frameSize":90,
+    "frameTopReach":100,"frameTopStrength":100,"frameTopLean":0,
+    "frameRightReach":100,"frameRightStrength":100,"frameRightLean":0,
+    "frameBottomReach":100,"frameBottomStrength":100,"frameBottomLean":0,
+    "frameLeftReach":100,"frameLeftStrength":100,"frameLeftLean":0,
+    "mode":"ribbon","cornerReach":50,"cornerWaves":60,"cornerScatter":0,
+    "frameReach":13,"frameFlare":35,"frameScale":3,"frameWidth":0.6,"framePhase":0,"frameAb":8,"frameFlow":0,"frameLayers":0,
+    "flowAngle":125,"flowZoom":400,"flowCx":50,"flowCy":50,
+    "scale":0,"octaves":1,"warp1":70,"warp2":65,"aniso":70,"time":12,"curl":0,"rise":0,"ntype":"fbm","nchar":50,"kal":0,"kalRot":0,
+    "linAng":270,"linShape":"ribbon","linInv":false,"linCx":50,"linCy":50,"linRadius":100,"linWidth":100,"linPosition":0,
+    "peaks":3,"sharp":45,"peakH":75,"sway":40,"blobN":3,"blobSize":52,"blobSoft":55,
+    "gamma":50,"contrast":50,"offset":0,"norm":true
+  },
+  "lut": {"stops":[{"p":0,"c":"#0F1923","h":0},{"p":0.35,"c":"#1F2A36","h":0},{"p":0.55,"c":"#BD3944","h":0},{"p":0.75,"c":"#FF4655","h":0},{"p":1,"c":"#ECE8E1","h":0}],"bands":0,"invert":false,"shift":0},
+  "grain":{"mode":"tone","amount":0,"size":1,"paper":"#f2ead8"},
+  "finish":{"bg":0,"bgTop":"#d9c4a8","bgBot":"#26060f"},
+  "mask":{"on":false,"src":"text","text":"U19","text2":"U19 eスポーツ選手権2026","size":38,"size2":6,"ls":0,"gap":5,"yoff":0,"imgSize":70,"bg":"#55BCE7","transparent":false},
+  "motion":{"on":true,"loop":true,"loopSec":15,"evo":5,"sway":12,"speed":24,"hue":0,"paused":false},
+  "pins":[]
+}
