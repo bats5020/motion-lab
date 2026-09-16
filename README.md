@@ -25,7 +25,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [Grid Stretch](tools/grid-stretch.html) | raster | 画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きグリッチ |
 | [Dither → SVG](tools/dither-svg.html) | raster | 画像を網点・ディザ・ドット化してSVG／PNGで書き出す |
 | [Pixel Gradient](tools/pixel-gradient.html) | raster | メッシュグラデを土台にピクセル化・ポスタライズ・グレインで生成 |
-| [Thermal Flow](tools/thermal-flow.html) | raster | 円形／四角形のサーモフレーム、流体グラデ、個別エフェクトとキーフレーム。透過・トリミング対応PNG、作品JSON、連番ZIP／ロスレスMOV（[機能と検証](docs/thermal-flow-studio.md)、[PC操作](docs/thermal-flow-ux.md)） |
+| [Thermal Flow](tools/thermal-flow.html) | raster | 円形／四角形のサーモフレーム、流体グラデ、個別エフェクトとキーフレーム。透過・トリミング対応PNG、単体HTML、作品JSON、連番ZIP／ロスレスMOV（[機能と検証](docs/thermal-flow-studio.md)、[PC操作](docs/thermal-flow-ux.md)） |
 | [Glass Lab](tools/glass-lab.html) | motion | グロー球体を型板ガラス越しに歪ませる fluted glass シェーダー（WebGL）。画像・動画ソース、プリセット＋ランダマイズ、動画録画、設定URL共有 |
 | [ASCII Wave](tools/ascii-wave.html) | motion | 流体ノイズをASCII文字で描くアニメーション背景。カーソルインタラクション＋コード書き出し |
 | [Image Switcher](tools/image-switcher.html) | motion | 複数画像でロゴOP・スライドを制作。中央揃え、テンポ・開始／終了の演出、動画／透過PNG／連番ZIP／単体HTML／作品JSON（[使い方・検証](docs/image-switcher.md)） |

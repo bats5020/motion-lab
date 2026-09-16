@@ -285,3 +285,27 @@ THERMAL_URL=http://127.0.0.1:8781/tools/thermal-flow.html THERMAL_PLAYWRIGHT_MOD
 公開候補の証跡は `/private/tmp/thermal-release-qa/` の `studio/`・`alpha/`・`sharpness/`。
 
 検証終了時刻（UTC）: studio 2026-09-16T14:12:00.665Z, alpha 2026-09-16T14:12:20.711Z, sharpness 2026-09-16T14:12:44.722Z。
+
+## 2026-09-17 — 単体HTMLの書き出し
+
+右下の「HTMLを保存」で、編集用のパネルを含まない単体HTMLを保存できる。動き、再生位置、再生／停止状態、グラデーション、キーフレーム、マスク、円形の透過、読み込んだ画像を内包し、ネット接続なしで再生する。編集を再開する場合は従来どおり作品JSONを使う。
+
+- シェーダー・色テーブル・描画・エフェクト・合成・補間関数をエディターから直接組み立てる。見た目を別方式に置き換えたり動画に変換したりせず、WebGLで描画する。
+- 設定したキャンバス解像度で描画し、画面内へ縦横比を維持して収める。GPUの最大描画サイズを超える場合のみ縮小する。アニメーションの形状や画像位置が動いても切れないよう、HTMLはキャンバス全体を保持する。PNGのマスク外トリミングは従来どおり。
+- 動きONなら再生／一時停止とスペースキーが使える。ループOFFでは終端で止まる。動きOFFでは静止画として表示する。OSの「視差効果を減らす」などの設定では自動再生せず、再生ボタンから開始できる。
+- バックグラウンドのタブでは描画を止め、復帰時に大きく時刻が飛ばない。停止中も連続描画をしない。
+- 画像はデータURLで内包する。設定JSON内の `<` をエスケープし、作品名や文字列をHTMLとして実行しない。外部ライブラリや編集画面のCSS・localStorage・設定URLへ依存しない。
+- Webページへ置く場合は、保存したHTMLをアップロードしてiframeで読み込める。背景は透過。例えば今回の横長設定なら次のように置ける。
+
+```html
+<iframe src="thermal-flow.html" title="グラデーション"
+  style="display:block;width:100%;aspect-ratio:1376 / 260;border:0"></iframe>
+```
+
+同じページ内で操作する場合、プレイヤーの `window.thermalFlow` は `play()` / `pause()` / `seek(秒)` と `time` / `playing` / `duration` を公開する。iframe内の場合は同一オリジンで `iframe.contentWindow.thermalFlow` を参照する。1回再生が終了するとcanvasから `thermal-flow:complete` を送出する。
+
+再検証は `tests/thermal-flow.html-export.browser.cjs`。`THERMAL_URL`、`THERMAL_PLAYWRIGHT_MODULE`、`THERMAL_HTML_OUTPUT`、`THERMAL_HTML_ENGINES`（既定 `chromium,webkit`）で環境を指定する。1376×260・15秒ループの共有設定は `tests/fixtures/thermal-html-banner.json` に保持。未指定のStudio項目は既定値を使用する。
+
+検証結果: Chromiumで11項目、WebKitで3項目が合格。1376×260の0／3.75／7.5／15秒をネイティブ描画と比較して完全一致し、ループの両端も一致。Chromiumでは文字・画像マスク、画像合成、スリット画像、複合エフェクト、色と形のキーフレーム、静止画、JSON埋め込みのエスケープ、動きの抑制、1回再生も確認。外部HTTPリクエスト0件、JavaScriptエラー0件。WebKitはfile://とオフラインモードの併用に制約があるため、HTTP(S)を遮断してローカルHTMLを検証した。
+
+既存機能は境界調整6項目・円形透過5項目が合格。旧公開版の6ルックと画素一致し、PNGの1倍／2倍保存、透明度・トリミング、JSON・URL復元を保持。証跡は `/private/tmp/thermal-html-qa/`、円形の回帰確認は `/private/tmp/thermal-circle-alpha/`。
