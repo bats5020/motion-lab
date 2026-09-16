@@ -1668,7 +1668,7 @@ function buildPresets(){
     ch.setAttribute('aria-pressed','false');ch.setAttribute('aria-label','ルック: '+p.name);
     const cv=document.createElement('canvas');cv.width=144;cv.height=180;cv.setAttribute('aria-hidden','true');
     ch.append(cv,ce('span',null,p.name));
-    ch.addEventListener('click',()=>{pushUndo();applyPreset(p);toast('プリセット: '+p.name)});
+    ch.addEventListener('click',()=>{pushUndo();applyPreset(p,{preserveSettings:true});toast('ルック: '+p.name+'（設定は保持）')});
     $(i<6?'#presets':'#extraPresets').appendChild(ch);
   });
   renderUserLuts();
@@ -1721,32 +1721,42 @@ function commitUserLut(){
 const DEFAULT_FIELD={...FRAME_LAYOUT_DEFAULTS,mode:'warp',cornerReach:50,cornerWaves:60,cornerScatter:0,frameReach:13,frameFlare:35,frameScale:3,frameWidth:.6,framePhase:0,frameAb:8,frameFlow:0,frameLayers:0,flowAngle:0,flowZoom:100,flowCx:50,flowCy:50,scale:30,octaves:4,warp1:55,warp2:45,aniso:0,time:0,curl:0,rise:0,ntype:'fbm',nchar:50,kal:0,kalRot:0,
   linAng:270,linShape:'line',linInv:false,linCx:50,linCy:50,linRadius:100,linWidth:100,linPosition:0,
   peaks:3,sharp:45,peakH:75,sway:40,blobN:3,blobSize:52,blobSoft:55,gamma:50,contrast:56,offset:0,norm:false};
-function applyPreset(p){
+function applyPresetField(field,preserveSettings=false){
+  // 枠の形・サイズ・各方向の調整と静止画の時刻は、模様から独立した制作設定。
+  const layout=preserveSettings?Object.fromEntries([...Object.keys(FRAME_LAYOUT_DEFAULTS),'framePhase'].map(k=>[k,state.field[k]])):{};
+  Object.assign(state.field,DEFAULT_FIELD,field,layout);
+}
+function applyPreset(p,{preserveSettings=false}={}){
   selectedStops.clear();
   if(p.colorOnly){
     const lp=LUT_PRESETS.find(l=>l.name===p.lut);
     if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
-    if(p.grain)Object.assign(state.grain,p.grain);
-    if(p.finish)Object.assign(state.finish,p.finish);
+    if(!preserveSettings&&p.grain)Object.assign(state.grain,p.grain);
+    if(!preserveSettings&&p.finish)Object.assign(state.finish,p.finish);
     selStop=0;buildLut();refreshAll();redraw();
     return;
   }
-  const keepImage=state.studio.image,keepOutput=state.studio.output;
-  state.studio=normalizeStudio();state.studio.image=keepImage;state.studio.output=keepOutput;
+  // 新規プリセットとアニメーションの出発点だけ初期化し、編集中のルック選択は設定を引き継ぐ。
+  if(!preserveSettings){
+    const keepImage=state.studio.image,keepOutput=state.studio.output;
+    state.studio=normalizeStudio();state.studio.image=keepImage;state.studio.output=keepOutput;
+  }
   state.seed=Number.isFinite(p.seed)?p.seed>>>0:20260816;
-  Object.assign(state.field,DEFAULT_FIELD,p.field);
+  applyPresetField(p.field,preserveSettings);
   if(p.stops)state.lut.stops=p.stops.map(s=>({...s}));
   else{
     const lp=LUT_PRESETS.find(l=>l.name===p.lut);
     if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
   }
-  Object.assign(state.motion,DEFAULT_MOTION,p.motion||{});
-  playback.time=0;playback.playing=!state.motion.paused;playback.last=performance.now();_frameTime=0;
-  restoreFramePlayback();
-  _animT={z:0,x:0,h:0};
-  state.lut.bands=(p.lutOpts&&p.lutOpts.bands)||0;state.lut.invert=false;state.lut.shift=0;
-  Object.assign(state.grain,{paper:state.grain.paper},p.grain);
-  Object.assign(state.finish,{bg:0,bgTop:'#d9c4a8',bgBot:'#26060f'},p.finish);
+  if(!preserveSettings){
+    Object.assign(state.motion,DEFAULT_MOTION,p.motion||{});
+    playback.time=0;playback.playing=!state.motion.paused;playback.last=performance.now();_frameTime=0;
+    restoreFramePlayback();
+    _animT={z:0,x:0,h:0};
+    state.lut.bands=(p.lutOpts&&p.lutOpts.bands)||0;state.lut.invert=false;state.lut.shift=0;
+    Object.assign(state.grain,{paper:state.grain.paper},p.grain);
+    Object.assign(state.finish,{bg:0,bgTop:'#d9c4a8',bgBot:'#26060f'},p.finish);
+  }
   state.pins=(p.pins||[]).map(x=>({...x}));
   selPin=state.pins.length-1;
   selStop=0;_blobs=blobState();
@@ -2311,7 +2321,7 @@ function restoreRecord(o,refresh=true){
   selPin=state.pins.length-1;selStop=0;_blobs=blobState();
   if(refresh){restoreFramePlayback();buildLut();refreshAll()}
 }
-function historyEntry(){return{json:JSON.stringify(stateRecord()),image:_maskImg}}
+function historyEntry(){return{json:JSON.stringify(stateRecord()),image:_maskImg,playback:{time:playback.time,playing:playback.playing},frameTime:_frameTime,anim:clone(_animT)}}
 function syncHistoryUI(){
   $('#btnUndo').disabled=!UNDO.length;$('#btnRedo').disabled=!REDO.length;
 }
@@ -2327,7 +2337,9 @@ function travelHistory(from,to,msg){
   const current=historyEntry();
   while(from.length&&from[from.length-1].json===current.json&&from[from.length-1].image===current.image)from.pop();
   if(!from.length){syncHistoryUI();return}
-  const entry=from.pop();to.push(current);_maskImg=entry.image;restoreRecord(JSON.parse(entry.json));
+  const entry=from.pop();to.push(current);_maskImg=entry.image;restoreRecord(JSON.parse(entry.json),false);
+  Object.assign(playback,entry.playback,{last:performance.now()});_frameTime=entry.frameTime;_animT=clone(entry.anim);
+  buildLut();refreshAll();
   document.querySelectorAll('input').forEach(i=>i._u=false);
   syncHistoryUI();toast(msg);
 }
@@ -2730,7 +2742,7 @@ function buildStudio(){
   `;document.head.append(css);
   const grad=ce('details','studio-section');grad.id='gradientEditor';grad.append(ce('summary',null,'グラデーションを編集'));
   $('#motionFeature').before(grad);
-  const shape=mkSel('グラデーションの形',[['frame','サーモフレーム'],['corner','四隅フレア'],['ribbon','流体リボン'],['line','リニア'],['radial','ラジアル'],['four','4色'],['diamond','ダイヤモンド'],['angle','角度'],['bezier','ベジェ']],state.field.linShape,v=>{if(['frame','ribbon','corner'].includes(v)){const preset=PRESETS.find(p=>p.name===({frame:'サーモフレーム',corner:'四隅フレア',ribbon:'溶融リボン'})[v]);Object.assign(state.field,DEFAULT_FIELD,preset.field);state.pins=[];if(v==='frame'){Object.assign(state.motion,DEFAULT_MOTION,preset.motion);restoreFramePlayback();}}else{state.field.mode='linear';state.field.linShape=v;}buildLut();rebaseQuick('カスタム');refreshAll();redraw()});
+  const shape=mkSel('グラデーションの形',[['frame','サーモフレーム'],['corner','四隅フレア'],['ribbon','流体リボン'],['line','リニア'],['radial','ラジアル'],['four','4色'],['diamond','ダイヤモンド'],['angle','角度'],['bezier','ベジェ']],state.field.linShape,v=>{if(['frame','ribbon','corner'].includes(v)){const preset=PRESETS.find(p=>p.name===({frame:'サーモフレーム',corner:'四隅フレア',ribbon:'溶融リボン'})[v]);applyPresetField(preset.field,true);state.pins=[];}else{state.field.mode='linear';state.field.linShape=v;}buildLut();rebaseQuick('カスタム');refreshAll();redraw()});
   grad.append(shape.row);studioControls.push({path:'field.linShape',ctl:shape});
   const sharpness=studioRange(grad,'境界のくっきり感','studio.gradient.sharpness',0,85);sharpness.row.id='gradientSharpness';
   const sharpHint=ce('p','hint','上げるほど、色が混ざる幅を狭めます。0で元の柔らかさに戻せます。');sharpHint.id='gradientSharpnessHint';grad.append(sharpHint);

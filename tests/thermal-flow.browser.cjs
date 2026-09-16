@@ -292,15 +292,16 @@ fs.mkdirSync(output, { recursive: true });
     note('precise edits become the baseline for the simple controls without changing the artwork');
 
     await choose('Webフロー');
+    assert.equal(await page.getByRole('checkbox', { name: 'モーション', exact: true }).isChecked(), false);
+    await page.getByRole('checkbox', { name: 'モーション', exact: true }).check();
     assert.equal(await page.getByRole('checkbox', { name: 'モーション', exact: true }).isChecked(), true);
     assert.equal(await page.locator('#motionDetails').isVisible(), true);
     await choose('KVスワール');
-    assert.equal(await page.getByRole('checkbox', { name: 'モーション', exact: true }).isChecked(), false);
-    assert.equal(await page.locator('#motionDetails').isVisible(), false);
-    await page.getByRole('checkbox', { name: 'モーション', exact: true }).check();
+    assert.equal(await page.getByRole('checkbox', { name: 'モーション', exact: true }).isChecked(), true);
+    assert.equal(await page.locator('#motionDetails').isVisible(), true);
     assert.equal(await page.locator('#motionDetails').evaluate(e => e.open), true);
     await page.getByRole('checkbox', { name: 'モーション', exact: true }).uncheck();
-    note('optional motion settings appear on demand and do not leak between looks');
+    note('optional motion settings appear on demand and remain enabled across look changes');
 
     await range('うねりの強さ', 100);
     const encoded = await page.evaluate(() => encodeState());
@@ -344,7 +345,9 @@ fs.mkdirSync(output, { recursive: true });
 
     await page.getByRole('checkbox', { name: '文字・画像で切り抜く', exact: true }).uncheck();
     await choose('マーブル');
+    await page.locator('#paletteChoices').locator('..').evaluate(e => e.open = true);
     await page.getByRole('button', { name: '配色: VALO レッド', exact: true }).first().click();
+    await page.locator('#paletteChoices').locator('..').evaluate(e => e.open = false);
     await range('粒感', 18);
     assert.equal(await page.locator('#advanced').evaluate(e => e.open), false);
     png = await savePng('basic-workflow.png');
