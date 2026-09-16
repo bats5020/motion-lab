@@ -790,37 +790,54 @@ function loop(now){
   }
 }
 /* ============ recording ============ */
-let _rec=null,_chunks=[];
+let _rec=null;
+function resetRecUI(){
+  _recording=false;_rec=null;
+  $('#recbadge').classList.remove('on');
+  $('#btnRec').classList.remove('on');
+  $('#btnRec').innerHTML='&#9210; WebM録画';
+}
 function startRec(){
-  if(_recording)return;
+  if(_rec||_recording)return;
+  const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
+  if(!mime||!view.captureStream){toast('この環境はWebM録画に対応していません');return}
   const fps=+(state.motion.recFps||30);
   _recDur=state.motion.loop?state.motion.loopSec:state.motion.recSec;
-  _recording=true;
-  if(state.motion.loop)tEvo=0;
-  const[FW,FH]=fullSize();
-  renderFrame(FW,FH);
-  const stream=view.captureStream(fps);
-  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
-  _chunks=[];
-  _rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16e6});
-  _rec.ondataavailable=e=>{if(e.data.size)_chunks.push(e.data)};
-  _rec.onstop=()=>{
-    download(new Blob(_chunks,{type:'video/webm'}),'u19-aberration_'+state.seed+'.webm');
-    toast('WebM を書き出しました');
+  const previousTime=tEvo;
+  let stream,rec,failed=false;
+  const cleanup=()=>{
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    resetRecUI();
   };
-  _rec.start();
+  try{
+    if(state.motion.loop)tEvo=0;
+    const[FW,FH]=fullSize();
+    renderFrame(FW,FH);
+    stream=view.captureStream(fps);
+    rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16e6});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    rec.onerror=()=>{failed=true;cleanup();toast('録画に失敗しました。設定を下げて再試行してください');};
+    rec.onstop=()=>{
+      if(failed)return;
+      cleanup();
+      if(!chunks.length){toast('録画データがありません。再試行してください');return}
+      download(new Blob(chunks,{type:'video/webm'}),'u19-aberration_'+state.seed+'.webm');
+      toast('WebM を書き出しました');
+    };
+    rec.start();_rec=rec;_recording=true;
+  }catch(e){
+    failed=true;tEvo=previousTime;cleanup();
+    toast('録画を開始できませんでした。設定を下げて再試行してください');return;
+  }
   _recStart=performance.now();
   $('#recbadge').classList.add('on');
   $('#btnRec').classList.add('on');
   $('#btnRec').textContent='⏹ 録画停止';
 }
 function stopRec(){
-  if(!_recording)return;
-  _recording=false;
   if(_rec&&_rec.state!=='inactive')_rec.stop();
-  $('#recbadge').classList.remove('on');
-  $('#btnRec').classList.remove('on');
-  $('#btnRec').innerHTML='&#9210; WebM録画';
 }
 $('#btnRec').addEventListener('click',()=>_recording?stopRec():startRec());
 /* ============ PNG export ============ */

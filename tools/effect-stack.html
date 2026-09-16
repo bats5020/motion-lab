@@ -155,7 +155,7 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
     </section>
     <section id="secExport"><h2><b>04</b>書き出し</h2>
       <div class="btnrow"><button class="btn" id="btnPng">PNG保存</button><button class="btn" id="btnCopy">コピー</button></div>
-      <div class="btnrow" id="recRow" style="display:none"><button class="btn" id="btnRec">&#9679; WebM録画（1ループ）</button></div>
+      <div class="btnrow" id="recRow" style="display:none"><button class="btn" id="btnRec">&#9679; 動画録画（1ループ）</button></div>
       <div class="btnrow"><button class="btn" id="btnJsonOut">設定JSON書き出し</button><button class="btn" id="btnJsonIn">JSON読み込み</button></div>
       <input type="file" id="fileJson" accept="application/json" hidden>
       <input type="file" id="fileImg" accept="image/*,video/*" hidden>
@@ -1218,36 +1218,50 @@ $('#btnCopy').addEventListener('click',()=>{
       e=>toast('コピー失敗: '+e));
   }catch(e){toast('コピー失敗: '+e.message)}
 });
-/* ============ WebM録画（動画ソース） ============ */
+/* ============ 動画録画（動画ソース） ============ */
 let _rec=null,_recIv=0,_recTo=0;
 $('#btnRec').addEventListener('click',()=>{
-  if(_rec){_rec.stop();return}
+  if(_rec){if(_rec.state!=='inactive')_rec.stop();return}
   if(!videoActive()){toast('動画ソースを読み込んでください');return}
   const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
   const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
-  if(!mime){toast('この環境は録画に対応していません');return}
+  if(!mime||!view.captureStream){toast('この環境は録画に対応していません');return}
   _recLockSize=previewSize();
   srcVideo.currentTime=0;
   srcVideo.play().catch(()=>{});
   syncVideoLoop();
-  const stream=view.captureStream(30);
-  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8e6});
-  const chunks=[];
-  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  rec.onstop=()=>{
+  let stream,rec,failed=false;
+  const cleanup=()=>{
     clearInterval(_recIv);clearTimeout(_recTo);
+    if(stream)stream.getTracks().forEach(t=>t.stop());
     _rec=null;_recLockSize=null;
-    $('#btnRec').innerHTML='&#9679; WebM録画（1ループ）';
-    download(new Blob(chunks,{type:mime.split(';')[0]}),'effect-stack_'+state.seed+'.webm');
-    toast('WebMを保存しました');
+    $('#btnRec').innerHTML='&#9679; 動画録画（1ループ）';
   };
-  rec.start(250);_rec=rec;
+  try{
+    stream=view.captureStream(30);
+    rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8e6});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    rec.onerror=()=>{failed=true;cleanup();toast('録画に失敗しました。設定を下げて再試行してください');};
+    rec.onstop=()=>{
+      if(failed)return;
+      cleanup();
+      if(!chunks.length){toast('録画データがありません。再試行してください');return}
+      const type=(rec.mimeType||mime).split(';')[0];
+      const ext=type==='video/mp4'?'mp4':'webm';
+      download(new Blob(chunks,{type}),'effect-stack_'+state.seed+'.'+ext);
+      toast(ext.toUpperCase()+'を保存しました');
+    };
+    rec.start(250);_rec=rec;
+  }catch(e){
+    failed=true;cleanup();toast('録画を開始できませんでした。設定を下げて再試行してください');return;
+  }
   const dur=Math.min(60,srcVideo.duration&&isFinite(srcVideo.duration)?srcVideo.duration:10);
   let left=Math.ceil(dur);
   const lbl=()=>{$('#btnRec').textContent='録画中… '+left+'s（クリックで停止）'};
   lbl();
   _recIv=setInterval(()=>{left--;if(left>0&&_rec)lbl()},1000);
-  _recTo=setTimeout(()=>{if(_rec)_rec.stop()},dur*1000);
+  _recTo=setTimeout(()=>{if(_rec&&_rec.state!=='inactive')_rec.stop()},dur*1000);
 });
 $('#btnJsonOut').addEventListener('click',()=>{
   const data={app:'effect-stack',v:1,seed:state.seed,
@@ -1329,6 +1343,10 @@ function loadVideoFile(f){
     toast('動画を読み込みました ('+v.videoWidth+'×'+v.videoHeight+' · '+(v.duration||0).toFixed(1)+'s)');
   },{once:true});
   v.addEventListener('play',syncVideoLoop);
+  // Seeking can temporarily drop readyState and stop the render loop.
+  // Restart once decoded frames are available, including at loop boundaries.
+  v.addEventListener('playing',syncVideoLoop);
+  v.addEventListener('seeked',()=>{syncVideoLoop();schedule()});
   v.addEventListener('error',()=>{URL.revokeObjectURL(url);toast('動画の読み込みに失敗しました')},{once:true});
   v.src=url;
 }
