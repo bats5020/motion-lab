@@ -52,6 +52,15 @@
       <details id="scroll-panel" class="lighting-panel motion-panel">
         <summary>アニメーション <span aria-hidden="true">⌄</span></summary>
         <div class="lighting-body">
+          <div class="responsive-motion">
+            <label class="responsive-toggle"><input id="responsive-enabled" type="checkbox">PC / SPで動きを分ける</label>
+            <div id="responsive-options" hidden>
+              <label class="number-row">SPに切り替える幅 <span><input id="responsive-breakpoint" type="number" min="241" max="3840" step="1" value="768"> px未満</span></label>
+              <div class="track-tabs" role="group" aria-label="PC・SPのプレビュー"><button data-motion-profile="pc" aria-pressed="true">PCで確認</button><button data-motion-profile="sp" aria-pressed="false">SPで確認</button></div>
+              <p class="light-instruction">確認ボタンで描画サイズを切替。上部のW / Hでも変更できます。卵・背景ともPC / SP別のキーを保存します。</p>
+            </div>
+            <p id="responsive-feedback" class="light-instruction" role="status"></p>
+          </div>
           <div class="track-tabs" role="group" aria-label="アニメーションの編集対象"><button data-track="egg" aria-pressed="true">卵</button><button data-track="background" aria-pressed="false">SVG背景</button></div>
           <label class="number-row">スクロール位置 <span><input id="scroll-percent" type="number" min="0" max="100" step="0.1" value="0"> %</span></label>
           <div class="key-actions"><button id="keyframe-add">＋ キーを追加</button><button id="keyframe-delete">削除</button></div>
@@ -156,7 +165,7 @@
           <div class="export-actions"><select id="export-video-format" aria-label="動画形式"></select><select id="export-fps" aria-label="フレームレート"><option value="30">30 fps 目安</option><option value="60">60 fps 目安</option></select><button id="export-video" class="export-primary">動画を保存</button></div>
           <p id="video-support" class="export-note">キーフレームを指定の秒数で再生して実時間で収録します。描画負荷によってフレーム数は変わります。対応形式のみ表示します。</p>
         </section>
-        <section class="export-section"><h3>HTML</h3><p class="export-note">3D・素材・設定を1ファイルにまとめます。単体で開いてスクロールやマウスで動かせます。</p><button id="export-html" class="export-primary">HTMLを保存</button></section>
+        <section class="export-section"><h3>HTML</h3><p class="export-note">3D・素材・設定を1ファイルにまとめます。単体で開いてスクロールやマウスで動かせます。PC / SPを分けた場合は、表示先の画面幅に合わせて動きが切り替わります。</p><button id="export-html" class="export-primary">HTMLを保存</button></section>
         <progress id="export-progress" max="1" value="0" hidden></progress><p id="export-status" role="status"></p><button id="export-cancel" hidden>中止</button>
       </dialog>
       <div id="fallback" role="status" hidden>3D表示を開始できませんでした。WebGL対応のブラウザで開いてください。</div>

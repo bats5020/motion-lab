@@ -37,5 +37,5 @@ export function setupPreviewViewport({container,onChange}) {
     output.title=`描画サイズ ${width} × ${height} CSS px。縮小してもレイアウトの基準サイズは変わりません。`;
     lastLayout={width,height,scale};return lastLayout;
   }
-  return {workspace,layout,serialize:()=>({...settings}),get size(){return {...lastLayout};}};
+  return {workspace,layout,setSize:commit,serialize:()=>({...settings}),get size(){return {...lastLayout};}};
 }

@@ -1,23 +1,24 @@
 import * as THREE from './vendor/three.module.js';
-import {defaultKeyframes,restoreKeyframes,sampleKeyframes,transformLimits,backgroundLimits,defaultBackground,round} from './keyframes.js';
+import {defaultKeyframes,restoreKeyframes,sampleKeyframes,transformLimits,backgroundLimits,defaultBackground,round,copyMotionTrack,motionProfile} from './keyframes.js';
 import {setupTransformGizmo} from './transform-gizmo.js';
 
-export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackground,motionState,shareUrl}) {
+export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackground,motionState,shareUrl,getViewport,setViewport}) {
   const panel=document.querySelector('#scroll-panel'),lightPanel=document.querySelector('#lighting-panel');
-  let config=defaultKeyframes(),preview=null,force=true,gizmo,target=new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('track')==='background'?'background':'egg';
-  const track=()=>target==='background'?config.background:config;
+  let project=restoreKeyframes(null),profile='pc',preview=null,force=true,gizmo,target=new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('track')==='background'?'background':'egg';
+  const config=()=>profile==='sp'?project.responsive.sp:project;
+  const track=()=>target==='background'?config().background:config();
   const limits=()=>target==='background'?backgroundLimits:transformLimits;
-  const storageKey='fennel.egg.scroll.v3',history=[],future=[];
+  const storageKey='fennel.egg.scroll.v4',history=[],future=[];
   const scrub=document.querySelector('#scroll-preview'),percentInput=document.querySelector('#scroll-percent');
   const atInput=document.querySelector('#keyframe-at'),marks=document.querySelector('#keyframe-marks');
   const select=document.querySelector('#keyframe-select'),status=document.querySelector('#scroll-status');
   try {
-    const raw=new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('scrollMotion')??localStorage.getItem(storageKey)??localStorage.getItem('fennel.egg.scroll.v2')??localStorage.getItem('fennel.egg.scroll.v1');
-    if(raw)config=restoreKeyframes(JSON.parse(raw));
+    const raw=new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('scrollMotion')??localStorage.getItem(storageKey)??localStorage.getItem('fennel.egg.scroll.v3')??localStorage.getItem('fennel.egg.scroll.v2')??localStorage.getItem('fennel.egg.scroll.v1');
+    if(raw)project=restoreKeyframes(JSON.parse(raw));
   } catch {}
   const currentPercent=()=>round((preview??(motionState.mode==='auto'?0:motionState.scroll))*100);
   const currentKey=()=>track().keyframes.find(key=>Math.abs(key.at-currentPercent())<.05);
-  const snapshot=()=>JSON.stringify(config);
+  const snapshot=()=>JSON.stringify(project);
   function remember() {
     const value=snapshot();if(history.at(-1)!==value)history.push(value);
     if(history.length>60)history.shift();future.length=0;
@@ -58,9 +59,10 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
     document.querySelectorAll('[data-egg-field]').forEach(element=>element.hidden=target!=='egg');
     document.querySelectorAll('[data-background-field]').forEach(element=>element.hidden=target!=='background');
     document.querySelectorAll('[data-track]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.track===target)));
-    const marginInput=document.querySelector('#background-margin');if(document.activeElement!==marginInput)marginInput.value=config.background.margin;
-    document.querySelector('#background-fit').value=config.background.fit;
-    document.querySelector('#timeline-target').textContent=target==='background'?'BACKGROUND':'EGG';
+    const marginInput=document.querySelector('#background-margin');if(document.activeElement!==marginInput)marginInput.value=config().background.margin;
+    document.querySelector('#background-fit').value=config().background.fit;
+    document.querySelector('#timeline-target').textContent=(target==='background'?'BACKGROUND':'EGG')+(project.responsive.enabled?' / '+profile.toUpperCase():'');
+    syncResponsive();
     if(document.activeElement!==percentInput)percentInput.value=String(time);
     if(document.activeElement!==atInput)atInput.value=key?String(key.at):'';
     atInput.disabled=!key;
@@ -120,15 +122,15 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
   window.addEventListener('scroll',()=>{gizmo?.setEditing(false);if(preview!==null)setPreview(null);},{passive:true});
   document.querySelector('#scroll-easing').addEventListener('change',event=>{remember();const value=event.target.value;setPreview(currentPercent()/100);ensureKey().easing=value;save();force=true;sync();});
   for(const [id,from,to] of [['scroll-undo',history,future],['scroll-redo',future,history]])document.querySelector('#'+id).addEventListener('click',()=>{
-    if(!from.length)return;to.push(snapshot());config=JSON.parse(from.pop());save();force=true;marks.replaceChildren();sync();
+    if(!from.length)return;to.push(snapshot());project=JSON.parse(from.pop());save();marks.replaceChildren();refreshProfile();
   });
   document.querySelectorAll('[data-scroll-preset]').forEach(button=>button.addEventListener('click',()=>{
-    remember();config.keyframes=defaultKeyframes().keyframes;
+    remember();config().keyframes=defaultKeyframes().keyframes;
     if(button.dataset.scrollPreset==='return')track().keyframes.splice(1,0,{id:'middle',at:45,x:20,y:8,scale:55,easing:'smooth'});
     else Object.assign(track().keyframes[1],button.dataset.scrollPreset==='shrink'?{x:20,y:8,scale:55}:{scale:140});
-    marks.replaceChildren();save();setPreview(0);document.querySelector('[data-mode="scroll"]').click();status.textContent='プリセットを適用しました';
+    marks.replaceChildren();save();setPreview(0);document.querySelector('[data-mode="scroll"]').click();status.textContent=(project.responsive.enabled?profile.toUpperCase()+'に':'')+'プリセットを適用しました';
   }));
-  document.querySelector('#scroll-reset').addEventListener('click',()=>{remember();if(target==='background')config.background=defaultBackground();else config.keyframes=defaultKeyframes().keyframes;marks.replaceChildren();save();gizmo.setEditing(false);setPreview(null);status.textContent='キーを初期状態に戻しました';});
+  document.querySelector('#scroll-reset').addEventListener('click',()=>{remember();if(target==='background')config().background=defaultBackground();else config().keyframes=defaultKeyframes().keyframes;marks.replaceChildren();save();gizmo.setEditing(false);setPreview(null);status.textContent='キーを初期状態に戻しました';});
   document.querySelector('#scroll-copy').addEventListener('click',async()=>{
     const url=shareUrl();try{await navigator.clipboard.writeText(url);document.querySelector('#scroll-url').hidden=true;status.textContent='設定URLをコピーしました';}
     catch{const field=document.querySelector('#scroll-url');field.value=url;field.hidden=false;field.select();status.textContent='選択したURLをコピーしてください';}
@@ -137,10 +139,40 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
     gizmo.setEditing(false);target=button.dataset.track;marks.replaceChildren();sync();
   }));
   document.querySelector('#background-margin').addEventListener('change',event=>{
-    const value=validNumber(event.target);if(value!==null){remember();config.background.margin=round(THREE.MathUtils.clamp(value,0,120));save();force=true;}
-    event.target.value=config.background.margin;sync();
+    const value=validNumber(event.target);if(value!==null){remember();config().background.margin=round(THREE.MathUtils.clamp(value,0,120));save();force=true;}
+    event.target.value=config().background.margin;sync();
   });
-  document.querySelector('#background-fit').addEventListener('change',event=>{remember();config.background.fit=event.target.value;save();force=true;sync();});
+  document.querySelector('#background-fit').addEventListener('change',event=>{remember();config().background.fit=event.target.value;save();force=true;sync();});
+  function syncResponsive() {
+    const enabled=project.responsive.enabled,width=getViewport().width;
+    document.querySelector('#responsive-enabled').checked=enabled;
+    document.querySelector('#responsive-options').hidden=!enabled;
+    const input=document.querySelector('#responsive-breakpoint');
+    if(document.activeElement!==input)input.value=project.responsive.breakpoint;
+    document.querySelector('#responsive-feedback').textContent=enabled
+      ?`${width}px → ${profile.toUpperCase()}を編集中 · ${project.responsive.breakpoint}px未満はSP`
+      :'全サイズで同じ動きを使います。';
+    document.querySelectorAll('[data-motion-profile]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.motionProfile===profile)));
+  }
+  function refreshProfile() {
+    const next=motionProfile(project,getViewport().width);
+    if(next!==profile){gizmo?.setEditing(false);profile=next;marks.replaceChildren();}
+    force=true;sync();
+  }
+  document.querySelector('#responsive-enabled').addEventListener('change',event=>{
+    remember();project.responsive.enabled=event.target.checked;
+    if(project.responsive.enabled&&!project.responsive.sp)project.responsive.sp=copyMotionTrack(project);
+    save();refreshProfile();status.textContent=project.responsive.enabled?'PCとSPの動きを分けました。プレビュー幅に応じて編集対象が切り替わります。':'全サイズでPCの動きを使います。SPの設定は残しています。';
+  });
+  document.querySelector('#responsive-breakpoint').addEventListener('change',event=>{
+    const value=validNumber(event.target);
+    if(value!==null){remember();project.responsive.breakpoint=Math.round(THREE.MathUtils.clamp(value,241,3840));save();}
+    event.target.value=project.responsive.breakpoint;refreshProfile();
+  });
+  document.querySelectorAll('[data-motion-profile]').forEach(button=>button.addEventListener('click',()=>{
+    const sp=button.dataset.motionProfile==='sp';
+    setViewport(sp?Math.min(390,project.responsive.breakpoint-1):Math.max(1440,project.responsive.breakpoint),sp?844:900);
+  }));
   function timelineVisibility(){document.querySelector('#keyframe-timeline').hidden=!panel.open&&!gizmo?.editing;document.body.classList.toggle('timeline-open',panel.open||gizmo?.editing);}
   panel.addEventListener('pointermove',event=>event.stopPropagation());
   document.querySelector('#keyframe-timeline').addEventListener('pointermove',event=>event.stopPropagation());
@@ -148,22 +180,22 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
   lightPanel.addEventListener('toggle',()=>{if(lightPanel.open){gizmo?.setEditing(false);if(matchMedia('(max-width:600px)').matches)panel.open=false;}});
   if(new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('panel')==='scroll'){lightPanel.open=false;panel.open=true;}
   gizmo=setupTransformGizmo({root,egg,pivot,camera,renderer,motionState,getPose:()=>currentKey()??sampleKeyframes(track(),currentPercent()),beginEdit,changePose,onEditing:timelineVisibility});
-  sync();timelineVisibility();
+  refreshProfile();timelineVisibility();
   let lastTime=-1;
   function update(dt) {
-    const time=currentPercent(),pose=sampleKeyframes(config,time);
+    const time=currentPercent(),pose=sampleKeyframes(config(),time);
     if(force||(!motionState.paused&&!motionState.lightingEditing&&!motionState.objectEditing)) {
       const height=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
       const blend=force?1:1-Math.exp(-dt*8);
       root.position.x=THREE.MathUtils.lerp(root.position.x,pose.x*height*camera.aspect/100,blend);
       root.position.y=THREE.MathUtils.lerp(root.position.y,pose.y*height/100,blend);
       root.scale.setScalar(THREE.MathUtils.lerp(root.scale.x,pose.scale/100,blend));
-      svgBackground.apply(sampleKeyframes(config.background,time),config.background);force=false;
+      svgBackground.apply(sampleKeyframes(config().background,time),config().background);force=false;
     }
     scrub.value=String(time);document.querySelector('#timeline-playhead').style.left=time+'%';
-    document.querySelector('#scroll-feedback').textContent=(preview!==null?'プレビュー':motionState.mode==='auto'?'自動回転：0%の位置':'ページスクロール')+` · ${time}% / ${target==='background'?'背景':'卵'} ${round(target==='background'?svgBackground.pose.scale:root.scale.x*100)}%`;
+    document.querySelector('#scroll-feedback').textContent=(preview!==null?'プレビュー':motionState.mode==='auto'?'自動回転：0%の位置':'ページスクロール')+` · ${project.responsive.enabled?profile.toUpperCase()+' / ':''}${time}% / ${target==='background'?'背景':'卵'} ${round(target==='background'?svgBackground.pose.scale:root.scale.x*100)}%`;
     document.querySelector('#hint').textContent=gizmo.editing?'卵をドラッグ：移動 / 赤・緑の矢印：軸を固定 / 右下の角：拡大縮小':preview!==null?`動きのプレビュー ${time}% / ページをスクロールすると連動に戻ります`:motionState.mode==='auto'?'ゆっくり自動回転':motionState.mode==='scroll'?'下にスクロールして移動・拡大縮小・回転':'マウスを動かす / 下にスクロール';
     if(lastTime!==time){sync();lastTime=time;}
   }
-  return {get config(){return config;},get target(){return target;},update,setPreview,serialize:()=>config,resize:()=>{force=true;},get preview(){return preview;},gizmo,updateGizmo:gizmo.update};
+  return {get config(){return config();},get profile(){return profile;},get target(){return target;},update,setPreview,serialize:()=>project,resize:refreshProfile,get preview(){return preview;},gizmo,updateGizmo:gizmo.update};
 }

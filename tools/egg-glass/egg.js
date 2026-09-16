@@ -212,7 +212,7 @@ if(new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('back
 const requestedSurface = new URLSearchParams(globalThis.__eggInitialSearch??location.search).get('material');
 selectSurface(['clear','tint','painted'].includes(requestedSurface) ? requestedSurface : 'pattern');
 lightingControls=setupLightingControls({scene,materials,key,fill,lowerFill,patternFill,egg,camera,renderer,motionState:state,getScrollSettings:()=>scrollControls?.serialize(),getPreviewSettings:()=>previewViewport?.serialize(),getPatternSettings:()=>patternControls?.serialize(),getLogoSettings:()=>logoControls?.serialize()});
-scrollControls=setupScrollControls({root:motionRoot,egg,pivot,camera,renderer,svgBackground,motionState:state,shareUrl:()=>lightingControls.shareUrl()});
+scrollControls=setupScrollControls({root:motionRoot,egg,pivot,camera,renderer,svgBackground,motionState:state,shareUrl:()=>lightingControls.shareUrl(),getViewport:()=>previewViewport?.size??{width:innerWidth,height:innerHeight},setViewport:(width,height)=>previewViewport.setSize(width,height)});
 
 const buttons = [...document.querySelectorAll('[data-mode]')];
 const pauseButton = document.querySelector('#pause');
