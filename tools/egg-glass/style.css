@@ -170,3 +170,8 @@
 #mlab-home{position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);transition:opacity .15s}
 #mlab-home:hover,#mlab-home:focus-visible{opacity:1}
 .ui-hidden #mlab-home{display:none}
+
+.responsive-motion{border-bottom:1px solid #ffffff20;padding-bottom:8px;margin-bottom:12px}
+.responsive-toggle{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:12px}
+#responsive-enabled{width:16px;height:16px;accent-color:#91c9df}
+#responsive-feedback{color:#bcdae8}

@@ -140,7 +140,9 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
   }));
   document.querySelector('#export-html').addEventListener('click',()=>run(async(session,signal)=>{
     status.textContent='素材・ライブラリ・設定をHTMLへまとめています…';
-    const search=new URL(lightingControls.shareUrl()).search;
+    const params=new URL(lightingControls.shareUrl()).searchParams;
+    if(scrollControls.serialize().responsive?.enabled)params.set('previewViewport',JSON.stringify({...previewViewport.serialize(),mode:'window'}));
+    const search='?'+params.toString();
     const blob=await buildHtml(search,{rotation:state.rotation,patternImage:patternControls.serialize().source==='image'?patternControls.image:null,logoImage:logoControls.image});signal.throwIfAborted();
     download(blob,'u19-interactive.html');status.textContent='HTMLを保存しました。単体で開けます。@で編集UIも表示できます。';
   }));

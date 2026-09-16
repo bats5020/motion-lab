@@ -6,7 +6,7 @@ const clean=(value,fallback,range)=>typeof value==='number'&&Number.isFinite(val
 export const backgroundLimits={scale:[50,200],shift:[-100,100],spread:[20,250],angle:[-180,180]};
 export const defaultBackground=()=>({margin:32,fit:'edges',keyframes:[{id:'bg-start',at:0,scale:100,shift:0,spread:100,angle:0,easing:'smooth'},{id:'bg-end',at:100,scale:100,shift:0,spread:100,angle:0,easing:'smooth'}]});
 export const defaultKeyframes=()=>({version:3,background:defaultBackground(),keyframes:[{id:'start',at:0,x:0,y:0,scale:100,easing:'smooth'},{id:'end',at:100,x:0,y:0,scale:100,easing:'smooth'}]});
-export function restoreKeyframes(saved) {
+function restoreTrack(saved) {
   if(!saved||typeof saved!=='object')return defaultKeyframes();
   const source=Array.isArray(saved.keyframes)?saved.keyframes:[{...saved.start,at:0,easing:saved.easing},{...saved.end,at:100,easing:saved.easing}];
   const unique=new Map();
@@ -28,6 +28,21 @@ export function restoreKeyframes(saved) {
     if(keys.size)result.background.keyframes=[...keys.values()].sort((a,b)=>a.at-b.at);
   }
   return result;
+}
+// The root track remains PC/common so v1-v3 URLs keep their original motion.
+export function restoreKeyframes(saved) {
+  const result=restoreTrack(saved),responsive=saved?.responsive;
+  result.version=4;
+  result.responsive={enabled:responsive?.enabled===true,breakpoint:Math.round(clean(responsive?.breakpoint,768,[241,3840])),sp:null};
+  if(responsive?.sp)result.responsive.sp=restoreTrack(responsive.sp);
+  else if(result.responsive.enabled)result.responsive.sp=copyMotionTrack(result);
+  return result;
+}
+export function copyMotionTrack(config) {
+  return structuredClone({version:3,keyframes:config.keyframes,background:config.background});
+}
+export function motionProfile(config,width) {
+  return config.responsive?.enabled&&config.responsive.sp&&width<config.responsive.breakpoint?'sp':'pc';
 }
 export function sampleKeyframes(config,percent) {
   const keys=config.keyframes;
