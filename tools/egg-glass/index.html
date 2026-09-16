@@ -144,10 +144,10 @@
       </section>
       <dialog id="export-dialog" aria-labelledby="export-title">
         <div class="export-heading"><h2 id="export-title">書き出し</h2><button id="export-close" aria-label="閉じる">×</button></div>
-        <p class="export-note">出力サイズ <strong id="export-size"></strong> · 編集UIを除く</p>
+        <p class="export-note">描画サイズ <strong id="export-size"></strong> · 編集UIを除く</p>
         <section class="export-section"><h3>画像 · PNG</h3>
           <label>保存する対象<select id="export-png-target"><option value="scene">卵＋背景</option><option value="egg">卵のみ（背景透過）</option></select></label>
-          <p class="export-note">卵のみ：背景を除き、柄・ロゴ・光沢を含めて透過PNGに保存します。サイズと配置は指定フレームのままです。</p>
+          <p class="export-note">卵のみ：背景を除き、柄・ロゴ・光沢を含めて透過PNGに保存します。指定フレームの卵に合わせて透明な余白を自動でトリミングします。</p>
           <label>保存するフレーム <span><input id="export-frame" data-label="保存位置" type="number" min="0" max="100" step="0.1" value="0"> %</span></label>
           <div class="export-actions"><button id="export-frame-current">現在の％を使う</button><button id="export-frame-preview">フレームを確認</button><button id="export-png" class="export-primary">PNGを保存</button></div>
         </section>
