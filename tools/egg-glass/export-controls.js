@@ -15,7 +15,7 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
   document.querySelector('#export-open').addEventListener('click',()=>{
     document.querySelector('#export-frame').value=currentPercent();
     document.querySelector('#export-size').textContent=`${previewViewport.size.width} × ${previewViewport.size.height} px`;
-    status.textContent='背景と卵を書き出します。編集UIは入りません。';dialog.showModal();
+    status.textContent='PNGは卵のみ・背景込みを選べます。動画とHTMLは背景込みです。編集UIは入りません。';dialog.showModal();
   });
   document.querySelector('#export-close').addEventListener('click',()=>{if(!busy)dialog.close();});
   dialog.addEventListener('cancel',event=>{if(busy){event.preventDefault();abort?.abort();}});
@@ -38,13 +38,29 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;const context=canvas.getContext('2d');
     return {
       canvas,width,height,
-      render(percent,seconds=0) {
+      render(percent,seconds=0,{eggOnly=false}={}) {
         const pose=sampleKeyframes(config,percent),viewHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
         root.position.set(pose.x*viewHeight*camera.aspect/100,pose.y*viewHeight/100,0);root.scale.setScalar(pose.scale/100);
         svgBackground.apply(sampleKeyframes(config.background,percent),config.background);
         egg.rotation.y=base+(mode==='scroll'?0:seconds*.14)+percent/100*Math.PI*1.35+(mode==='blend'?pointer.x*.22:0);
         pivot.rotation.x=mode==='blend'?pointer.y*.11:0;pivot.rotation.z=-.055+percent/100*.18;
-        renderer.render(scene,camera);context.drawImage(renderer.domElement,0,0,width,height);
+        // Keep the environment lighting, but remove artwork from transmission as well.
+        const background=scene.background,visible=svgBackground.group.visible;
+        const clearColor=renderer.getClearColor(new THREE.Color()),clearAlpha=renderer.getClearAlpha();
+        const material=egg.material,premultipliedAlpha=material.premultipliedAlpha;
+        const exportPremultiplied=renderer.getContext().getContextAttributes().premultipliedAlpha;
+        try {
+          if(eggOnly){
+            scene.background=null;svgBackground.group.visible=false;renderer.setClearColor(0x000000,0);
+            // Match the canvas alpha convention to avoid washed-out glass RGB on copy.
+            if(material.premultipliedAlpha!==exportPremultiplied){material.premultipliedAlpha=exportPremultiplied;material.needsUpdate=true;}
+          }
+          renderer.render(scene,camera);
+          context.clearRect(0,0,width,height);context.drawImage(renderer.domElement,0,0,width,height);
+        }finally{
+          scene.background=background;svgBackground.group.visible=visible;renderer.setClearColor(clearColor,clearAlpha);
+          if(material.premultipliedAlpha!==premultipliedAlpha){material.premultipliedAlpha=premultipliedAlpha;material.needsUpdate=true;}
+        }
       },
       restore(){egg.rotation.copy(snapshot.rotation);pivot.rotation.copy(snapshot.pivot);root.position.copy(snapshot.rootPosition);root.scale.copy(snapshot.rootScale);scrollControls.setPreview(snapshot.preview);}
     };
@@ -67,9 +83,9 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
     finally{state.exporting=false;resize();}
   });
   document.querySelector('#export-png').addEventListener('click',()=>run(async(session,signal)=>{
-    const percent=number('export-frame',0,100);session.render(percent);
+    const percent=number('export-frame',0,100),eggOnly=document.querySelector('#export-png-target').value==='egg';session.render(percent,0,{eggOnly});
     const blob=await new Promise((resolve,reject)=>session.canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNGを作成できませんでした')),'image/png'));
-    signal.throwIfAborted();download(blob,`u19-frame-${percent}pct-${session.width}x${session.height}.png`);status.textContent=`${percent}%のフレームをPNGで保存しました。`;
+    signal.throwIfAborted();download(blob,`u19-${eggOnly?'egg-transparent':'frame'}-${percent}pct-${session.width}x${session.height}.png`);status.textContent=eggOnly?`${percent}%の卵のみを背景透過PNGで保存しました。`:`${percent}%のフレームをPNGで保存しました。`;
   }));
   document.querySelector('#export-video').addEventListener('click',()=>run(async(session,signal)=>{
     const start=number('export-start',0,100),end=number('export-end',0,100),duration=number('export-duration',1,30),fps=+document.querySelector('#export-fps').value;
