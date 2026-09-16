@@ -23,6 +23,19 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
   document.addEventListener('visibilitychange',()=>{if(busy&&document.hidden)abort?.abort();});
   function number(id,min,max){const input=document.querySelector('#'+id),value=input.valueAsNumber;if(!Number.isFinite(value)||value<min||value>max)throw new Error(`${input.dataset.label}は${min}〜${max}で指定してください`);return value;}
   function download(blob,name){const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+  function trimTransparent(canvas) {
+    const {width,height}=canvas,source=canvas.getContext('2d').getImageData(0,0,width,height);
+    let left=width,top=height,right=-1,bottom=-1;
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++) {
+      if(source.data[(y*width+x)*4+3]===0)continue;
+      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+    }
+    if(right<left)throw new Error('指定フレームに卵が写っていません。位置・スケール・フレームを調整してください');
+    const cropped=document.createElement('canvas');cropped.width=right-left+1;cropped.height=bottom-top+1;
+    // Keep even the faintest antialiased edge; no scaling or alpha threshold.
+    cropped.getContext('2d').putImageData(source,-left,-top);
+    return cropped;
+  }
   function setBusy(value) {
     busy=value;state.exporting=value;
     dialog.querySelectorAll('input,select,button').forEach(element=>{element.disabled=value;});
@@ -84,8 +97,9 @@ export function setupExports({renderer,scene,camera,egg,pivot,root,state,scrollC
   });
   document.querySelector('#export-png').addEventListener('click',()=>run(async(session,signal)=>{
     const percent=number('export-frame',0,100),eggOnly=document.querySelector('#export-png-target').value==='egg';session.render(percent,0,{eggOnly});
-    const blob=await new Promise((resolve,reject)=>session.canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNGを作成できませんでした')),'image/png'));
-    signal.throwIfAborted();download(blob,`u19-${eggOnly?'egg-transparent':'frame'}-${percent}pct-${session.width}x${session.height}.png`);status.textContent=eggOnly?`${percent}%の卵のみを背景透過PNGで保存しました。`:`${percent}%のフレームをPNGで保存しました。`;
+    const output=eggOnly?trimTransparent(session.canvas):session.canvas;
+    const blob=await new Promise((resolve,reject)=>output.toBlob(blob=>blob?resolve(blob):reject(new Error('PNGを作成できませんでした')),'image/png'));
+    signal.throwIfAborted();download(blob,`u19-${eggOnly?'egg-transparent':'frame'}-${percent}pct-${output.width}x${output.height}.png`);status.textContent=eggOnly?`${percent}%の卵のみをトリミングし、${output.width} × ${output.height} pxの背景透過PNGで保存しました。`:`${percent}%のフレームをPNGで保存しました。`;
   }));
   document.querySelector('#export-video').addEventListener('click',()=>run(async(session,signal)=>{
     const start=number('export-start',0,100),end=number('export-end',0,100),duration=number('export-duration',1,30),fps=+document.querySelector('#export-fps').value;
