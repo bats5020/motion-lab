@@ -1,7 +1,7 @@
 # MOTION LAB
 
 アニメーション＆グラフィックツールの統合プラットフォーム。
-すべて**ビルド不要**で、画像・動画の処理はブラウザ内で完結（サーバー送信なし）。基本は単体HTML、Three.jsを使うEgg Glassは専用フォルダに依存ファイルを同梱しています。WireframeはCDNライブラリ、Warp TypeはGoogle Fontsを読み込みます。
+すべて**ビルド不要**で、画像・動画の処理はブラウザ内で完結（サーバー送信なし）。基本は単体HTML、Three.jsを使うEgg Glassは専用フォルダに依存ファイルを同梱しています。WireframeはCDNライブラリ、Warp TypeはGoogle Fonts、Aberration Overlayは動画レンダー時のみCDNのwebm-muxer(WebCodecs用・非対応環境は内蔵録画にフォールバック)を読み込みます。
 
 **→ 公開URL: https://bats5020.github.io/motion-lab/**
 
@@ -19,6 +19,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 
 | ツール | カテゴリ | 何をするか |
 |---|---|---|
+| [Aberration Overlay](tools/aberration-overlay.html) | motion | 画像・動画にサーモ/流体/歪み/HUDをスタックで重ねがけ。マルチパス実ブルーム+ACES、フレーム正確レンダーキュー(WebCodecs 32Mbps・モーションブラー対応)、実メディア生成のプリセットサムネ、単体HTML書き出し |
 | [Egg Glass](tools/egg-glass/) | motion | 卵形3Dの柄・ロゴ・照明・SVG背景を編集。スクロールキーフレーム、PNG／動画／単体HTML書き出し（[使い方・正本](tools/egg-glass/README.md)） |
 | [Halftone Lab](tools/halftone-lab.html) | raster | 画像・プロシージャルソースをハーフトーン／ディザ／ASCII化。メルト・消灯セル・アニメ＋動画録画・SVG／コード書き出し |
 | [Effect Stack](tools/effect-stack.html) | raster | 14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応（リアルタイム適用＋動画録画）、ランダマイズ＋スタック刻印 |
