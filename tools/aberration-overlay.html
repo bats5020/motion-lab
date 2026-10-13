@@ -16,7 +16,8 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #app{display:flex;width:100vw;height:100vh}
 #stage{flex:1 1 auto;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;padding:34px 34px 58px;background:
   radial-gradient(1200px 800px at 30% 20%,#101014,var(--bg))}
-#view{max-width:100%;max-height:100%;display:block;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329;background:#000}
+#view{max-width:100%;max-height:100%;display:block;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329;background:#000;touch-action:none}
+#view.pick{cursor:crosshair}
 /* ステージ下部バー: トランスポート(再生/時間/スクラブ/プレビュー解像度) + メタ */
 #stageBar{position:absolute;left:150px;right:16px;bottom:12px;display:flex;align-items:center;gap:12px;z-index:4}
 .tp{display:flex;align-items:center;gap:8px;background:rgba(14,14,17,.82);border:1px solid var(--line);border-radius:999px;
@@ -230,7 +231,7 @@ const SIZE_PRESETS={'169':[1920,1080],'11':[1080,1080],'916':[1080,1920],'45':[1
 const state={
   seed:20261014,
   canvas:{mode:'src',w:1920,h:1080},
-  warp:{on:false,swirl:38,flow:30,scale:24,smear:46,tint:18},
+  warp:{on:false,swirl:38,flow:30,scale:24,smear:46,tint:18,cx:.5,cy:.5},
   map:{on:true,mix:100,split:0,blur:30,flow:26,contrast:22,steps:0,iso:0,fpn:12,bloom:55},
   edge:{on:false,width:34,gain:58,dim:30,flow:16},
   blob:{on:false,scale:30,coverage:38,warp:66,blend:'screen',dim:38,light:62,glow:66},
@@ -326,7 +327,7 @@ const PRESETS=[
   color:{lut:'MSI RED',invert:false,ab:8,grain:9,vig:28,bloom:55,aces:true},
   motion:{tempo:'reactive',loop:false,speed:30}},
  {name:'LIQUID SMEAR',
-  fx:{warp:{on:true,swirl:55,flow:30,scale:24,smear:70,tint:12},map:{on:false},edge:{on:false},blob:{on:false},hud:{on:false}},
+  fx:{warp:{on:true,swirl:55,flow:30,scale:24,smear:70,tint:12,cx:.5,cy:.5},map:{on:false},edge:{on:false},blob:{on:false},hud:{on:false}},
   color:{lut:'INFERNO',invert:false,ab:14,grain:7,vig:24,bloom:35,aces:true},
   motion:{tempo:'ominous',loop:true,loopSec:8,evo:40}},
  {name:'FLIR CAM',
@@ -338,7 +339,7 @@ const PRESETS=[
   color:{lut:'IRONBOW',invert:false,ab:10,grain:8,vig:24,bloom:55,aces:true},
   motion:{tempo:'ominous',loop:true,loopSec:10,evo:40}},
  {name:'HEAT HAZE',
-  fx:{warp:{on:true,swirl:6,flow:24,scale:46,smear:20,tint:10},map:{on:false},edge:{on:false},blob:{on:false},hud:{on:false}},
+  fx:{warp:{on:true,swirl:6,flow:24,scale:46,smear:20,tint:10,cx:.5,cy:.5},map:{on:false},edge:{on:false},blob:{on:false},hud:{on:false}},
   color:{lut:'IRONBOW',invert:false,ab:8,grain:7,vig:24,bloom:28,aces:true},
   motion:{tempo:'ominous',loop:true,loopSec:8,evo:44}}
 ];
@@ -426,10 +427,12 @@ uniform sampler2D uTex;
 uniform int uHasTex;
 uniform vec2 uTexScale;
 uniform sampler2D uLut;
+uniform sampler2D uBMap,uBEA,uBEB;
 uniform int uWarpOn,uMapOn,uEdgeOn,uBlobOn;
+uniform vec2 uWCenter;
 uniform float uWSwirl,uWFlow,uWScale,uWSmear,uWTint;
-uniform float uMix,uSplit,uBlurAmt,uMFlow,uCtrA,uCtrB,uSteps,uIso,uFpn,uKnee;
-uniform float uEWidth,uEGain,uEDim,uEFlow;
+uniform float uMix,uSplit,uMFlow,uCtrA,uCtrB,uSteps,uIso,uFpn,uKnee;
+uniform float uEGain,uEDim,uEFlow;
 uniform float uBScale,uBCover,uBWarp,uBDim,uBLight,uBGlow;
 uniform int uBBlend;
 uniform float uAb,uInvert;
@@ -442,18 +445,8 @@ vec3 mediaCol(vec2 uv){
   return texture2D(uTex,mUV(uv)).rgb;
 }
 float luma(vec3 c){return dot(c,vec3(.299,.587,.114));}
-float blurLum(vec2 uv,float r){
-  vec2 px=r/uRes;
-  float s=luma(mediaCol(uv))*1.4;
-  float w=1.4;
-  for(int i=0;i<8;i++){
-    float a=float(i)*.785398163;
-    vec2 o=vec2(cos(a),sin(a));
-    s+=luma(mediaCol(uv+o*px));w+=1.;
-    s+=luma(mediaCol(uv+o*px*.45))*.8;w+=.8;
-  }
-  return s/w;
-}
+/* 別パスで分離ガウス済みの輝度(R+G/255に16bit相当でパック)を読む */
+float blurLum(sampler2D t,vec2 uv){vec2 v=texture2D(t,uv).rg;return v.r+v.g/255.;}
 float softKnee(float t,float T0,float K){
   float x=clamp(t-(T0-K),0.,2.*K);
   float rq=(.25/K)*x*x;
@@ -466,7 +459,7 @@ void main(){
   vec2 smearDir=vec2(0.);
   float warpT=0.;
   if(uWarpOn==1){
-    vec2 c=vec2(.5)+vec2(fbm(vec3(uSeedOff,1.7)+T*.5),fbm(vec3(uSeedOff+3.1,9.4)+T*.5))*.07;
+    vec2 c=uWCenter+vec2(fbm(vec3(uSeedOff,1.7)+T*.5),fbm(vec3(uSeedOff+3.1,9.4)+T*.5))*.07;
     vec2 d=(vUv-c)*asp;
     float rad=length(d);
     float fall=exp(-rad*rad*3.4);
@@ -508,7 +501,7 @@ void main(){
       vec3 FP=vec3((vUv-.5)*asp*2.6+uSeedOff+vec2(3.1,6.2),0.)+T;
       fw=vec2(fbm(FP+vec3(1.3,7.7,0.)),fbm(FP+vec3(8.1,2.3,0.)))*uMFlow;
     }
-    float l=blurLum(suv+fw,uBlurAmt);
+    float l=blurLum(uBMap,suv+fw);
     l=clamp((l-uCtrA)/max(uCtrB-uCtrA,.05),0.,1.);
     l+=uFpn*(hash2(floor(vUv*uRes*.5))-.5)*.05;
     l+=uFpn*(hash2(vec2(floor(vUv.y*uRes.y*.5),3.7))-.5)*.028;
@@ -534,8 +527,8 @@ void main(){
       few=vec2(fbm(FP+vec3(1.3,7.7,0.)),fbm(FP+vec3(8.1,2.3,0.)))*uEFlow;
     }
     vec2 eu=suv+few;
-    float lA=blurLum(eu,uEWidth*.5+.5);
-    float lB=blurLum(eu,uEWidth*2.4+2.);
+    float lA=blurLum(uBEA,eu);
+    float lB=blurLum(uBEB,eu);
     float e=clamp(abs(lA-lB)*uEGain,0.,1.);
     e=pow(e,.68);
     e=clamp(e+softKnee(e,.6,.18)*.8,0.,1.);
@@ -628,6 +621,47 @@ void main(){
   c+=(ign-.5)*(2.4/255.);
   gl_FragColor=vec4(c,1.);
 }`;
+  /* 輝度ブラー系: 値は enc() で R=上位8bit, G=下位8bit にパック(8bitターゲットでもDoGが段付かない。線形なので補間・畳み込みに安全) */
+  const PACK=`
+vec4 enc(float l){l=clamp(l,0.,1.)*255.;float hi=floor(l);return vec4(hi/255.,l-hi,0.,1.);}
+float dec(vec4 t){return t.r+t.g/255.;}`;
+  const LUMA_FSH=`precision highp float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform int uHasTex;
+uniform vec2 uTexScale;
+`+PACK+`
+void main(){
+  vec3 c=uHasTex==0?vec3(.045+.025*vUv.y):texture2D(uTex,clamp((vUv-.5)*uTexScale+.5,vec2(.002),vec2(.998))).rgb;
+  gl_FragColor=enc(dot(c,vec3(.299,.587,.114)));
+}`;
+  const DOWN_FSH=`precision highp float;
+varying vec2 vUv;
+uniform sampler2D uT;
+uniform vec2 uTexel;
+`+PACK+`
+void main(){
+  vec2 o=uTexel*.5;
+  gl_FragColor=enc((dec(texture2D(uT,vUv+vec2(-o.x,-o.y)))+dec(texture2D(uT,vUv+vec2(o.x,-o.y)))
+    +dec(texture2D(uT,vUv+vec2(-o.x,o.y)))+dec(texture2D(uT,vUv+vec2(o.x,o.y))))*.25);
+}`;
+  const GAUSS_FSH=`precision highp float;
+varying vec2 vUv;
+uniform sampler2D uT;
+uniform vec2 uStep;
+uniform float uSig,uRad;
+`+PACK+`
+void main(){
+  float k2=-.5/(uSig*uSig);
+  float s=dec(texture2D(uT,vUv)),w=1.;
+  for(int i=1;i<=12;i++){
+    float x=float(i);
+    if(x>uRad)break;
+    float k=exp(x*x*k2);
+    s+=(dec(texture2D(uT,vUv+uStep*x))+dec(texture2D(uT,vUv-uStep*x)))*k;w+=2.*k;
+  }
+  gl_FragColor=enc(s/w);
+}`;
   function mkShader(type,src){
     const s=gl.createShader(type);
     gl.shaderSource(s,src);gl.compileShader(s);
@@ -650,16 +684,20 @@ void main(){
   gl.bindBuffer(gl.ARRAY_BUFFER,buf);
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
   const SCENE_U=['uRes','uTimeVec','uSeedOff','uTex','uHasTex','uTexScale','uLut',
-   'uWarpOn','uMapOn','uEdgeOn','uBlobOn',
+   'uBMap','uBEA','uBEB',
+   'uWarpOn','uMapOn','uEdgeOn','uBlobOn','uWCenter',
    'uWSwirl','uWFlow','uWScale','uWSmear','uWTint',
-   'uMix','uSplit','uBlurAmt','uMFlow','uCtrA','uCtrB','uSteps','uIso','uFpn','uKnee',
-   'uEWidth','uEGain','uEDim','uEFlow',
+   'uMix','uSplit','uMFlow','uCtrA','uCtrB','uSteps','uIso','uFpn','uKnee',
+   'uEGain','uEDim','uEFlow',
    'uBScale','uBCover','uBWarp','uBDim','uBLight','uBGlow','uBBlend',
    'uAb','uInvert'];
   const PR={
     scene:mkProg(SCENE_FSH,SCENE_U),
     bright:mkProg(BRIGHT_FSH,['uT','uTh','uKn']),
     blur:mkProg(BLUR_FSH,['uT','uDir']),
+    luma:mkProg(LUMA_FSH,['uTex','uHasTex','uTexScale']),
+    down:mkProg(DOWN_FSH,['uT','uTexel']),
+    gauss:mkProg(GAUSS_FSH,['uT','uStep','uSig','uRad']),
     comp:mkProg(COMP_FSH,['uScene','uB0','uB1','uB2','uRes','uSeedOff','uBloomAmt','uVig','uGrain','uTimeLin','uAces'])
   };
   function useProg(pr){
@@ -697,9 +735,19 @@ void main(){
       scene:mkTarget(W,H),
       a0:mkTarget(w1,h1),b0:mkTarget(w1,h1),
       a1:mkTarget(w2,h2),b1:mkTarget(w2,h2),
-      a2:mkTarget(w3,h3),b2:mkTarget(w3,h3)
+      a2:mkTarget(w3,h3),b2:mkTarget(w3,h3),
+      l0:mkTarget(W,H),l1:mkTarget(w1,h1),l2:mkTarget(w2,h2),l3:mkTarget(w3,h3)
     };
     tgW=W;tgH=H;
+  }
+  const SL={};
+  function blurSlot(name,w,h){
+    let s=SL[name];
+    if(!s||s.w!==w||s.h!==h){
+      if(s){[s.tmp,s.out].forEach(x=>{gl.deleteTexture(x.t);gl.deleteFramebuffer(x.fb)})}
+      s=SL[name]={tmp:mkTarget(w,h),out:mkTarget(w,h),w,h};
+    }
+    return s;
   }
   const mediaTex=mkTex(2,2);
   let mKind='none',mEl=null,mW=0,mH=0;
@@ -734,23 +782,65 @@ void main(){
     ensureTargets(W,H);
     const hasTex=mKind!=='none'&&!!mEl;
     if(mKind==='video'&&mEl&&mEl.readyState>=2)uploadMedia(mEl);
+    let tsx=1,tsy=1;
+    if(hasTex&&mW&&mH){const ca=W/H,ta=mW/mH;tsx=ta>ca?ca/ta:1;tsy=ta>ca?1:ta/ca}
+    /* ---- 輝度ブラー(THERMAL / EDGE用): 輝度→ミップ→レベル別に分離ガウス ---- */
+    const kH=H/1080;
+    const needs=[];
+    if(st.map.on)needs.push(['map',.55*Math.max(.5,st.map.blur*.22*kH)]);
+    if(st.edge.on){
+      needs.push(['ea',.55*Math.max(.5,(st.edge.width*.07+.75)*kH)]);
+      needs.push(['eb',.55*Math.max(.5,(st.edge.width*.336+3.2)*kH)]);
+    }
+    const blurOut={};
+    if(needs.length){
+      /* σがテクセル換算で3を超えたら1段下のミップへ(見た目は同等で負荷が1/4ずつ) */
+      const lv=needs.map(([,sg])=>{let L=0;while(L<3&&sg/(1<<L)>3)L++;return L});
+      const maxL=Math.max.apply(null,lv);
+      const LU=PR.luma;useProg(LU);
+      bindT(0,mediaTex);gl.uniform1i(LU.loc['uTex'],0);
+      gl.uniform1i(LU.loc['uHasTex'],hasTex?1:0);
+      gl.uniform2f(LU.loc['uTexScale'],tsx,tsy);
+      drawTo(TG.l0,W,H);
+      const chain=[TG.l0,TG.l1,TG.l2,TG.l3];
+      if(maxL>0){
+        const DN=PR.down;useProg(DN);gl.uniform1i(DN.loc['uT'],0);
+        for(let L=1;L<=maxL;L++){
+          bindT(0,chain[L-1].t);
+          gl.uniform2f(DN.loc['uTexel'],1/chain[L-1].w,1/chain[L-1].h);
+          drawTo(chain[L],chain[L].w,chain[L].h);
+        }
+      }
+      const G=PR.gauss;useProg(G);gl.uniform1i(G.loc['uT'],0);
+      needs.forEach(([name,sg],i)=>{
+        const L=lv[i],src=chain[L],sl=blurSlot(name,src.w,src.h);
+        const sgT=sg/(1<<L),step=Math.max(1,sgT/4),sgS=Math.max(.3,sgT/step);
+        gl.uniform1f(G.loc['uSig'],sgS);
+        gl.uniform1f(G.loc['uRad'],Math.min(12,Math.ceil(sgS*3)));
+        bindT(0,src.t);gl.uniform2f(G.loc['uStep'],step/src.w,0);drawTo(sl.tmp,sl.w,sl.h);
+        bindT(0,sl.tmp.t);gl.uniform2f(G.loc['uStep'],0,step/src.h);drawTo(sl.out,sl.w,sl.h);
+        blurOut[name]=sl.out.t;
+      });
+    }
     const S2=PR.scene;
     useProg(S2);
     bindT(0,mediaTex);bindT(1,lutTex);
+    bindT(2,blurOut.map||mediaTex);bindT(3,blurOut.ea||mediaTex);bindT(4,blurOut.eb||mediaTex);
     gl.uniform1i(S2.loc['uTex'],0);
     gl.uniform1i(S2.loc['uLut'],1);
+    gl.uniform1i(S2.loc['uBMap'],2);
+    gl.uniform1i(S2.loc['uBEA'],3);
+    gl.uniform1i(S2.loc['uBEB'],4);
     gl.uniform2f(S2.loc['uRes'],W,H);
     gl.uniform3f(S2.loc['uTimeVec'],tv[0],tv[1],tv[2]);
     gl.uniform2f(S2.loc['uSeedOff'],(st.seed%1000)*.137,(Math.floor(st.seed/1000)%1000)*.113);
     gl.uniform1i(S2.loc['uHasTex'],hasTex?1:0);
-    if(hasTex&&mW&&mH){
-      const ca=W/H,ta=mW/mH;
-      gl.uniform2f(S2.loc['uTexScale'],ta>ca?ca/ta:1,ta>ca?1:ta/ca);
-    }else gl.uniform2f(S2.loc['uTexScale'],1,1);
+    gl.uniform2f(S2.loc['uTexScale'],tsx,tsy);
     gl.uniform1i(S2.loc['uWarpOn'],st.warp.on?1:0);
     gl.uniform1i(S2.loc['uMapOn'],st.map.on?1:0);
     gl.uniform1i(S2.loc['uEdgeOn'],st.edge.on?1:0);
     gl.uniform1i(S2.loc['uBlobOn'],st.blob.on?1:0);
+    gl.uniform2f(S2.loc['uWCenter'],st.warp.cx!=null?st.warp.cx:.5,st.warp.cy!=null?st.warp.cy:.5);
     gl.uniform1f(S2.loc['uWSwirl'],st.warp.swirl*.05);
     gl.uniform1f(S2.loc['uWFlow'],st.warp.flow*.0012);
     gl.uniform1f(S2.loc['uWScale'],1.2+st.warp.scale*.07);
@@ -758,7 +848,6 @@ void main(){
     gl.uniform1f(S2.loc['uWTint'],st.warp.tint/100);
     gl.uniform1f(S2.loc['uMix'],st.map.mix/100);
     gl.uniform1f(S2.loc['uSplit'],st.map.split/100);
-    gl.uniform1f(S2.loc['uBlurAmt'],Math.max(.5,st.map.blur*.22*(H/1080)));
     gl.uniform1f(S2.loc['uMFlow'],st.map.flow*.0012);
     gl.uniform1f(S2.loc['uCtrA'],st.map.contrast*.004);
     gl.uniform1f(S2.loc['uCtrB'],1-st.map.contrast*.002);
@@ -766,8 +855,7 @@ void main(){
     gl.uniform1f(S2.loc['uIso'],st.map.iso/100);
     gl.uniform1f(S2.loc['uFpn'],st.map.fpn/100);
     gl.uniform1f(S2.loc['uKnee'],st.map.bloom/100);
-    gl.uniform1f(S2.loc['uEWidth'],st.edge.width*.14*(H/1080)+.5);
-    gl.uniform1f(S2.loc['uEGain'],1.5+st.edge.gain*.14);
+    gl.uniform1f(S2.loc['uEGain'],(1.5+st.edge.gain*.14)*1.12); /* 真ガウスDoGは旧リング近似より応答が穏やかなため補正 */
     gl.uniform1f(S2.loc['uEDim'],st.edge.dim/100);
     gl.uniform1f(S2.loc['uEFlow'],st.edge.flow*.0012);
     gl.uniform1f(S2.loc['uBScale'],.8+st.blob.scale*.055);
@@ -1182,6 +1270,22 @@ window.addEventListener('paste',e=>{
     if(it.type&&it.type.startsWith('image/')){loadMediaFile(it.getAsFile());return}
   }
 });
+/* ============ WARP中心: プレビューをドラッグで指定 ============ */
+(function(){
+  let drag=false;
+  const setFrom=e=>{
+    const r=view.getBoundingClientRect();
+    state.warp.cx=clamp((e.clientX-r.left)/r.width,0,1);
+    state.warp.cy=clamp(1-(e.clientY-r.top)/r.height,0,1);
+    UI.wCenterLbl.textContent='X '+state.warp.cx.toFixed(2)+'  Y '+(1-state.warp.cy).toFixed(2);
+  };
+  view.addEventListener('pointerdown',e=>{
+    if(!state.warp.on||_rendering)return;
+    drag=true;view.setPointerCapture(e.pointerId);setFrom(e);markDirty();
+  });
+  view.addEventListener('pointermove',e=>{if(drag)setFrom(e)});
+  ['pointerup','pointercancel'].forEach(ev=>view.addEventListener(ev,()=>{drag=false}));
+})();
 /* ============ preset thumbnails ============ */
 const thumbScratch=new Uint8Array(256*4);
 let _activePreset=-1;
@@ -1356,8 +1460,13 @@ function buildFx(){
   UI.wFlow=mkRange('うねり',0,100,1,state.warp.flow,v=>state.warp.flow=v);
   UI.wScale=mkRange('スケール',0,100,1,state.warp.scale,v=>state.warp.scale=v);
   UI.wTint=mkRange('サーモ化',0,100,1,state.warp.tint,v=>state.warp.tint=v);
+  UI.wCenter=ce('div','prow');
+  UI.wCenterLbl=ce('span','pv','');UI.wCenterLbl.style.flex='1';UI.wCenterLbl.style.textAlign='left';
+  const wcReset=ce('button','btn','中央に戻す');
+  wcReset.addEventListener('click',()=>{state.warp.cx=.5;state.warp.cy=.5;markDirty();refreshAll()});
+  UI.wCenter.append(ce('span',null,'歪みの中心'),UI.wCenterLbl,wcReset);
   UI.fxWarp=mkFx('warp','WARP','液状歪み+流れスメア',
-    [UI.wSwirl,UI.wSmear,UI.wFlow],[UI.wScale,UI.wTint]);
+    [UI.wSwirl,UI.wSmear,UI.wFlow,UI.wCenter,ce('div','hint','WARP有効時はプレビューをドラッグして中心を指定')],[UI.wScale,UI.wTint]);
   UI.mMix=mkRange('ミックス',0,100,1,state.map.mix,v=>state.map.mix=v);
   UI.mBlur=mkRange('ぼかし',0,100,1,state.map.blur,v=>state.map.blur=v);
   UI.mBloom=mkRange('発光シフト',0,100,1,state.map.bloom,v=>state.map.bloom=v);
@@ -1447,6 +1556,8 @@ function refreshAll(){
   UI.fxEdge.setOn(state.edge.on);UI.fxBlob.setOn(state.blob.on);UI.fxHud.setOn(state.hud.on);
   UI.wSwirl.set(state.warp.swirl);UI.wSmear.set(state.warp.smear);UI.wFlow.set(state.warp.flow);
   UI.wScale.set(state.warp.scale);UI.wTint.set(state.warp.tint);
+  UI.wCenterLbl.textContent='X '+(+state.warp.cx).toFixed(2)+'  Y '+(1-state.warp.cy).toFixed(2);
+  view.classList.toggle('pick',!!state.warp.on);
   UI.mMix.set(state.map.mix);UI.mBlur.set(state.map.blur);UI.mBloom.set(state.map.bloom);
   UI.mSplit.set(state.map.split);UI.mFlow.set(state.map.flow);UI.mCtr.set(state.map.contrast);
   UI.mIso.set(state.map.iso);UI.mFpn.set(state.map.fpn);UI.mSteps.set(state.map.steps);
@@ -1484,7 +1595,7 @@ function applyRandom(){
   state.blob.on=r()<.5;
   state.hud.on=r()<.3;
   if(!state.map.on&&!state.blob.on&&!state.edge.on&&!state.warp.on)state.map.on=true;
-  Object.assign(state.warp,{swirl:10+r()*70,flow:15+r()*55,scale:10+r()*60,smear:20+r()*60,tint:r()*55});
+  Object.assign(state.warp,{swirl:10+r()*70,flow:15+r()*55,scale:10+r()*60,smear:20+r()*60,tint:r()*55,cx:.3+r()*.4,cy:.3+r()*.4});
   Object.assign(state.map,{mix:80+r()*20,split:r()<.25?30+r()*45:0,blur:14+r()*50,flow:8+r()*40,
     contrast:12+r()*26,steps:r()<.18?3+(r()*8|0):0,iso:r()<.3?20+r()*40:0,fpn:r()*34,bloom:30+r()*55});
   Object.assign(state.edge,{width:16+r()*60,gain:34+r()*50,dim:10+r()*50,flow:8+r()*30});
