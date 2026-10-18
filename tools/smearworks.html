@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smearworks</title>
+<style>
+/* Layout: darkroom bench — large preview stage left, grouped effect cards right; mode switch and file actions in the top bar. */
+:root{
+  --ground:#0a0a0b;
+  --panel:#141417;
+  --ink:#e6e6ef;
+  --muted:#9a9aa6;
+  --line:#2a2a31;
+  --stage:#050506;
+  --tone:#4f5cff;
+  --tone-ink:#ffffff;
+  --brand:#e5141d;
+  --font-display:"Helvetica Neue","Arial Black",Arial,sans-serif;
+  --font-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  --font-mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{
+  background:var(--ground);color:var(--ink);font-family:var(--font-body);font-size:13px;line-height:1.5;
+  padding-left:16px;padding-right:16px;
+  display:flex;flex-direction:column;
+}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px 20px;flex-wrap:wrap;padding-block:12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0}
+.brand h1{margin:0;font-family:var(--font-mono);font-weight:700;font-size:15px;letter-spacing:.28em;line-height:1}
+.brand h1 b{color:var(--brand);font-weight:700}
+.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button,.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover{border-color:var(--muted)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--tone);outline-offset:2px}
+.primary{background:var(--tone);border-color:var(--tone);color:var(--tone-ink);font-weight:600}
+.primary:hover{border-color:var(--ink)}
+button[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+select,input[type=text],input[type=number]{font:inherit;min-width:0;padding:6px 8px;border:1px solid var(--line);background:var(--ground);color:var(--ink);border-radius:2px}
+.vsep{width:1px;height:22px;background:var(--line);margin-inline:4px}
+.modes{display:inline-flex;border:1px solid var(--ink);border-radius:2px;overflow:hidden}
+.modes button{border:0;border-radius:0;padding:6px 12px;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;background:transparent;color:var(--ink)}
+.modes button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 368px;padding-block:14px}
+.stage{position:relative;background:radial-gradient(1200px 800px at 30% 20%,#101014,var(--stage));min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.wrap{position:relative;box-shadow:0 14px 40px rgba(0,0,0,.3);touch-action:none}
+.wrap canvas{display:block;width:100%;height:100%}
+.wrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;cursor:crosshair}
+.wrap svg .h{cursor:grab}
+.stage-top{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;z-index:2;pointer-events:none}
+.stage-top>*{pointer-events:auto}
+.chip{font-family:var(--font-mono);font-size:11px;background:var(--panel);color:var(--muted);padding:4px 8px;border:1px solid var(--line)}
+.chip strong{color:var(--ink);font-weight:700}
+.stage-top .bar button{font-size:11.5px;padding:4px 9px}
+.stage-hint{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:var(--muted);pointer-events:none;padding-inline:12px}
+.drophint{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--stage) 82%,transparent);border:2px dashed var(--tone);font-weight:600;font-size:15px}
+.error{max-width:420px;padding:16px;background:var(--panel);border:1px solid var(--line)}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;min-height:0}
+.group{font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--muted);padding:14px 16px 6px;border-bottom:1px solid var(--line);background:var(--ground)}
+.card{border-bottom:1px solid var(--line)}
+.card-h{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 16px}
+.card-h .title{flex:1;min-width:0;background:none;border:0;padding:4px 0;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);justify-content:flex-start;gap:8px}
+.card-h .title .jp{font-family:var(--font-body);font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600}
+.card-h .title::after{content:"＋";margin-left:auto;color:var(--muted);font-family:var(--font-body)}
+.card.open .card-h .title::after{content:"−"}
+.card.active .card-h{background:var(--ink)}
+.card.active .card-h .title,.card.active .card-h .title .jp,.card.active .card-h .title::after{color:var(--panel)}
+.card-b{padding:4px 16px 16px;display:grid;gap:10px}
+.card:not(.open) .card-b{display:none}
+.card.off .card-b{opacity:.45}
+.sw{position:relative;width:34px;height:20px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.sw span{position:absolute;inset:0;border-radius:10px;background:var(--line);transition:background .15s}
+.sw span::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--panel);transition:transform .15s}
+.sw input:checked+span{background:var(--tone)}
+.sw input:checked+span::after{transform:translateX(14px)}
+.sw input:focus-visible+span{outline:2px solid var(--tone);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.ctl{display:grid;gap:1px;min-width:0}
+.ctl.wide{grid-column:1/-1}
+.ctl .row{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.ctl label{font-size:12px}
+output{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ink);margin-top:-5.5px;border:2px solid var(--panel)}
+input[type=range]::-moz-range-track{height:2px;background:var(--line)}
+input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:var(--ink);border:2px solid var(--panel)}
+input[type=color]{width:100%;height:28px;border:1px solid var(--line);background:var(--ground);padding:2px;border-radius:2px;cursor:pointer}
+.lut{height:14px;border:1px solid var(--line);border-radius:2px}
+.mask{border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:8px}
+.mask .mh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.mask .mh span{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:4px 8px;font-size:11.5px;background:transparent;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.check{display:flex;align-items:center;gap:6px;font-size:12px}
+.note{font-size:11.5px;color:var(--muted);margin:0}
+.small{font-size:11.5px;padding:4px 9px}
+.out{padding:16px;display:grid;gap:10px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:9px 16px;font-size:12.5px;border-radius:2px;z-index:40;max-width:calc(100% - 32px)}
+.modal{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.modal-card{background:var(--panel);padding:16px;display:grid;gap:12px;max-width:min(560px,100%);max-height:100%;overflow:auto}
+.modal-card img{max-height:66vh;width:auto;margin:0 auto;display:block}
+.modal-card textarea{width:100%;height:240px;font-family:var(--font-mono);font-size:11px;background:var(--ground);color:var(--ink);border:1px solid var(--line)}
+.modal-card p{margin:0;font-size:12.5px}
+
+.thermal-link{font-family:var(--font-mono);font-size:11px;color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--line);padding-bottom:1px}
+.thermal-link:hover{color:var(--ink)}
+body{min-width:1080px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+
+<header>
+  <div class="brand">
+    <h1>SMEAR<b>WORKS</b></h1>
+    <div class="modes" role="group" aria-label="モード">
+      <button type="button" data-mode="portrait">PORTRAIT</button>
+      <button type="button" data-mode="hybrid">HYBRID</button>
+    </div>
+    <a class="thermal-link" href="thermal-flow.html" title="熱分布グラフィック単体はThermal Flowで作ります">THERMAL単体 → Thermal Flow</a>
+  </div>
+  <div class="bar">
+    <button type="button" id="pick">画像を開く</button>
+    <select id="preset" aria-label="プリセット"></select>
+    <button type="button" id="savePreset" title="現在の設定をこのブラウザに保存">保存</button>
+    <button type="button" id="reset">リセット</button>
+    <span class="vsep"></span>
+    <button type="button" id="before" title="押している間、元画像を表示（スペースキーでも可）">Before</button>
+    <button type="button" id="export" class="primary">書き出し</button>
+    <input id="file" type="file" accept="image/*" hidden>
+    <input id="jsonFile" type="file" accept="application/json,.json" hidden>
+  </div>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <div class="stage-top">
+      <span class="chip" id="info">サンプル画像 · 画像をドロップして差し替え</span>
+      <div class="bar">
+        <button type="button" id="showMask" aria-pressed="false" title="編集中の項目のマスク（フローならフロー場）を表示">マスク表示</button>
+        <span class="chip">編集中：<strong id="editingName"></strong></span>
+      </div>
+    </div>
+    <div class="wrap" id="wrap">
+      <canvas id="gl"></canvas>
+      <svg id="ov" aria-label="編集ハンドル"></svg>
+    </div>
+    <div class="stage-hint" id="hint"></div>
+    <div class="drophint" id="drophint" hidden>ドロップして読み込み</div>
+  </div>
+  <aside id="panel">
+    <div id="cards"></div>
+    <div class="group">OUTPUT</div>
+    <div class="out">
+      <div class="grid2">
+        <div class="ctl"><label for="exSize">サイズ</label>
+          <select id="exSize"><option value="full">最大（長辺4096px）</option><option value="preview">プレビューと同じ</option></select></div>
+        <div class="ctl"><label for="exFmt">形式</label>
+          <select id="exFmt"><option value="png">PNG</option><option value="jpg">JPG</option></select></div>
+      </div>
+      <button type="button" class="primary" id="export2">画像を書き出す</button>
+      <div class="bar">
+        <button type="button" class="small" id="jsonOut">設定をJSONで書き出し</button>
+        <button type="button" class="small" id="jsonIn">JSONを読み込む</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <img id="modalImg" alt="書き出した画像" hidden>
+    <textarea id="modalText" readonly hidden></textarea>
+    <p id="modalMsg"></p>
+    <button type="button" id="modalClose">閉じる</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* ═════════ shaders ═════════ */
+const VS = `#version 300 es
+out vec2 vUv;
+void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); vUv = p; gl_Position = vec4(p*2.-1., 0., 1.); }`;
+
+const HEAD = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform vec2 uRes; uniform float uSeed;
+uniform float uFScale, uFWarp, uFAng, uFStretch, uFEvolve;
+const vec3 LUM = vec3(.2126,.7152,.0722);
+vec2 toQ(vec2 uv){ return vec2(uv.x, uv.y*uRes.y/uRes.x); }
+vec2 toUV(vec2 q){ return vec2(q.x, q.y*uRes.x/uRes.y); }
+float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); vec2 s = vec2(uSeed*17.13, uSeed*5.71);
+  float a = hash(i+s), b = hash(i+vec2(1,0)+s), c = hash(i+vec2(0,1)+s), d = hash(i+vec2(1,1)+s);
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+vec2 rot(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c*v.x - s*v.y, s*v.x + c*v.y); }
+float fbm(vec2 p){ float s = 0., a = .5; for(int i=0;i<5;i++){ s += a*vnoise(p); p = mat2(1.6,1.2,-1.2,1.6)*p + vec2(11.7,3.1); a *= .5; } return s/.96875; }
+vec2 flowP(vec2 q){ vec2 p = rot(q - vec2(.5, .5*uRes.y/uRes.x), -uFAng); p.x /= max(uFStretch, .2); return p*uFScale + uFEvolve; }
+float field(vec2 q){
+  vec2 p = flowP(q);
+  vec2 w = vec2(fbm(p+vec2(1.7,9.2)), fbm(p+vec2(8.3,2.8)));
+  p += (w-.5)*uFWarp*3.;
+  vec2 w2 = vec2(fbm(p+vec2(4.1,1.3)), fbm(p+vec2(2.6,7.7)));
+  return smoothstep(.2, .8, fbm(p + (w2-.5)*uFWarp*2.));
+}
+vec2 warpVec(vec2 q){ vec2 p = flowP(q)*1.4 + 3.3; return vec2(fbm(p), fbm(p+vec2(5.2,1.3))) - .5; }
+struct Mask { int kind; float inv, feather, warp, thr; vec2 c, r, a, b; };
+uniform Mask uM;
+float maskOf(Mask M, vec2 q){
+  if(M.kind == 0) return 1. - M.inv;
+  float m;
+  if(M.kind == 4){ float f = max(M.feather, .01)*.5; m = smoothstep(M.thr - f, M.thr + f, field(q)); }
+  else {
+    vec2 qq = M.warp > 0. ? q + warpVec(q)*M.warp*.45 : q;
+    if(M.kind == 1){ float r = length((qq-M.c)/max(M.r, vec2(1e-4))); m = 1. - smoothstep(1.-max(M.feather,.001), 1., r); }
+    else {
+      vec2 ab = M.b - M.a; float t = dot(qq-M.a, ab)/max(dot(ab,ab), 1e-6);
+      m = M.kind == 2 ? smoothstep(0., 1., clamp(t,0.,1.)) : smoothstep(0., 1., clamp(1.-abs(t*2.-1.), 0., 1.));
+    }
+  }
+  return mix(m, 1.-m, M.inv);
+}
+float mask(vec2 q){ return maskOf(uM, q); }
+`;
+
+const FS = {
+tone: `uniform sampler2D uTex; uniform float uSat,uCon,uBri,uHi,uSh,uLinear;
+void main(){
+  vec3 c = texture(uTex, vUv).rgb; float l = dot(c, LUM);
+  c = mix(vec3(l), c, uSat);
+  c += uSh*.5*(1.-smoothstep(0.,.55,l));
+  c += uHi*.5*smoothstep(.45,1.,l);
+  c = clamp((c-.5)*uCon + .5 + uBri, 0., 1.);
+  o = vec4(uLinear > .5 ? pow(c, vec3(2.2)) : c, 1.);
+}`,
+zoom: `uniform sampler2D uIn; uniform vec2 uC; uniform float uS;
+void main(){
+  vec2 q = toQ(vUv); float s = uS*mask(q);
+  if(s < .0005){ o = texture(uIn, vUv); return; }
+  float j = hash(gl_FragCoord.xy + uSeed);
+  vec3 a = vec3(0.);
+  for(int i=0;i<48;i++){ float t = (float(i)+j)/48.; a += texture(uIn, toUV(mix(q, uC, s*t))).rgb; }
+  o = vec4(a/48., 1.);
+}`,
+smear: `uniform sampler2D uIn; uniform vec2 uDir, uO; uniform float uLen,uDecay,uMax,uStretch,uSLen,uRough,uDist,uRand;
+vec2 remap(vec2 q, float m){
+  if(uStretch <= 0.) return q;
+  vec2 perp = vec2(-uDir.y, uDir.x);
+  float L = max(uSLen, 1e-4);
+  float d = dot(q-uO, uDir) - (vnoise(vec2(dot(q-uO, perp)*14., 3.1))-.5)*uRough*L*.9;
+  if(d <= 0.) return q;
+  float k = 1. + uStretch*7.;
+  float nd = d < L ? L*pow(d/L, k) : d;
+  return q - uDir*(d - nd)*m;
+}
+void main(){
+  vec2 q = toQ(vUv); float m = mask(q);
+  if(m < .001){ o = texture(uIn, vUv); return; }
+  vec2 dir = rot(uDir, (vnoise(q*3.2)-.5)*uDist*2.4);
+  float len = uLen*m*max(0., 1. + uRand*(vnoise(q*vec2(2.,9.)+11.)-.5)*2.);
+  vec2 base = remap(q, m);
+  if(len < .0005){ o = texture(uIn, toUV(base)); return; }
+  float j = hash(gl_FragCoord.xy + uSeed*3.);
+  vec3 acc = vec3(0.), mx = vec3(0.); float ws = 0.;
+  for(int i=0;i<56;i++){
+    float t = (float(i)+j)/56.;
+    float w = exp(-uDecay*t*5.);
+    vec3 c = texture(uIn, toUV(base - dir*len*t)).rgb;
+    acc += c*w; ws += w; mx = max(mx, c*mix(1., w, .6));
+  }
+  o = vec4(mix(acc/ws, mx, uMax), 1.);
+}`,
+echo: `uniform sampler2D uIn; uniform vec2 uDir, uZC; uniform float uGap,uOp,uScale; uniform int uN, uBlend;
+void main(){
+  vec2 q = toQ(vUv); float m = mask(q);
+  vec3 col = texture(uIn, vUv).rgb;
+  for(int j=1;j<=5;j++){
+    if(j > uN) break;
+    float fj = float(j);
+    vec2 qq = uZC + (q-uZC)/pow(uScale, fj) - uDir*uGap*fj;
+    vec3 g = texture(uIn, toUV(qq)).rgb;
+    float a = uOp*(1.-(fj-1.)/(float(uN)+1.))*m;
+    vec3 b = uBlend == 0 ? g : uBlend == 1 ? 1.-(1.-col)*(1.-g) : max(col, g);
+    col = mix(col, b, a);
+  }
+  o = vec4(col, 1.);
+}`,
+blur: `uniform sampler2D uIn; uniform vec2 uStep;
+void main(){
+  vec3 a = texture(uIn, vUv).rgb*.2270270270;
+  a += (texture(uIn, vUv+uStep*1.3846153846).rgb + texture(uIn, vUv-uStep*1.3846153846).rgb)*.3162162162;
+  a += (texture(uIn, vUv+uStep*3.2307692308).rgb + texture(uIn, vUv-uStep*3.2307692308).rgb)*.0702702703;
+  o = vec4(a, 1.);
+}`,
+detail: `uniform sampler2D uIn, uOrig, uBlur; uniform float uAmt, uRestore;
+void main(){
+  vec2 q = toQ(vUv); float m = mask(q);
+  vec3 c = texture(uIn, vUv).rgb, og = texture(uOrig, vUv).rgb;
+  c = mix(c, og, uRestore*m);
+  c += (og - texture(uBlur, vUv).rgb)*uAmt*m*2.;
+  o = vec4(max(c, 0.), 1.);
+}`,
+final: `uniform sampler2D uIn, uSrc, uLut; uniform Mask uM2;
+uniform vec3 uCol, uFrameCol, uGlowCol;
+uniform float uFill,uOpac,uGrain,uGSize,uFrame,uFlip,uLinear,uColorOn,uShowOrig,uThermalMode;
+uniform int uMode;
+uniform float uThOn,uThMix,uThCon,uThShift,uThBands,uThBandSoft,uThOp; uniform int uThBlend;
+uniform float uGlowOn,uGlowW,uGlowAmt,uGlowIso,uGlowLut,uGlowUseLut; uniform int uGlowSrc,uGlowSide;
+uniform float uDitherAmt,uDitherCell,uScan,uScanGap,uSpeck; uniform int uDitherType;
+const float BAYER[16] = float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
+vec3 overlayB(vec3 a, vec3 b){ return mix(2.*a*b, 1.-2.*(1.-a)*(1.-b), step(.5, a)); }
+float lumAt(vec2 uv){ vec3 c = texture(uIn, uv).rgb; if(uLinear > .5) c = pow(max(c,0.), vec3(1./2.2)); return dot(c, LUM); }
+void main(){
+  vec2 uv = uFlip > .5 ? vec2(vUv.x, 1.-vUv.y) : vUv;
+  vec2 q = toQ(uv), pc = uv*uRes;
+  if(uShowOrig > .5){ o = vec4(texture(uSrc, uv).rgb, 1.); return; }
+  vec3 c = vec3(0.);
+  if(uThermalMode < .5){ c = texture(uIn, uv).rgb; if(uLinear > .5) c = pow(max(c,0.), vec3(1./2.2)); c = clamp(c, 0., 1.); }
+  float l = dot(c, LUM);
+  bool needField = (uThOn > .5 && (uThMix > 0. || uThermalMode > .5)) || (uGlowOn > .5 && uGlowSrc == 1);
+  float fld = needField ? field(q) : 0.;
+  float sRaw = uThermalMode > .5 ? fld : mix(l, fld, uThMix);
+  float s1 = clamp((sRaw-.5)*uThCon + .5 + uThShift, 0., 1.);
+  float s = s1;
+  if(uThBands >= 2.){ float x = s1*uThBands; float bs = max(uThBandSoft, .001)*.5; s = clamp((floor(x) + smoothstep(.5-bs, .5+bs, fract(x)))/uThBands, 0., 1.); }
+  float mc = 0.;
+  if(uColorOn > .5){
+    vec3 C = uCol;
+    vec3 tonal = l < .5 ? mix(C*.16, C, l*2.) : mix(C, mix(C, vec3(1.), .55), (l-.5)*2.);
+    vec3 layer = uMode == 0 ? mix(tonal, C, uFill) : uMode == 1 ? c*C : uMode == 2 ? 1.-(1.-c)*(1.-C) : uMode == 3 ? overlayB(c, C) : tonal;
+    mc = mask(q);
+    c = mix(c, layer, mc*uOpac);
+  }
+  if(uThOn > .5){
+    vec3 hc = texture(uLut, vec2(s, .5)).rgb;
+    float a = maskOf(uM2, q)*uThOp;
+    vec3 b = uThBlend == 0 ? hc : uThBlend == 1 ? 1.-(1.-c)*(1.-hc) : uThBlend == 2 ? c + hc : max(c, hc);
+    c = mix(c, b, a);
+  }
+  if(uGlowOn > .5){
+    float wpx = max(uGlowW*uRes.x, .6), g = 0.;
+    if(uGlowSrc == 2){
+      vec2 e = vec2(wpx*.5)/uRes;
+      float gx = lumAt(uv+vec2(e.x,0.)) - lumAt(uv-vec2(e.x,0.));
+      float gy = lumAt(uv+vec2(0.,e.y)) - lumAt(uv-vec2(0.,e.y));
+      g = smoothstep(.04, .3, length(vec2(gx, gy)));
+    } else {
+      float v, iso;
+      if(uGlowSrc == 0){ v = mask(q); iso = .5; }
+      else if(uThBands >= 2.){ v = fract(s1*uThBands); iso = .5; }
+      else { v = s1; iso = uGlowIso; }
+      float gr = length(vec2(dFdx(v), dFdy(v)));
+      float d = (v - iso)/max(gr, 1e-5);
+      if(uGlowSrc == 1 && uThBands >= 2.) d = abs(d) > 1. && gr > .25 ? 1e4 : d;
+      g = exp(-abs(d)/wpx);
+      if(uGlowSide == 1) g *= step(0., d); else if(uGlowSide == 2) g *= step(d, 0.);
+    }
+    vec3 gc = uGlowUseLut > .5 ? texture(uLut, vec2(uGlowLut, .5)).rgb : uGlowCol;
+    float k = clamp(g*uGlowAmt, 0., 1.);
+    c = 1. - (1.-c)*(1.-gc*k);
+    c += gc*g*g*uGlowAmt*.25;
+  }
+  c = clamp(c, 0., 1.);
+  if(uDitherType > 0 && uDitherAmt > 0.){
+    float cell = max(uDitherCell*uRes.x/1600., 1.);
+    vec3 dc;
+    if(uDitherType == 1){
+      vec2 bp = floor(pc/cell); int idx = int(mod(bp.x,4.)) + int(mod(bp.y,4.))*4;
+      dc = floor(c*3. + (BAYER[idx]+.5)/16.)/3.;
+    } else {
+      vec2 p = rot(pc, .785)/(cell*4.); float dist = length(fract(p)-.5);
+      vec3 rr = sqrt(c)*.62;
+      dc = smoothstep(vec3(dist-.05), vec3(dist+.05), rr);
+    }
+    c = mix(c, dc, uDitherAmt);
+  }
+  if(uScan > 0.){ float gap = max(uScanGap*uRes.x/1600., 1.5); c *= 1. - uScan*(.5 - .5*cos(pc.y/gap*6.2832)); }
+  if(uSpeck > 0.){
+    vec2 cp = floor(pc/max(uRes.x/1600.*1.6, 1.));
+    if(hash(cp + uSeed*7.) > 1. - uSpeck*.012) c = mix(c, vec3(step(.5, hash(cp + 3.3))), .85);
+  }
+  if(uGrain > 0.){
+    float gs = max(uGSize*uRes.x/1600., .35);
+    float gn = (vnoise(pc/gs) + vnoise(pc/gs*2.13 + 7.3)*.5)/1.5 - .5;
+    c += gn*uGrain*(1. - pow(abs(dot(c, LUM)-.5)*2., 2.)*.7)*1.6;
+  }
+  if(uFrame > 0.){ float f = uFrame*uRes.x; if(min(min(pc.x, uRes.x-pc.x), min(pc.y, uRes.y-pc.y)) < f) c = uFrameCol; }
+  o = vec4(clamp(c, 0., 1.), 1.);
+}`,
+maskview: `uniform float uFlip, uShowField;
+void main(){
+  vec2 uv = uFlip > .5 ? vec2(vUv.x, 1.-vUv.y) : vUv; vec2 q = toQ(uv);
+  if(uShowField > .5){ o = vec4(vec3(field(q)), 1.); return; }
+  o = vec4(1., .08, .3, (1.-mask(q))*.62);
+}`
+};
+
+/* ═════════ GL setup ═════════ */
+const canvas = $('#gl');
+const gl = canvas.getContext('webgl2', {antialias:false, premultipliedAlpha:false, preserveDrawingBuffer:false});
+function fatal(msg){ $('#stage').innerHTML = `<div class="error"><p><strong>表示できません</strong></p><p>${msg}</p></div>`; }
+if(!gl){ fatal('このブラウザではWebGL2が使えません。最新のChrome / Safari / Firefoxで開いてください。'); return; }
+const HALF = !!gl.getExtension('EXT_color_buffer_float') || !!gl.getExtension('EXT_color_buffer_half_float');
+const MAXTEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+gl.bindVertexArray(gl.createVertexArray());
+function compile(type, src){
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const P = {};
+try {
+  const vs = compile(gl.VERTEX_SHADER, VS);
+  for(const [k, src] of Object.entries(FS)){
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + src)); gl.linkProgram(p);
+    if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(k + ': ' + gl.getProgramInfoLog(p));
+    const u = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for(let i=0;i<n;i++){ const info = gl.getActiveUniform(p, i); u[info.name.replace(/\[0\]$/, '')] = {loc:gl.getUniformLocation(p, info.name), type:info.type}; }
+    P[k] = {p, u};
+  }
+} catch(e){ console.error(e); fatal('シェーダーの初期化に失敗しました。'); return; }
+
+function setU(prog, vals){
+  let unit = 0;
+  for(const [name, v] of Object.entries(vals)){
+    const u = prog.u[name]; if(!u || v === undefined) continue;
+    if(v instanceof WebGLTexture){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, v); gl.uniform1i(u.loc, unit++); }
+    else if(u.type === gl.INT || u.type === gl.BOOL) gl.uniform1i(u.loc, v|0);
+    else if(typeof v === 'number') gl.uniform1f(u.loc, v);
+    else if(v.length === 2) gl.uniform2f(u.loc, v[0], v[1]);
+    else if(v.length === 3) gl.uniform3f(u.loc, v[0], v[1], v[2]);
+  }
+}
+function texParams(filter){
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter || gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+function makeTarget(w, h, half){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, half ? gl.RGBA16F : gl.RGBA8, w, h, 0, gl.RGBA, half ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
+  texParams();
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return {tex, fb, w, h, ok:gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE};
+}
+function freeTarget(t){ gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+function makeSet(w, h){
+  const s = {w, h, half:HALF}; ['A','X','Y','B1','B2'].forEach(k => s[k] = makeTarget(w, h, HALF));
+  s.ok = ['A','X','Y','B1','B2'].every(k => s[k].ok);
+  return s;
+}
+function freeSet(s){ ['A','X','Y','B1','B2'].forEach(k => freeTarget(s[k])); }
+
+let srcTex = null, srcW = 0, srcH = 0;
+function uploadSource(img){
+  if(srcTex) gl.deleteTexture(srcTex);
+  srcTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  texParams(gl.LINEAR_MIPMAP_LINEAR);
+  srcW = img.width; srcH = img.height;
+}
+
+/* palettes → LUT texture */
+const PALETTES = {
+  classic:{name:'Thermal Classic', stops:['#000000','#1b0038','#5a00a8','#c8004e','#ff4d00','#ffae00','#fff1b8','#ffffff']},
+  neon:{name:'Infrared Neon', stops:['#000000','#0d0033','#2f00ff','#b800ff','#ff0080','#ff5a1f','#ffe600','#eafffb']},
+  fire:{name:'Fire Edge', stops:['#000000','#1f0000','#6e0000','#cc1000','#ff4600','#ff9500','#ffdf8a','#ffffff']},
+  purple:{name:'Purple Heat', stops:['#000000','#12001f','#36005c','#7400cc','#b833ff','#ff63d6','#ffd6f5']},
+  sunset:{name:'Sunset False Color', stops:['#000000','#170a52','#521dcc','#ff2f92','#ff781a','#ffd23f','#7dffe3']},
+  cyan:{name:'Cyan Shift', stops:['#000000','#00172e','#0047c9','#00adff','#00ffe1','#c9fff6','#ffffff']},
+  red:{name:'Red Mono', stops:['#000000','#2a0002','#860008','#e5141d','#ff6a5e','#ffe1dc']},
+};
+const lutTex = gl.createTexture();
+const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [n>>16&255, n>>8&255, n&255]; };
+function buildLut(key){
+  const st = PALETTES[key].stops.map(hexRGB), d = new Uint8Array(256*4);
+  for(let i=0;i<256;i++){
+    const t = i/255*(st.length-1), k = Math.min(st.length-2, Math.floor(t)), f = t-k;
+    for(let ch=0;ch<3;ch++) d[i*4+ch] = Math.round(st[k][ch] + (st[k+1][ch]-st[k][ch])*f);
+    d[i*4+3] = 255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, lutTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, d);
+  texParams();
+}
+const lutCSS = key => `linear-gradient(90deg, ${PALETTES[key].stops.join(',')})`;
+
+/* ═════════ state ═════════ */
+const mkMask = o => Object.assign({type:'none', inv:false, cx:.5, cy:.5, rx:.32, ry:.42, feather:.6, warp:0, thr:.5, ax:.35, ay:.5, bx:.65, by:.5}, o);
+const BASE = {
+  mode:'portrait', canvas:'4:5',
+  flow:{scale:2.4, warp:.7, angle:-15, stretch:1.8, evolve:0, seed:7},
+  tone:{sat:0, con:1.35, bri:0, hi:0, sh:0},
+  zoom:{on:true, s:.2, cx:.5, cy:.62, mask:mkMask()},
+  smear:{on:true, len:.12, angle:180, decay:.45, streak:.35, stretch:.18, slen:.2, rough:.4, dist:.25, rand:.35, ox:.5, oy:.5,
+         mask:mkMask({type:'ellipse', cx:.5, cy:.48, rx:.36, ry:.48, feather:.55, warp:.25})},
+  echo:{on:true, n:2, gap:.025, op:.3, scale:1.035, blend:'1', mask:mkMask()},
+  detail:{on:true, amt:.6, restore:.15, rad:.008, mask:mkMask({type:'ellipse', cx:.5, cy:.56, rx:.16, ry:.2, feather:.75})},
+  color:{on:true, col:'#e5141d', mode:'0', fill:.82, op:1, mask:mkMask({type:'linear', ax:.36, ay:.5, bx:.64, by:.5, warp:.3})},
+  thermal:{on:true, palette:'fire', mix:.45, con:1.5, shift:0, bands:0, bandSoft:.6, op:.9, blend:'1',
+           mask:mkMask({type:'band', ax:.34, ay:.5, bx:.66, by:.5, warp:.7})},
+  glow:{on:false, src:'0', side:'0', w:.004, amt:.8, iso:.5, useLut:'1', lutPos:.8, col:'#ff6a3d'},
+  texture:{grain:.09, size:1.2, dither:'0', ditherAmt:.35, cell:2, scan:0, scanGap:3, speck:0},
+  frame:{on:true, w:.012, col:'#2b2b2d'}
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+function merge(base, over){
+  const r = clone(base);
+  for(const [k, v] of Object.entries(over || {})){
+    if(v && typeof v === 'object' && !Array.isArray(v) && r[k] && typeof r[k] === 'object'){
+      r[k] = Object.assign(r[k], v);
+      if(v.mask) r[k].mask = mkMask(Object.assign(clone(base[k].mask || {}), v.mask));
+    } else r[k] = v;
+  }
+  return r;
+}
+const PRESETS = [
+  {group:'Portrait', name:'赤 × モノクロ（参考）', s:BASE},
+  {group:'Portrait', name:'横に強く流す', s:merge(BASE, {zoom:{s:.08}, smear:{len:.3, stretch:.5, slen:.35, streak:.55, decay:.3}})},
+  {group:'Portrait', name:'青 × モノクロ', s:merge(BASE, {color:{col:'#1f4dff'}})},
+  {group:'Portrait', name:'境界を光らせる', s:merge(BASE, {color:{mask:{warp:.6}}, glow:{on:true, src:'0', useLut:'0', col:'#ff7a5c', w:.005, amt:.9, side:'0'}})},
+  {group:'Hybrid', name:'赤スミア × 熱の境界', s:merge(BASE, {mode:'hybrid', glow:{on:true, src:'0', useLut:'1', lutPos:.85, w:.004, amt:.7}})},
+  {group:'Hybrid', name:'熱の残像', s:merge(BASE, {mode:'hybrid', color:{on:false}, smear:{len:.24, stretch:.35, streak:.5},
+    thermal:{palette:'neon', mix:.6, con:1.6, op:.88, blend:'0', mask:{type:'flow', thr:.56, feather:.22}}, glow:{on:true, src:'1', w:.0025, amt:.4, lutPos:.95}})},
+  {group:'Hybrid', name:'背景だけ熱分布', s:merge(BASE, {mode:'hybrid', color:{on:false}, zoom:{s:.12},
+    thermal:{palette:'classic', mix:.85, con:1.6, op:1, blend:'3', mask:{type:'ellipse', cx:.5, cy:.52, rx:.36, ry:.5, feather:.5, warp:.5, inv:true}}})},
+];
+let S = clone(BASE);
+let userPresets = [];
+try { userPresets = JSON.parse(localStorage.getItem('smearworks.presets') || '[]'); } catch {}
+const RATIOS = {'4:5':[1600,2000], '3:4':[1500,2000], '1:1':[2000,2000], '9:16':[1125,2000], '16:9':[2000,1125], '3:2':[2000,1334]};
+const dims = () => S.mode === 'thermal' ? RATIOS[S.canvas] : [srcW, srcH];
+
+/* ═════════ render ═════════ */
+const PREVIEW_MAX = 1600;
+let pv = null, blackTex = null;
+{ blackTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, blackTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,255])); texParams(); }
+const hex3 = h => hexRGB(h).map(v => v/255);
+const KIND = {none:0, ellipse:1, linear:2, band:3, flow:4};
+function maskU(m, a, pre = 'uM'){
+  return {[pre+'.kind']:KIND[m.type], [pre+'.inv']:m.inv ? 1 : 0, [pre+'.feather']:m.feather, [pre+'.warp']:m.warp, [pre+'.thr']:m.thr,
+          [pre+'.c']:[m.cx, m.cy*a], [pre+'.r']:[m.rx, m.ry], [pre+'.a']:[m.ax, m.ay*a], [pre+'.b']:[m.bx, m.by*a]};
+}
+const NOMASK = {'uM.kind':0, 'uM.inv':0};
+function pass(prog, target, vals){
+  gl.useProgram(prog.p);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fb : null);
+  gl.viewport(0, 0, target ? target.w : canvas.width, target ? target.h : canvas.height);
+  setU(prog, vals);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function globals(w, h){
+  const f = S.flow;
+  return {uRes:[w, h], uSeed:f.seed % 997, uFScale:f.scale, uFWarp:f.warp, uFAng:f.angle*Math.PI/180, uFStretch:f.stretch, uFEvolve:f.evolve};
+}
+function runPipeline(set, final, w, h, opts = {}){
+  const a = h/w, base = globals(w, h);
+  const portrait = S.mode !== 'thermal';
+  let cur = null;
+  if(portrait){
+    pass(P.tone, set.A, {...base, ...NOMASK, uTex:srcTex, uSat:S.tone.sat, uCon:S.tone.con, uBri:S.tone.bri, uHi:S.tone.hi, uSh:S.tone.sh, uLinear:set.half ? 1 : 0});
+    cur = set.A;
+    const next = () => cur === set.X ? set.Y : set.X;
+    const z = S.zoom, sm = S.smear, ec = S.echo, dt = S.detail;
+    const dir = [Math.cos(sm.angle*Math.PI/180), Math.sin(sm.angle*Math.PI/180)];
+    if(z.on && z.s > 0){ const t = next(); pass(P.zoom, t, {...base, ...maskU(z.mask, a), uIn:cur.tex, uC:[z.cx, z.cy*a], uS:z.s}); cur = t; }
+    if(sm.on && (sm.len > 0 || sm.stretch > 0)){
+      const mu = maskU(sm.mask, a);
+      let t = next();
+      pass(P.smear, t, {...base, ...mu, uIn:cur.tex, uDir:dir, uO:[sm.ox, sm.oy*a], uLen:sm.len, uDecay:sm.decay, uMax:sm.streak,
+        uStretch:sm.stretch, uSLen:sm.slen, uRough:sm.rough, uDist:sm.dist, uRand:sm.rand});
+      cur = t;
+      if(sm.len > .01){
+        t = next();
+        pass(P.smear, t, {...base, ...mu, uIn:cur.tex, uDir:dir, uO:[sm.ox, sm.oy*a], uLen:sm.len*.22, uDecay:0, uMax:0,
+          uStretch:0, uSLen:sm.slen, uRough:0, uDist:sm.dist, uRand:0});
+        cur = t;
+      }
+    }
+    if(ec.on && ec.n > 0 && ec.op > 0){
+      const t = next();
+      pass(P.echo, t, {...base, ...maskU(ec.mask, a), uIn:cur.tex, uDir:dir, uZC:[z.cx, z.cy*a], uGap:ec.gap, uOp:ec.op, uScale:ec.scale, uN:ec.n, uBlend:+ec.blend});
+      cur = t;
+    }
+    if(dt.on && (dt.amt > 0 || dt.restore > 0)){
+      const r = Math.max(.5, dt.rad*w/2.2);
+      pass(P.blur, set.B1, {...base, ...NOMASK, uIn:set.A.tex, uStep:[r/w, 0]});
+      pass(P.blur, set.B2, {...base, ...NOMASK, uIn:set.B1.tex, uStep:[0, r/h]});
+      pass(P.blur, set.B1, {...base, ...NOMASK, uIn:set.B2.tex, uStep:[r*1.7/w, 0]});
+      pass(P.blur, set.B2, {...base, ...NOMASK, uIn:set.B1.tex, uStep:[0, r*1.7/h]});
+      const t = next();
+      pass(P.detail, t, {...base, ...maskU(dt.mask, a), uIn:cur.tex, uOrig:set.A.tex, uBlur:set.B2.tex, uAmt:dt.amt, uRestore:dt.restore});
+      cur = t;
+    }
+  }
+  const c = S.color, th = S.thermal, gw = S.glow, tx = S.texture, f = S.frame;
+  const thermalOn = S.mode !== 'portrait' && th.on;
+  pass(P.final, final, {...base, ...maskU(c.mask, a), ...maskU(th.mask, a, 'uM2'),
+    uIn:cur ? cur.tex : blackTex, uSrc:srcTex, uLut:lutTex, uLinear:set && set.half ? 1 : 0, uFlip:final ? 0 : 1,
+    uShowOrig:opts.showOrig && portrait ? 1 : 0, uThermalMode:portrait ? 0 : 1,
+    uColorOn:portrait && c.on ? 1 : 0, uCol:hex3(c.col), uMode:+c.mode, uFill:c.fill, uOpac:c.op,
+    uThOn:thermalOn ? 1 : 0, uThMix:th.mix, uThCon:th.con, uThShift:th.shift, uThBands:th.bands, uThBandSoft:th.bandSoft, uThOp:th.op, uThBlend:+th.blend,
+    uGlowOn:gw.on ? 1 : 0, uGlowSrc:+gw.src, uGlowSide:+gw.side, uGlowW:gw.w, uGlowAmt:gw.amt, uGlowIso:gw.iso, uGlowUseLut:+gw.useLut, uGlowLut:gw.lutPos, uGlowCol:hex3(gw.col),
+    uGrain:tx.grain, uGSize:tx.size, uDitherType:+tx.dither, uDitherAmt:tx.ditherAmt, uDitherCell:tx.cell, uScan:tx.scan, uScanGap:tx.scanGap, uSpeck:tx.speck,
+    uFrame:f.on ? f.w : 0, uFrameCol:hex3(f.col)});
+  if(opts.maskView){
+    const st = S[active];
+    const showField = active === 'flow';
+    if(showField || (st && st.mask && st.mask.type !== 'none')){
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      pass(P.maskview, final, {...base, ...(showField ? NOMASK : maskU(st.mask, a)), uFlip:1, uShowField:showField ? 1 : 0});
+      gl.disable(gl.BLEND);
+    }
+  }
+}
+let showOrig = false, showMask = false, raf = 0;
+function previewSize(){
+  const [W, H] = dims(), k = Math.min(1, PREVIEW_MAX/Math.max(W, H));
+  return [Math.max(2, Math.round(W*k)), Math.max(2, Math.round(H*k))];
+}
+function draw(){
+  raf = 0;
+  const [w, h] = previewSize();
+  if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; fit(); }
+  let set = null;
+  if(S.mode !== 'thermal'){
+    if(!pv || pv.w !== w || pv.h !== h){ if(pv) freeSet(pv); pv = makeSet(w, h); }
+    set = pv;
+  }
+  runPipeline(set, null, w, h, {showOrig, maskView:showMask});
+}
+function schedule(){ if(!raf) raf = requestAnimationFrame(draw); drawOverlay(); }
+
+/* ═════════ layout ═════════ */
+const wrap = $('#wrap'), ov = $('#ov');
+function fit(){
+  const [W, H] = dims(); if(!W) return;
+  const r = $('#stage').getBoundingClientRect();
+  const k = Math.max(.01, Math.min((r.width-32)/W, (r.height-84)/H));
+  wrap.style.width = W*k + 'px'; wrap.style.height = H*k + 'px';
+  drawOverlay();
+}
+new ResizeObserver(fit).observe($('#stage'));
+
+/* ═════════ UI schema ═════════ */
+const GROUPS = [
+  ['PORTRAIT', ['tone','zoom','smear','echo','detail'], ['portrait','hybrid']],
+  ['OVERLAY', ['color'], ['portrait','hybrid']],
+  ['THERMAL', ['thermal','glow'], ['portrait','thermal','hybrid']],
+  ['MASK', ['flow'], ['portrait','thermal','hybrid']],
+  ['TEXTURE', ['texture','frame'], ['portrait','thermal','hybrid']],
+];
+const PAL_OPTS = Object.entries(PALETTES).map(([k, p]) => [k, p.name]);
+const EFFECTS = {
+  tone:{name:'トーン', en:'Tone', params:[
+    ['sat','彩度',0,1,.01,'pct'], ['con','コントラスト',.5,2.6,.01,'x'], ['bri','明るさ',-.4,.4,.005,'spct'],
+    ['hi','ハイライト',-.6,.6,.01,'spct'], ['sh','シャドウ',-.6,.6,.01,'spct']]},
+  zoom:{name:'ズームブラー', en:'Zoom', toggle:true, mask:true, hint:'◎ をドラッグして中心を移動', params:[['s','強さ',0,.8,.005,'pct']]},
+  smear:{name:'スミア / ストレッチ', en:'Smear', toggle:true, mask:true, hint:'● で起点、矢印の先で方向と長さを調整', params:[
+    ['len','流れの長さ',0,.6,.002,'pct'], ['angle','方向',-180,180,1,'deg'],
+    ['stretch','引き伸ばし',0,1,.01,'pct'], ['slen','引き伸ばし範囲',.02,.8,.005,'pct'],
+    ['streak','筋の強さ',0,1,.01,'pct'], ['decay','減衰',0,1,.01,'pct'],
+    ['rough','輪郭の荒さ',0,1,.01,'pct'], ['dist','歪み',0,1,.01,'pct'], ['rand','ランダム',0,1,.01,'pct']]},
+  echo:{name:'残像', en:'Echo', toggle:true, mask:true, hint:'方向はスミア、拡大の中心はズームブラーと共通', params:[
+    ['n','枚数',0,5,1,'int'], ['op','濃さ',0,1,.01,'pct'], ['gap','ずれ',-.1,.1,.001,'spct'], ['scale','拡大率',.9,1.2,.005,'x3'],
+    ['blend','重ね方','select',[['0','通常'],['1','スクリーン'],['2','比較（明）']]]]},
+  detail:{name:'ディテール保持', en:'Detail', toggle:true, mask:true, hint:'マスクの範囲だけ元のシャープさを戻す', params:[
+    ['amt','シャープさ',0,1.5,.01,'pct'], ['restore','元画像を戻す',0,1,.01,'pct'], ['rad','ディテールの細かさ',.002,.03,.0005,'pct']]},
+  color:{name:'色面', en:'Color', toggle:true, mask:true, hint:'2つの点でグラデーションの位置と幅、「ゆらぎ」で境界を有機的に', params:[
+    ['col','色','color'], ['mode','描画モード','select',[['0','ベタ塗り'],['1','乗算'],['2','スクリーン'],['3','オーバーレイ'],['4','グラデーションマップ']]],
+    ['fill','塗りの強さ',0,1,.01,'pct'], ['op','不透明度',0,1,.01,'pct']]},
+  thermal:{name:'サーマル着色', en:'Thermal', toggle:true, mask:true, modes:['hybrid'], hint:'値（写真の明るさ×フロー場）をパレットで着色', params:[
+    ['palette','パレット','select',PAL_OPTS,'wide'], ['__lut','', 'lut'],
+    ['mix','フロー場の割合',0,1,.01,'pct'], ['con','コントラスト',.3,4,.01,'x'],
+    ['shift','カラーシフト',-.5,.5,.005,'spct'], ['op','不透明度',0,1,.01,'pct'],
+    ['bands','バンド数（0＝なめらか）',0,16,1,'int'], ['bandSoft','バンドの境界',0,1,.01,'pct'],
+    ['blend','合成','select',[['0','通常'],['1','スクリーン'],['2','加算'],['3','比較（明）']]]]},
+  glow:{name:'エッジグロー', en:'Glow', toggle:true, hint:'輪郭に沿って発光させる', params:[
+    ['src','光らせる輪郭','select',[['0','色面マスクの境界'],['1','サーマルの等高線'],['2','画像の輪郭']],'wide'],
+    ['side','光る側','select',[['0','両側'],['1','内側'],['2','外側']]],
+    ['useLut','発光色','select',[['1','パレットの色'],['0','単色']]],
+    ['w','発光幅',.0005,.05,.0005,'pct'], ['amt','強さ',0,2,.01,'pct'],
+    ['lutPos','パレット上の位置',0,1,.01,'pct'], ['col','単色','color'],
+    ['iso','等高線の値（バンド0時）',0,1,.01,'pct']]},
+  flow:{name:'フロー場', en:'Flow Field', hint:'フローマスクとサーマル着色の元になるノイズ場。「マスク表示」で確認できます', params:[
+    ['scale','スケール',.4,8,.05,'x'], ['warp','ドメインワープ',0,1.6,.01,'pct'],
+    ['angle','流れの向き',-180,180,1,'deg'], ['stretch','流れの伸び',.3,5,.05,'x'],
+    ['evolve','パターン送り',0,10,.01,'x'], ['seed','シード','seed']]},
+  texture:{name:'質感', en:'Texture', hint:'やりすぎ注意。控えめ〜中程度が基本', params:[
+    ['grain','グレイン',0,.4,.005,'pct'], ['size','粒の大きさ',.5,4,.05,'x'],
+    ['dither','網点','select',[['0','なし'],['1','ディザ'],['2','ハーフトーン']]], ['ditherAmt','網点の強さ',0,1,.01,'pct'],
+    ['cell','網点のサイズ',.5,8,.1,'x'], ['scan','走査線',0,.6,.01,'pct'],
+    ['scanGap','走査線の間隔',1,10,.1,'x'], ['speck','ダスト',0,1,.01,'pct']]},
+  frame:{name:'フレーム', en:'Frame', toggle:true, params:[['w','太さ',0,.06,.001,'pct'], ['col','色','color']]},
+};
+const FMT = {
+  pct:v => Math.round(v*100) + '%', spct:v => (v > 0 ? '+' : '') + (Math.round(v*1000)/10) + '%',
+  x:v => '×' + (+v).toFixed(2), x3:v => '×' + (+v).toFixed(3), int:v => String(v|0), deg:v => Math.round(v) + '°'
+};
+const getP = p => p.split('.').reduce((o, k) => o?.[k], S);
+const setP = (p, v) => { const ks = p.split('.'), last = ks.pop(); ks.reduce((o, k) => o[k], S)[last] = v; };
+let active = 'smear';
+
+function el(tag, attrs = {}, html = ''){ const e = document.createElement(tag); for(const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if(html) e.innerHTML = html; return e; }
+function buildCards(){
+  const root = $('#cards'); root.innerHTML = '';
+  GROUPS.forEach(([gname, ids, modes]) => {
+    const gh = el('div', {class:'group', 'data-gmodes':modes.join(' ')}, gname); root.appendChild(gh);
+    ids.forEach(id => root.appendChild(buildCard(id, EFFECTS[id], modes)));
+  });
+  root.querySelectorAll('[data-p]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const p = inp.dataset.p;
+      let v = inp.type === 'checkbox' ? inp.checked : inp.type === 'range' ? parseFloat(inp.value) : inp.type === 'number' ? Math.max(1, parseInt(inp.value || '1', 10)) : inp.value;
+      setP(p, v); showOut(inp);
+      if(p === 'color.col') setTone();
+      if(p === 'thermal.palette'){ buildLut(v); syncLut(); }
+      if(p === 'flow.canvas') fit();
+      if(p.endsWith('.on')) syncCardState();
+      schedule();
+    });
+  });
+  root.querySelectorAll('[data-mask]').forEach(b => b.addEventListener('click', () => {
+    S[b.dataset.mask].mask.type = b.dataset.mt; setActive(b.dataset.mask); syncUI(); schedule();
+  }));
+  root.querySelectorAll('[data-shuffle]').forEach(b => b.addEventListener('click', () => {
+    S.flow.seed = 1 + Math.floor(Math.random()*9999); syncUI(); schedule();
+  }));
+}
+function buildCard(id, E, gmodes){
+  const card = el('div', {class:'card', 'data-id':id, 'data-modes':(E.modes || gmodes).join(' ')});
+  if(['smear','color','thermal','flow'].includes(id)) card.classList.add('open');
+  const head = el('div', {class:'card-h'});
+  const tb = el('button', {type:'button', class:'title', 'aria-expanded':String(card.classList.contains('open'))}, `${E.en}<span class="jp">${E.name}</span>`);
+  tb.addEventListener('click', () => { card.classList.toggle('open'); tb.setAttribute('aria-expanded', card.classList.contains('open')); setActive(id); });
+  head.appendChild(tb);
+  if(E.toggle) head.appendChild(el('label', {class:'sw', title:'オン / オフ'}, `<input type="checkbox" data-p="${id}.on" aria-label="${E.name}をオンにする"><span></span>`));
+  card.appendChild(head);
+  const body = el('div', {class:'card-b'}), grid = el('div', {class:'grid2'});
+  E.params.forEach(([k, label, ...rest]) => {
+    const p = `${id}.${k}`, cid = 'c_' + p.replace('.', '_');
+    let c;
+    if(rest[0] === 'lut') c = el('div', {class:'ctl wide'}, `<div class="lut" data-lut></div>`);
+    else if(rest[0] === 'color') c = el('div', {class:'ctl'}, `<label for="${cid}">${label}</label><input id="${cid}" type="color" data-p="${p}">`);
+    else if(rest[0] === 'select') c = el('div', {class:'ctl' + (rest[2] === 'wide' ? ' wide' : '')}, `<label for="${cid}">${label}</label><select id="${cid}" data-p="${p}">${rest[1].map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`);
+    else if(rest[0] === 'seed') c = el('div', {class:'ctl'}, `<label for="${cid}">${label}</label><div class="bar"><input id="${cid}" type="number" min="1" max="9999" step="1" data-p="${p}" style="width:70px"><button type="button" class="small" data-shuffle title="ランダムなシードに変更">ランダム</button></div>`);
+    else { const [min, max, step, f] = rest; c = el('div', {class:'ctl'}, `<div class="row"><label for="${cid}">${label}</label><output data-o="${p}"></output></div><input id="${cid}" type="range" min="${min}" max="${max}" step="${step}" data-p="${p}" data-f="${f}">`); }
+    grid.appendChild(c);
+  });
+  body.appendChild(grid);
+  if(E.hint) body.appendChild(el('p', {class:'note'}, E.hint));
+  if(E.mask){
+    const m = el('div', {class:'mask'});
+    m.innerHTML = `<div class="mh"><span>MASK 適用範囲</span>
+      <div class="seg" role="group" aria-label="マスクの種類">
+        ${[['none','全体'],['ellipse','楕円'],['linear','線形'],['band','帯'],['flow','フロー']].map(([t, n]) => `<button type="button" data-mask="${id}" data-mt="${t}">${n}</button>`).join('')}
+      </div></div>
+      <div class="grid2">
+        <label class="check"><input type="checkbox" data-p="${id}.mask.inv"> 反転する</label>
+        <div class="ctl" data-mshow="${id}" data-for="ellipse flow"><div class="row"><label for="mf_${id}">境界のぼかし</label><output data-o="${id}.mask.feather"></output></div>
+          <input id="mf_${id}" type="range" min="0.02" max="1" step="0.01" data-p="${id}.mask.feather" data-f="pct"></div>
+        <div class="ctl" data-mshow="${id}" data-for="ellipse linear band"><div class="row"><label for="mw_${id}">境界のゆらぎ</label><output data-o="${id}.mask.warp"></output></div>
+          <input id="mw_${id}" type="range" min="0" max="1.5" step="0.01" data-p="${id}.mask.warp" data-f="pct"></div>
+        <div class="ctl" data-mshow="${id}" data-for="flow"><div class="row"><label for="mt_${id}">しきい値</label><output data-o="${id}.mask.thr"></output></div>
+          <input id="mt_${id}" type="range" min="0" max="1" step="0.01" data-p="${id}.mask.thr" data-f="pct"></div>
+      </div>`;
+    body.appendChild(m);
+  }
+  card.appendChild(body);
+  card.addEventListener('pointerdown', () => setActive(id));
+  card.addEventListener('focusin', () => setActive(id));
+  return card;
+}
+function showOut(inp){
+  const o = document.querySelector(`output[data-o="${inp.dataset.p}"]`);
+  if(o && inp.dataset.f) o.textContent = FMT[inp.dataset.f](getP(inp.dataset.p));
+}
+function syncLut(){ document.querySelectorAll('[data-lut]').forEach(d => d.style.background = lutCSS(S.thermal.palette)); }
+function syncUI(){
+  document.querySelectorAll('[data-p]').forEach(inp => {
+    const v = getP(inp.dataset.p);
+    if(inp.type === 'checkbox') inp.checked = !!v; else inp.value = v;
+    showOut(inp);
+  });
+  document.querySelectorAll('[data-mask]').forEach(b => b.setAttribute('aria-pressed', S[b.dataset.mask].mask.type === b.dataset.mt));
+  document.querySelectorAll('[data-mshow]').forEach(d => d.hidden = !d.dataset.for.split(' ').includes(S[d.dataset.mshow].mask.type));
+  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.mode));
+  document.querySelectorAll('[data-modes]').forEach(c => c.hidden = !c.dataset.modes.split(' ').includes(S.mode));
+  document.querySelectorAll('[data-gmodes]').forEach(g => g.hidden = !g.dataset.gmodes.split(' ').includes(S.mode));
+  $('#before').disabled = S.mode === 'thermal';
+  if(document.querySelector(`.card[data-id="${active}"]`)?.hidden) setActive(S.mode === 'thermal' ? 'thermal' : 'smear', true);
+  syncCardState(); setTone(); syncLut(); updateInfo();
+}
+function syncCardState(){
+  document.querySelectorAll('.card').forEach(c => {
+    c.classList.toggle('off', S[c.dataset.id].on === false);
+    c.classList.toggle('active', c.dataset.id === active);
+  });
+  $('#editingName').textContent = EFFECTS[active].name;
+}
+function setActive(id, force){
+  if(active === id && !force) return;
+  active = id; syncCardState(); schedule();
+}
+function setTone(){ return;
+  const c = S.color.col;
+  const [r, g, b] = hex3(c), root = document.documentElement.style;
+  root.setProperty('--tone', c);
+  root.setProperty('--tone-ink', (r*.299 + g*.587 + b*.114) > .6 ? '#111' : '#fff');
+}
+let srcLabel = 'サンプル画像 · 画像をドロップして差し替え';
+function updateInfo(){
+  const [W, H] = dims();
+  $('#info').innerHTML = S.mode === 'thermal' ? `THERMAL · <strong>${S.canvas}</strong> · 書き出し最大 ${W >= H ? 4096 : Math.round(4096*W/H)} × ${H >= W ? 4096 : Math.round(4096*H/W)}px` : srcLabel;
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+  S.mode = b.dataset.mode; syncUI(); fit(); schedule();
+}));
+
+/* ═════════ handles ═════════ */
+const NS = 'http://www.w3.org/2000/svg';
+function svg(tag, attrs){ const e = document.createElementNS(NS, tag); for(const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); ov.appendChild(e); return e; }
+function line(x1, y1, x2, y2, dash){
+  svg('line', {x1, y1, x2, y2, stroke:'rgba(0,0,0,.55)', 'stroke-width':3.5});
+  svg('line', {x1, y1, x2, y2, stroke:'#fff', 'stroke-width':1.5, ...(dash ? {'stroke-dasharray':'5 4'} : {})});
+}
+function handle(x, y, key, shape, label){
+  if(shape === 'ring'){
+    svg('circle', {cx:x, cy:y, r:11, fill:'none', stroke:'rgba(0,0,0,.55)', 'stroke-width':4});
+    svg('circle', {cx:x, cy:y, r:11, fill:'none', stroke:'#fff', 'stroke-width':1.8});
+    svg('circle', {cx:x, cy:y, r:2.5, fill:'#fff'});
+    svg('circle', {cx:x, cy:y, r:16, fill:'transparent', class:'h', 'data-h':key, 'aria-label':label});
+  } else svg('circle', {cx:x, cy:y, r:shape === 'small' ? 5.5 : 7.5, fill:'#fff', stroke:'#111', 'stroke-width':1.5, class:'h', 'data-h':key, 'aria-label':label});
+}
+function drawOverlay(){
+  ov.innerHTML = '';
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const id = active, st = S[id], E = EFFECTS[id];
+  $('#hint').textContent = (E.hint || '') + (S.mode !== 'thermal' ? ' · スペースキーでBefore' : '');
+  if(!W || showOrig) return;
+  if(st.mask && st.mask.type !== 'none' && st.mask.type !== 'flow'){
+    const m = st.mask;
+    if(m.type === 'ellipse'){
+      const cx = m.cx*W, cy = m.cy*H, rx = m.rx*W, ry = m.ry*W, f = 1 - m.feather;
+      svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'rgba(0,0,0,.5)', 'stroke-width':3.5});
+      svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'#fff', 'stroke-width':1.3, 'stroke-dasharray':'6 5'});
+      if(f > .03) svg('ellipse', {cx, cy, rx:rx*f, ry:ry*f, fill:'none', stroke:'rgba(255,255,255,.55)', 'stroke-width':1, 'stroke-dasharray':'2 4'});
+      handle(cx, cy, 'm.c', 'dot', 'マスクの中心');
+      handle(cx + rx, cy, 'm.rx', 'small', 'マスクの横幅');
+      handle(cx, cy + ry, 'm.ry', 'small', 'マスクの高さ');
+    } else {
+      const x1 = m.ax*W, y1 = m.ay*H, x2 = m.bx*W, y2 = m.by*H;
+      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, px = -dy/L*26, py = dx/L*26;
+      line(x1 - px, y1 - py, x1 + px, y1 + py); line(x2 - px, y2 - py, x2 + px, y2 + py);
+      if(m.type === 'band'){ const mx = (x1 + x2)/2, my = (y1 + y2)/2; line(mx - px*1.6, my - py*1.6, mx + px*1.6, my + py*1.6, true); }
+      line(x1, y1, x2, y2, true);
+      handle(x1, y1, 'm.a', 'dot', 'マスクの始点');
+      handle(x2, y2, 'm.b', 'dot', 'マスクの終点');
+    }
+  }
+  if(S.mode === 'thermal') return;
+  if(id === 'zoom') handle(st.cx*W, st.cy*H, 'zoom.c', 'ring', 'ブラーの中心');
+  if(id === 'echo') handle(S.zoom.cx*W, S.zoom.cy*H, 'zoom.c', 'ring', '拡大の中心');
+  if(id === 'smear'){
+    const ox = st.ox*W, oy = st.oy*H, ang = st.angle*Math.PI/180, dx = Math.cos(ang), dy = Math.sin(ang);
+    const len = Math.max(st.len, .04)*W, tx = ox + dx*len, ty = oy + dy*len;
+    if(st.stretch > 0){
+      const px = -dy*40, py = dx*40;
+      line(ox - px, oy - py, ox + px, oy + py, true);
+      const sx = ox + dx*st.slen*W, sy = oy + dy*st.slen*W;
+      line(sx - px*.5, sy - py*.5, sx + px*.5, sy + py*.5, true);
+    }
+    line(ox, oy, tx, ty);
+    const ah = 10, l1 = ang + Math.PI*.82, l2 = ang - Math.PI*.82;
+    line(tx, ty, tx + Math.cos(l1)*ah, ty + Math.sin(l1)*ah); line(tx, ty, tx + Math.cos(l2)*ah, ty + Math.sin(l2)*ah);
+    handle(ox, oy, 'smear.o', 'dot', 'スミアの起点');
+    handle(tx, ty, 'smear.t', 'small', '方向と長さ');
+  }
+}
+let drag = null;
+function uvFrom(e){ const r = ov.getBoundingClientRect(); return [(e.clientX - r.left)/r.width, (e.clientY - r.top)/r.height]; }
+function primaryHandle(){
+  if(S.mode !== 'thermal'){
+    if(active === 'zoom' || active === 'echo') return 'zoom.c';
+    if(active === 'smear') return 'smear.o';
+  }
+  if(S[active].mask && S[active].mask.type === 'ellipse') return 'm.c';
+  return null;
+}
+ov.addEventListener('pointerdown', e => {
+  const key = e.target.dataset?.h || primaryHandle();
+  if(!key) return;
+  e.preventDefault(); ov.setPointerCapture(e.pointerId);
+  drag = {key, id:active}; moveHandle(e);
+});
+ov.addEventListener('pointermove', e => { if(drag) moveHandle(e); });
+const endDrag = () => { if(drag){ drag = null; syncUI(); } };
+ov.addEventListener('pointerup', endDrag);
+ov.addEventListener('pointercancel', endDrag);
+function moveHandle(e){
+  const [u, v] = uvFrom(e), [W, H] = dims(), a = H/W, cl = x => Math.min(1.2, Math.max(-.2, x));
+  const k = drag.key, st = S[drag.id];
+  if(k === 'zoom.c'){ S.zoom.cx = cl(u); S.zoom.cy = cl(v); }
+  else if(k === 'smear.o'){ S.smear.ox = cl(u); S.smear.oy = cl(v); }
+  else if(k === 'smear.t'){
+    const dx = u - S.smear.ox, dy = (v - S.smear.oy)*a;
+    S.smear.len = Math.min(.6, Math.max(0, Math.hypot(dx, dy)));
+    S.smear.angle = Math.round(Math.atan2(dy, dx)*180/Math.PI);
+    syncUI();
+  }
+  else if(k === 'm.c'){ st.mask.cx = cl(u); st.mask.cy = cl(v); }
+  else if(k === 'm.rx'){ st.mask.rx = Math.max(.01, Math.abs(u - st.mask.cx)); }
+  else if(k === 'm.ry'){ st.mask.ry = Math.max(.01, Math.abs(v - st.mask.cy)*a); }
+  else if(k === 'm.a'){ st.mask.ax = cl(u); st.mask.ay = cl(v); }
+  else if(k === 'm.b'){ st.mask.bx = cl(u); st.mask.by = cl(v); }
+  schedule();
+}
+$('#showMask').addEventListener('click', () => { showMask = !showMask; $('#showMask').setAttribute('aria-pressed', showMask); schedule(); });
+
+/* ═════════ image loading ═════════ */
+function makeSample(){
+  const c = document.createElement('canvas'), W = 1200, H = 1600; c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  let gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#dadada'); gr.addColorStop(1, '#6a6a6a');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#141414'; g.beginPath(); g.ellipse(570, 560, 440, 420, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#1d1d1d'; g.beginPath(); g.ellipse(600, 1820, 660, 540, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#5a3f33'; g.fillRect(470, 1150, 260, 420);
+  gr = g.createRadialGradient(470, 620, 60, 600, 820, 540); gr.addColorStop(0, '#d8b29a'); gr.addColorStop(.55, '#8a5f4b'); gr.addColorStop(1, '#33201a');
+  g.fillStyle = gr; g.beginPath(); g.ellipse(600, 820, 320, 430, 0, 0, Math.PI*2); g.fill();
+  g.strokeStyle = '#1a0f0b'; g.lineCap = 'round';
+  g.lineWidth = 24; [[470, 650], [730, 650]].forEach(([x, y]) => { g.beginPath(); g.moveTo(x-80, y-14); g.quadraticCurveTo(x, y+30, x+80, y-14); g.stroke(); });
+  g.lineWidth = 18; [[470, 570], [730, 570]].forEach(([x, y]) => { g.beginPath(); g.moveTo(x-90, y+10); g.quadraticCurveTo(x, y-30, x+90, y+4); g.stroke(); });
+  g.fillStyle = 'rgba(40,20,15,.55)'; g.beginPath(); g.ellipse(600, 815, 72, 40, 0, 0, Math.PI*2); g.fill();
+  g.strokeStyle = 'rgba(225,180,160,.55)'; g.lineWidth = 16; g.beginPath(); g.ellipse(600, 1010, 166, 206, 0, 0, Math.PI*2); g.stroke();
+  g.fillStyle = '#120505'; g.beginPath(); g.ellipse(600, 1010, 150, 190, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#efe6df'; g.beginPath(); g.ellipse(600, 842, 118, 36, 0, 0, Math.PI); g.fill();
+  g.fillStyle = '#8c2a2a'; g.beginPath(); g.ellipse(600, 1132, 95, 55, 0, 0, Math.PI*2); g.fill();
+  return c;
+}
+let fileName = 'smearworks';
+const escapeHTML = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function loadFile(f){
+  if(!f || !f.type.startsWith('image/')){ toast('画像ファイルを選んでください（JPG / PNG / WebP など）'); return; }
+  const url = URL.createObjectURL(f), img = new Image();
+  img.onload = () => {
+    const cap = Math.min(6000, MAXTEX), s = Math.min(1, cap/Math.max(img.naturalWidth, img.naturalHeight));
+    let src = img;
+    if(s < 1){ src = document.createElement('canvas'); src.width = Math.round(img.naturalWidth*s); src.height = Math.round(img.naturalHeight*s); src.getContext('2d').drawImage(img, 0, 0, src.width, src.height); }
+    uploadSource(src); URL.revokeObjectURL(url);
+    fileName = (f.name || 'image').replace(/\.[^.]+$/, '');
+    srcLabel = `<strong>${srcW} × ${srcH}</strong> · ${escapeHTML(f.name || '画像')}`;
+    if(S.mode === 'thermal'){ S.mode = 'hybrid'; syncUI(); toast('写真を読み込んだのでHYBRIDに切り替えました'); }
+    else toast('読み込みました。スミアの起点とマスクを顔に合わせてください');
+    updateInfo(); fit(); schedule();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('この画像は読み込めませんでした。JPG か PNG で試してください'); };
+  img.src = url;
+}
+$('#pick').addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+let dragDepth = 0;
+document.addEventListener('dragenter', e => { if([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('#drophint').hidden = false; } });
+document.addEventListener('dragleave', () => { if(--dragDepth <= 0){ dragDepth = 0; $('#drophint').hidden = true; } });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#drophint').hidden = true; if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]); });
+document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if(it) loadFile(it.getAsFile()); });
+
+/* ═════════ before / after ═════════ */
+function setBefore(on){ if(showOrig === on || (on && S.mode === 'thermal')) return; showOrig = on; $('#before').setAttribute('aria-pressed', on); schedule(); }
+const bb = $('#before');
+bb.addEventListener('pointerdown', () => setBefore(true));
+['pointerup','pointerleave','pointercancel'].forEach(ev => bb.addEventListener(ev, () => setBefore(false)));
+document.addEventListener('keydown', e => { if(e.code === 'Space' && !e.repeat && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)){ e.preventDefault(); setBefore(true); } });
+document.addEventListener('keyup', e => { if(e.code === 'Space') setBefore(false); });
+
+/* ═════════ presets ═════════ */
+function buildPresetSelect(){
+  const groups = ['Portrait','Hybrid'];
+  $('#preset').innerHTML = `<option value="" disabled>プリセット</option>` +
+    groups.map(g => `<optgroup label="${g}">${PRESETS.map((p, i) => p.group === g ? `<option value="b${i}">${p.name}</option>` : '').join('')}</optgroup>`).join('') +
+    (userPresets.length ? `<optgroup label="保存した設定">${userPresets.map((p, i) => `<option value="u${i}">${escapeHTML(p.name)}</option>`).join('')}</optgroup>` : '');
+}
+function applyState(s){
+  S = merge(BASE, s);
+  if(S.mode === 'thermal') S.mode = 'hybrid';
+  buildLut(S.thermal.palette); syncUI(); fit(); schedule();
+}
+$('#preset').addEventListener('change', e => {
+  const v = e.target.value, p = v[0] === 'b' ? PRESETS[+v.slice(1)] : userPresets[+v.slice(1)];
+  if(p){ applyState(clone(p.s)); toast(`「${p.name}」を適用しました`); }
+});
+$('#savePreset').addEventListener('click', () => {
+  const d = new Date(), name = `${S.mode.toUpperCase()} ${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  userPresets.push({name, s:clone(S)});
+  try { localStorage.setItem('smearworks.presets', JSON.stringify(userPresets)); toast(`「${name}」として保存しました`); }
+  catch { toast('このブラウザでは保存できません。JSONで書き出してください'); }
+  buildPresetSelect(); $('#preset').value = 'u' + (userPresets.length - 1);
+});
+$('#reset').addEventListener('click', () => {
+  const mode = S.mode, p = PRESETS.find(p => p.group.toLowerCase() === mode);
+  applyState(clone(p.s)); $('#preset').value = 'b' + PRESETS.indexOf(p); toast(`${mode.toUpperCase()} の初期設定に戻しました`);
+});
+
+/* ═════════ export ═════════ */
+let toastT = 0;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3400); }
+let dlP = null;
+function downloads(){
+  if(!dlP) dlP = (async () => { try { return window.claude?.use ? await window.claude.use('downloads') : null; } catch { return null; } })();
+  return dlP;
+}
+if(window.claude?.use) downloads();
+let modalURL = null;
+function modal({img, text, msg}){
+  if(modalURL){ URL.revokeObjectURL(modalURL); modalURL = null; }
+  $('#modalImg').hidden = !img; $('#modalText').hidden = !text;
+  if(img){ modalURL = URL.createObjectURL(img); $('#modalImg').src = modalURL; }
+  if(text) $('#modalText').value = text;
+  $('#modalMsg').textContent = msg; $('#modal').hidden = false;
+}
+$('#modalClose').addEventListener('click', () => $('#modal').hidden = true);
+function plainDownload(name, data){
+  const blob = data instanceof Blob ? data : new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('保存しました');
+}
+async function save(name, data, fallback){
+  if(!window.claude?.use){ plainDownload(name, data); return; }
+  const dl = await downloads();
+  if(!dl){ fallback(); return; }
+  try { await dl.save({filename:name, data}); toast('保存しました'); }
+  catch(e){
+    if(e?.code === 'declined') toast('保存をキャンセルしました');
+    else if(e?.code === 'rate_limited') toast('保存の確認がすでに開いています');
+    else fallback();
+  }
+}
+async function exportImage(){
+  const fmt = $('#exFmt').value;
+  let w, h;
+  if($('#exSize').value === 'preview') [w, h] = previewSize();
+  else { const [W, H] = dims(), cap = Math.min(4096, MAXTEX), k = S.mode === 'thermal' ? cap/Math.max(W, H) : Math.min(1, cap/Math.max(W, H)); w = Math.round(W*k); h = Math.round(H*k); }
+  toast(`${w} × ${h}px で書き出し中…`);
+  await new Promise(r => setTimeout(r, 40));
+  const set = S.mode === 'thermal' ? null : makeSet(w, h), outT = makeTarget(w, h, false);
+  if((set && !set.ok) || !outT.ok){ if(set) freeSet(set); freeTarget(outT); toast('メモリが足りません。サイズを「プレビューと同じ」にして試してください'); return; }
+  runPipeline(set, outT, w, h);
+  const px = new Uint8Array(w*h*4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, outT.fb);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  if(set) freeSet(set); freeTarget(outT);
+  schedule();
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer), w, h), 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, fmt === 'jpg' ? 'image/jpeg' : 'image/png', .95));
+  $('#toast').hidden = true;
+  save(`${S.mode === 'thermal' ? 'thermal' : fileName}-${S.mode}-${w}x${h}.${fmt}`, blob, () => modal({img:blob, msg:'この画面ではファイル保存が使えません。画像を長押し、または右クリックして保存してください。'}));
+}
+$('#export').addEventListener('click', exportImage);
+$('#export2').addEventListener('click', exportImage);
+$('#jsonOut').addEventListener('click', () => {
+  const text = JSON.stringify({app:'smearworks', version:2, settings:S}, null, 2);
+  save('smearworks-settings.json', text, () => modal({text, msg:'この画面ではファイル保存が使えません。上のテキストをコピーして保存してください。'}));
+});
+$('#jsonIn').addEventListener('click', () => $('#jsonFile').click());
+$('#jsonFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  try { const j = JSON.parse(await f.text()); applyState(j.settings || j); toast('設定を読み込みました'); }
+  catch { toast('JSONを読み込めませんでした。書き出したファイルか確認してください'); }
+});
+
+/* ═════════ boot ═════════ */
+uploadSource(makeSample());
+buildLut(S.thermal.palette);
+buildCards(); buildPresetSelect(); $('#preset').value = 'b0';
+syncUI(); fit(); draw(); drawOverlay();
+window.__sw = {applyPreset:i => applyState(clone(PRESETS[i].s)), setActive, toggleMask:() => $('#showMask').click()};
+})();
+</script>
+</body>
+</html>
