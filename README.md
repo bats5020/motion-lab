@@ -20,7 +20,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | ツール | カテゴリ | 何をするか |
 |---|---|---|
 | [Egg Glass](tools/egg-glass/) | motion | 卵形3Dの柄・ロゴ・照明・SVG背景を編集。スクロールキーフレーム、PNG／動画／単体HTML書き出し（[使い方・正本](tools/egg-glass/README.md)） |
-| [Lineup Poster](tools/lineup-poster.html) | raster | スタメン告知ポスターを写真とテキストから生成。デュオトーン+縦スメアの選手カード、白帯ネームバー、配色テーマ、グレイン背景、PNG書き出し |
+| [Duotone Smear](tools/duotone-smear.html) | raster | 写真1枚をデュオトーン+縦スメアのカード質感に加工。インク/ハイライト/シャドウの3色、上下ウォッシュ、グレイン、PNG書き出し |
 | [Halftone Lab](tools/halftone-lab.html) | raster | 画像・プロシージャルソースをハーフトーン／ディザ／ASCII化。メルト・消灯セル・アニメ＋動画録画・SVG／コード書き出し |
 | [Effect Stack](tools/effect-stack.html) | raster | 14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応（リアルタイム適用＋動画録画）、ランダマイズ＋スタック刻印 |
 | [Grid Stretch](tools/grid-stretch.html) | raster | 画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きグリッチ |
