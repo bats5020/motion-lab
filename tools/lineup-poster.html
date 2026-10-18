@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lineup Poster</title>
+<style>
+:root{
+  --bg:#0a0a0b;--panel:#141417;--panel2:#1c1c21;--line:#2a2a31;
+  --text:#e6e6ef;--sub:#9a9aa6;--faint:#6a6a74;--accent:#4f5cff;
+  --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-font-smoothing:antialiased;overflow:hidden}
+#app{display:flex;width:100vw;height:100vh}
+#stage{flex:1 1 auto;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;padding:34px;background:
+  radial-gradient(1200px 800px at 30% 20%,#101014,var(--bg))}
+#view{max-width:100%;max-height:100%;display:block;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329;background:#000;cursor:pointer}
+#meta{position:absolute;bottom:14px;right:16px;color:var(--faint);font-size:10px;letter-spacing:.06em;pointer-events:none}
+#dropOv{position:absolute;inset:12px;border:2px dashed var(--accent);border-radius:10px;display:none;
+  align-items:center;justify-content:center;color:var(--accent);font-size:14px;letter-spacing:.2em;
+  background:rgba(79,92,255,.08);pointer-events:none;z-index:5}
+#dropOv.on{display:flex}
+#panel{flex:0 0 344px;width:344px;height:100%;overflow-y:auto;background:var(--panel);
+  border-left:1px solid var(--line);padding:0 0 60px}
+#panel::-webkit-scrollbar{width:8px}
+#panel::-webkit-scrollbar-thumb{background:#2c2c34;border-radius:4px}
+#panel header{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+#panel h1{margin:0 0 3px;font-size:14px;letter-spacing:.22em;font-weight:700}
+#panel h1 em{color:var(--accent);font-style:normal}
+#panel header p{margin:0;color:var(--sub);font-size:10px;letter-spacing:.02em}
+#exportBar{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);
+  position:sticky;top:0;z-index:20}
+#exportBar .btn{flex:1;padding:7px 4px;text-align:center}
+section{border-bottom:1px solid var(--line);padding:13px 16px}
+section>h2{margin:0 0 10px;font-size:10.5px;color:var(--sub);letter-spacing:.24em;font-weight:600}
+section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+.seg button{flex:1;background:none;border:none;color:var(--sub);font:10.5px var(--mono);
+  padding:7px 2px;cursor:pointer;letter-spacing:.02em;white-space:nowrap}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button:not(.on):hover{color:var(--text)}
+.prow{display:flex;align-items:center;gap:8px;margin-top:8px}
+.prow>span:first-child{flex:0 0 88px;color:var(--sub);font-size:10.5px}
+.prow input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
+  background:#33333c;outline:none;cursor:pointer}
+.prow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--text);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
+.prow input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
+.prow .pv{flex:0 0 34px;text-align:right;color:var(--faint);font-size:10px}
+.prow select{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  color:var(--text);font:11px var(--mono);padding:4px 6px;min-width:0}
+.prow input[type=number]{width:64px;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  color:var(--text);font:11px var(--mono);padding:4px 6px}
+.prow input[type=text]{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  color:var(--text);font:11px var(--mono);padding:4px 6px;min-width:0}
+.prow input[type=color]{width:26px;height:22px;padding:0;border:1px solid var(--line);border-radius:4px;
+  background:var(--bg);cursor:pointer}
+.prow input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);
+  font:11px var(--mono);padding:6px 10px;cursor:pointer;letter-spacing:.04em}
+.btn:hover{border-color:var(--accent)}
+.btn.wide{width:100%;margin-top:8px}
+.btnrow{display:flex;gap:7px;margin-top:8px}
+.btnrow .btn{flex:1}
+.hint{color:var(--faint);font-size:9.5px;margin-top:6px;letter-spacing:.02em}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--sub);
+  font:10px var(--mono);padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chips .chip:hover{border-color:var(--accent);color:var(--text)}
+.chips .chip.on{border-color:var(--accent);color:var(--text)}
+.chips .chip i{width:16px;height:8px;border-radius:3px;display:inline-block}
+.card-item{border:1px solid var(--line);border-radius:7px;margin-top:8px;background:var(--panel2);padding:8px 10px}
+.card-item.sel{border-color:var(--accent)}
+.card-item .ci-head{display:flex;align-items:center;gap:8px}
+.card-item .ci-num{color:var(--faint);font-size:10px;flex:0 0 18px}
+.card-item .ci-thumb{width:34px;height:44px;border-radius:4px;background:#000;border:1px solid var(--line);
+  object-fit:cover;flex:0 0 34px;cursor:pointer}
+.card-item .ci-fields{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.card-item input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  color:var(--text);font:10.5px var(--mono);padding:3px 6px}
+.card-item .ci-row2{display:flex;gap:4px}
+.card-item .ci-row2 input:first-child{width:52px;flex:0 0 52px}
+.card-item .ci-row2 input:last-child{width:44px;flex:0 0 44px}
+.card-item .ci-row2 input.ci-name{flex:1;width:auto}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(8px);z-index:99;
+  background:var(--panel2);border:1px solid var(--accent);color:var(--text);border-radius:6px;
+  padding:8px 16px;font:11px var(--mono);opacity:0;transition:opacity .15s,transform .15s;pointer-events:none}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:760px){
+  #app{flex-direction:column}
+  #stage{padding:16px;min-height:44vh}
+  #panel{flex:1;width:100%;border-left:none;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<div id="app">
+  <main id="stage">
+    <canvas id="view" width="864" height="1080"></canvas>
+    <div id="meta"></div>
+    <div id="dropOv">写真をドロップ（カード上なら差し替え）</div>
+  </main>
+  <aside id="panel">
+    <header>
+      <h1><em>&#9670;</em> LINEUP POSTER</h1>
+      <p>スタメン告知グラフィックを写真とテキストから生成</p>
+    </header>
+    <div id="exportBar">
+      <button class="btn" id="btnPng1">PNG保存</button>
+      <button class="btn" id="btnPng2">PNG ×2</button>
+      <button class="btn" id="btnUrl">URL</button>
+    </div>
+    <section><h2><b>01</b>配色テーマ</h2>
+      <div class="chips" id="themeChips"></div>
+      <div id="themeOpts"></div>
+    </section>
+    <section><h2><b>02</b>キャンバス</h2>
+      <div id="sizeBlock"></div>
+    </section>
+    <section><h2><b>03</b>ヘッダー</h2>
+      <div id="headerOpts"></div>
+    </section>
+    <section><h2><b>04</b>カード</h2>
+      <div id="cardCountRow"></div>
+      <div id="cardList"></div>
+      <div class="hint">サムネクリック=写真選択。キャンバスのカードに直接ドロップでも差し替え可</div>
+    </section>
+    <section><h2><b>05</b>写真の加工</h2>
+      <div id="fxOpts"></div>
+    </section>
+    <section><h2><b>06</b>背景</h2>
+      <div id="bgOpts"></div>
+    </section>
+    <section><h2><b>07</b>フッター</h2>
+      <div id="footerOpts"></div>
+    </section>
+    <input type="file" id="fileCard" accept="image/*" hidden>
+    <input type="file" id="fileBg" accept="image/*" hidden>
+    <input type="file" id="fileLogo" accept="image/*" hidden>
+  </aside>
+</div>
+<div id="toast"></div>
+<script>
+'use strict';
+/* ============ utils ============ */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+function ce(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e}
+function mulberry32(a){a=a>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hex2rgb(hx){const n=parseInt(hx.slice(1),16);return[n>>16&255,n>>8&255,n&255]}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('on'),2400)}
+function download(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
+}
+/* ============ state ============ */
+const SIZE_PRESETS={'45':[1080,1350],'11':[1080,1080],'916':[1080,1920],'169':[1920,1080]};
+const state={
+  seed:20261019,
+  canvas:{mode:'45',w:1080,h:1350},
+  theme:{name:'GAME RED',ink:'#e8102a',paper:'#f4f2ec',dark:'#0c0c0e'},
+  header:{title:'STARTING\nLINEUP',size:100,skew:true,spTitle:'TISSOT',spSub:'SWISS WATCHES SINCE 1853',spLogo:null,spSize:100},
+  cards:{count:5,smear:65,wash:70,contrast:55,strip:true},
+  bg:{img:null,dark:62,grain:34},
+  footer:{left:'TOR',center:'VS',right:'MIL',size:100},
+  slots:[]
+};
+for(let i=0;i<6;i++)state.slots.push({img:null,pos:'',name:'',num:''});
+const DEMO_META=[['FG','SCOTTIE BARNES','4'],['FG','RJ BARRETT','9'],['C','JAKOB POELTL','19'],['G','IMMANUEL QUICKLEY','5'],['F','BRANDON INGRAM','3'],['G','PLAYER SIX','11']];
+/* ============ themes ============ */
+const THEMES=[
+ {name:'GAME RED',ink:'#e8102a',paper:'#f4f2ec',dark:'#0c0c0e'},
+ {name:'COURT BLUE',ink:'#1b4fff',paper:'#eef2f8',dark:'#070a14'},
+ {name:'VOLT',ink:'#c8f531',paper:'#101210',dark:'#0a0c08'},
+ {name:'CHAMPAGNE',ink:'#c89b3c',paper:'#f5efe0',dark:'#0e0c08'},
+ {name:'MONO',ink:'#e9e9ee',paper:'#f4f2ec',dark:'#0a0a0c'}
+];
+/* ============ demo placeholders ============ */
+function makeDemoPlayer(i){
+  const w=600,h=780;
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const x=cv.getContext('2d');
+  const rng=mulberry32(900+i*77);
+  const g=x.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#9a9aa2');g.addColorStop(1,'#515158');
+  x.fillStyle=g;x.fillRect(0,0,w,h);
+  /* 背景の淡い光 */
+  const rg=x.createRadialGradient(w*.5,h*.34,30,w*.5,h*.34,w*.72);
+  rg.addColorStop(0,'rgba(255,255,255,.55)');rg.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=rg;x.fillRect(0,0,w,h);
+  const cx=w*(.46+rng()*.08),hy=h*(.3+rng()*.06),hr=w*(.17+rng()*.03);
+  /* 肩 */
+  x.fillStyle='#2e2e34';
+  x.beginPath();
+  x.moveTo(cx-hr*2.6,h);
+  x.bezierCurveTo(cx-hr*2.4,hy+hr*1.5,cx-hr*1.25,hy+hr*.95,cx,hy+hr*1.02);
+  x.bezierCurveTo(cx+hr*1.25,hy+hr*.95,cx+hr*2.4,hy+hr*1.5,cx+hr*2.6,h);
+  x.closePath();x.fill();
+  /* 首・頭 */
+  x.fillStyle='#8a7a6e';
+  x.fillRect(cx-hr*.34,hy+hr*.55,hr*.68,hr*.75);
+  x.beginPath();x.ellipse(cx,hy,hr*.82,hr,0,0,7);x.fill();
+  /* 顔のハイライト/陰影(デュオトーンで映える明暗) */
+  const fg=x.createLinearGradient(cx-hr,hy-hr,cx+hr,hy+hr);
+  fg.addColorStop(0,'rgba(255,255,255,.75)');
+  fg.addColorStop(.55,'rgba(255,255,255,.08)');
+  fg.addColorStop(1,'rgba(0,0,0,.42)');
+  x.fillStyle=fg;
+  x.beginPath();x.ellipse(cx,hy,hr*.82,hr,0,0,7);x.fill();
+  /* 髪 */
+  x.fillStyle='#17171c';
+  x.beginPath();x.ellipse(cx,hy-hr*.52,hr*.86,hr*.55,0,Math.PI,0);x.closePath();x.fill();
+  if(rng()<.5){x.fillRect(cx-hr*.86,hy-hr*.62,hr*1.72,hr*.3)}
+  /* 目元の影 */
+  x.fillStyle='rgba(10,10,14,.5)';
+  x.beginPath();x.ellipse(cx-hr*.32,hy-hr*.08,hr*.17,hr*.09,0,0,7);x.fill();
+  x.beginPath();x.ellipse(cx+hr*.32,hy-hr*.08,hr*.17,hr*.09,0,0,7);x.fill();
+  x.fillStyle='rgba(10,10,14,.35)';
+  x.fillRect(cx-hr*.26,hy+hr*.42,hr*.52,hr*.1);
+  /* 粒 */
+  const id=x.getImageData(0,0,w,h),d=id.data;
+  for(let p=0;p<d.length;p+=4){const n=(rng()-.5)*22;d[p]+=n;d[p+1]+=n;d[p+2]+=n}
+  x.putImageData(id,0,0);
+  const img=new Image();
+  img.src=cv.toDataURL('image/jpeg',.9);
+  return img;
+}
+function makeDemoBg(){
+  const w=1080,h=1350;
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const x=cv.getContext('2d');
+  const rng=mulberry32(4242);
+  const g=x.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#3c3c42');g.addColorStop(.5,'#232327');g.addColorStop(1,'#101013');
+  x.fillStyle=g;x.fillRect(0,0,w,h);
+  /* ビル群シルエット(2層) */
+  for(let layer=0;layer<2;layer++){
+    const base=h*(.52+layer*.16),tone=layer?22:38;
+    x.fillStyle='rgb('+tone+','+tone+','+(tone+4)+')';
+    let bx=-20;
+    while(bx<w+20){
+      const bw=30+rng()*90,bh=h*(.08+rng()*.3)*(layer?1.25:1);
+      x.fillRect(bx,base-bh,bw,bh+h);
+      /* 窓 */
+      if(!layer&&rng()<.8){
+        x.fillStyle='rgba(210,210,220,.16)';
+        for(let wy=base-bh+8;wy<base-6;wy+=14)
+          for(let wx=bx+5;wx<bx+bw-6;wx+=12)
+            if(rng()<.3)x.fillRect(wx,wy,5,7);
+        x.fillStyle='rgb('+tone+','+tone+','+(tone+4)+')';
+      }
+      bx+=bw+4+rng()*18;
+    }
+  }
+  /* 道路 */
+  x.fillStyle='#0d0d10';
+  x.fillRect(0,h*.82,w,h*.18);
+  x.strokeStyle='rgba(220,220,228,.25)';x.lineWidth=3;
+  x.setLineDash([26,20]);
+  x.beginPath();x.moveTo(w*.18,h);x.lineTo(w*.46,h*.82);x.stroke();
+  x.beginPath();x.moveTo(w*.86,h);x.lineTo(w*.6,h*.82);x.stroke();
+  x.setLineDash([]);
+  const img=new Image();
+  img.src=cv.toDataURL('image/jpeg',.88);
+  return img;
+}
+/* ============ layout ============ */
+function fullSize(){
+  const c=state.canvas;
+  if(c.mode==='custom')return[clamp(c.w|0,320,4096)&~1,clamp(c.h|0,320,4096)&~1];
+  return SIZE_PRESETS[c.mode]||SIZE_PRESETS['45'];
+}
+function rowsFor(n){
+  if(n<=3)return[n];
+  if(n===4)return[2,2];
+  if(n===5)return[3,2];
+  return[3,3];
+}
+let _layoutRects=[];/* プレビュー座標でのカード矩形(ドロップ/クリック判定用) */
+/* ============ card treatment ============ */
+function coverDraw(ctx,img,w,h){
+  const iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+  if(!iw||!ih)return;
+  const s=Math.max(w/iw,h/ih);
+  ctx.drawImage(img,(w-iw*s)/2,(h-ih*s)/2,iw*s,ih*s);
+}
+function buildRamp(theme){
+  /* 黒→テーマ色→紙白 のグラデーションマップLUT */
+  const stops=[[0,[16,14,16]],[.48,hex2rgb(theme.ink)],[.86,hex2rgb(theme.paper)],[1,[255,255,255]]];
+  const lut=new Uint8Array(256*3);
+  for(let i=0;i<256;i++){
+    const t=i/255;
+    let a=stops[0],b=stops[stops.length-1];
+    for(let j=0;j<stops.length-1;j++)if(t>=stops[j][0]&&t<=stops[j+1][0]){a=stops[j];b=stops[j+1];break}
+    const f=(t-a[0])/Math.max(b[0]-a[0],1e-5);
+    const sf=f*f*(3-2*f);
+    for(let k=0;k<3;k++)lut[i*3+k]=Math.round(a[1][k]+(b[1][k]-a[1][k])*sf);
+  }
+  return lut;
+}
+function treatCard(img,w,h,seedIdx){
+  const t=state.theme,fx=state.cards;
+  const out=document.createElement('canvas');out.width=w;out.height=h;
+  const ox=out.getContext('2d');
+  const rng=mulberry32((state.seed^(seedIdx*7919))>>>0);
+  /* 1. グレースケール高コントラスト */
+  const base=document.createElement('canvas');base.width=w;base.height=h;
+  const bx=base.getContext('2d');
+  bx.filter='grayscale(1) contrast('+(1+fx.contrast/100*.9)+') brightness(1.04)';
+  coverDraw(bx,img,w,h);
+  bx.filter='none';
+  /* 2. 縦スメア(screen合成で明部が尾を引く) */
+  const sm=document.createElement('canvas');sm.width=w;sm.height=h;
+  const sx=sm.getContext('2d');
+  sx.drawImage(base,0,0);
+  const amt=fx.smear/100;
+  if(amt>.01){
+    const N=14,maxUp=h*.38*amt,maxDn=h*.14*amt;
+    sx.globalCompositeOperation='screen';
+    for(let i=1;i<=N;i++){
+      const f=i/N;
+      sx.globalAlpha=(1-f)*.24*amt+.02;
+      sx.drawImage(base,0,-Math.pow(f,1.35)*maxUp);
+      sx.globalAlpha=(1-f)*.12*amt;
+      sx.drawImage(base,0,Math.pow(f,1.35)*maxDn);
+    }
+    sx.globalCompositeOperation='source-over';
+    sx.globalAlpha=1;
+  }
+  /* 3. デュオトーン(グラデーションマップ) */
+  const id=sx.getImageData(0,0,w,h),d=id.data;
+  const lut=_rampCache||(_rampCache=buildRamp(t));
+  for(let p=0;p<d.length;p+=4){
+    const l=(d[p]*77+d[p+1]*150+d[p+2]*29)>>8;
+    d[p]=lut[l*3];d[p+1]=lut[l*3+1];d[p+2]=lut[l*3+2];
+  }
+  sx.putImageData(id,0,0);
+  ox.drawImage(sm,0,0);
+  /* 4. インクのウォッシュ(multiplyで白→テーマ色へ沈める) */
+  const washA=fx.wash/100;
+  if(washA>.01){
+    const ang=rng()<.5?0:(rng()-.5)*.5;
+    const reach=.42+rng()*.22;
+    ox.save();
+    ox.globalCompositeOperation='multiply';
+    ox.translate(w/2,0);ox.rotate(ang);ox.translate(-w/2,0);
+    const wg=ox.createLinearGradient(0,-h*.1,0,h*reach);
+    const ink=t.ink;
+    wg.addColorStop(0,ink);
+    wg.addColorStop(.72,ink+'cc');
+    wg.addColorStop(1,ink+'00');
+    ox.fillStyle=wg;
+    ox.globalAlpha=washA;
+    ox.fillRect(-w*.3,-h*.15,w*1.6,h*(reach+.2));
+    ox.restore();
+    /* 下からの弱いウォッシュ(カードごとに有無) */
+    if(rng()<.55){
+      ox.save();
+      ox.globalCompositeOperation='multiply';
+      const wg2=ox.createLinearGradient(0,h,0,h*(1-.3-rng()*.2));
+      wg2.addColorStop(0,ink);
+      wg2.addColorStop(1,ink+'00');
+      ox.fillStyle=wg2;
+      ox.globalAlpha=washA*.7;
+      ox.fillRect(0,h*.4,w,h*.6);
+      ox.restore();
+    }
+  }
+  /* 5. カード内グレイン */
+  ox.globalAlpha=.1;
+  ox.drawImage(noiseTile(),0,0,w,h);
+  ox.globalAlpha=1;
+  return out;
+}
+let _rampCache=null;
+let _noiseCv=null;
+function noiseTile(){
+  if(_noiseCv)return _noiseCv;
+  const s=256;
+  const cv=document.createElement('canvas');cv.width=s;cv.height=s;
+  const x=cv.getContext('2d');
+  const id=x.createImageData(s,s),d=id.data;
+  const rng=mulberry32(777);
+  for(let p=0;p<d.length;p+=4){
+    const v=rng()*255;
+    d[p]=v;d[p+1]=v;d[p+2]=v;d[p+3]=255;
+  }
+  x.putImageData(id,0,0);
+  _noiseCv=cv;
+  return cv;
+}
+/* ============ poster render ============ */
+const view=$('#view'),vctx=view.getContext('2d'),meta=$('#meta');
+const COND="'Arial Narrow','Helvetica Neue',Helvetica,Arial,sans-serif";
+function drawCondText(ctx,text,x,y,size,weight,color,align,skew,scaleX){
+  ctx.save();
+  ctx.translate(x,y);
+  if(skew)ctx.transform(1,0,-0.22,1,0,0);
+  ctx.scale(scaleX||.92,1);
+  ctx.font=weight+' '+size+'px '+COND;
+  ctx.fillStyle=color;
+  ctx.textAlign=align||'left';
+  ctx.textBaseline='alphabetic';
+  ctx.fillText(text,0,0);
+  ctx.restore();
+}
+function condWidth(ctx,text,size,weight,scaleX){
+  ctx.save();
+  ctx.font=weight+' '+size+'px '+COND;
+  const w=ctx.measureText(text).width*(scaleX||.92);
+  ctx.restore();
+  return w;
+}
+function renderPoster(scaleMul,forExport){
+  const[BW,BH]=fullSize();
+  const sc=scaleMul;
+  const W=Math.round(BW*sc),H=Math.round(BH*sc);
+  if(view.width!==W||view.height!==H){view.width=W;view.height=H}
+  const x=vctx,t=state.theme;
+  /* ---- 背景 ---- */
+  x.fillStyle=t.dark;
+  x.fillRect(0,0,W,H);
+  const bgi=state.bg.img||_demoBg;
+  if(bgi&&bgi.complete&&(bgi.naturalWidth||bgi.width)){
+    x.save();
+    x.filter='grayscale(1) contrast(1.1) brightness('+(1-state.bg.dark/100*.75)+')';
+    coverDraw(x,bgi,W,H);
+    x.filter='none';
+    const vg=x.createLinearGradient(0,0,0,H);
+    vg.addColorStop(0,'rgba(8,8,10,.82)');
+    vg.addColorStop(.42,'rgba(8,8,10,.28)');
+    vg.addColorStop(1,'rgba(8,8,10,.6)');
+    x.fillStyle=vg;x.fillRect(0,0,W,H);
+    x.restore();
+  }
+  if(state.bg.grain>0){
+    x.globalAlpha=state.bg.grain/100*.5;
+    for(let ty=0;ty<H;ty+=256*sc)
+      for(let tx=0;tx<W;tx+=256*sc)
+        x.drawImage(noiseTile(),tx,ty,256*sc,256*sc);
+    x.globalAlpha=1;
+  }
+  const M=W*.055;
+  /* ---- ヘッダー ---- */
+  const hd=state.header;
+  const titleLines=(hd.title||'').split('\n').filter(l=>l.length);
+  const tSize=W*.085*(hd.size/100);
+  let ty=M+tSize*.92;
+  x.save();
+  titleLines.forEach(line=>{
+    drawCondText(x,line,M,ty,tSize,'900',t.paper,'left',hd.skew,.88);
+    ty+=tSize*.9;
+  });
+  x.restore();
+  const headerBottom=Math.max(ty-tSize*.9+tSize*.28,M+tSize*1.1);
+  /* スポンサー(右上) */
+  const spSc=hd.spSize/100;
+  if(hd.spLogo&&hd.spLogo.complete&&hd.spLogo.naturalWidth){
+    const lw=W*.24*spSc,lh=lw*(hd.spLogo.naturalHeight/hd.spLogo.naturalWidth);
+    /* 紙色に単色化 */
+    const lt=document.createElement('canvas');lt.width=Math.max(2,Math.round(lw));lt.height=Math.max(2,Math.round(lh));
+    const ltx=lt.getContext('2d');
+    ltx.drawImage(hd.spLogo,0,0,lt.width,lt.height);
+    ltx.globalCompositeOperation='source-in';
+    ltx.fillStyle=t.paper;ltx.fillRect(0,0,lt.width,lt.height);
+    x.drawImage(lt,W-M-lw,M+tSize*.08);
+  }else if(hd.spTitle){
+    const sSize=W*.052*spSc;
+    drawCondText(x,hd.spTitle,W-M,M+sSize*.95,sSize,'900',t.paper,'right',false,.92);
+    if(hd.spSub){
+      x.save();
+      x.font='600 '+(W*.014*spSc)+'px '+COND;
+      x.fillStyle=t.paper;
+      x.textAlign='right';
+      const sub=hd.spSub.split('').join(' ');
+      x.globalAlpha=.92;
+      x.fillText(sub,W-M,M+sSize*1.5);
+      x.restore();
+    }
+  }
+  /* ---- フッター ---- */
+  const ft=state.footer;
+  const fSize=W*.05*(ft.size/100);
+  const footerTop=H-M*.5-fSize;
+  if(ft.left)drawCondText(x,ft.left,M,H-M*.55,fSize,'900',t.ink,'left',true,.88);
+  if(ft.right)drawCondText(x,ft.right,W-M,H-M*.55,fSize,'900',t.ink,'right',true,.88);
+  if(ft.center)drawCondText(x,ft.center,W/2,H-M*.55,fSize*.72,'900',t.ink,'center',true,.88);
+  /* ---- カード領域 ---- */
+  const n=clamp(state.cards.count,1,6);
+  const rows=rowsFor(n);
+  const gap=W*.022;
+  const regionTop=headerBottom+H*.028;
+  const regionBottom=footerTop-H*.022;
+  const regionH=regionBottom-regionTop;
+  const rowH=(regionH-(rows.length-1)*gap)/rows.length;
+  const CARD_AR=.74;/* w/h */
+  _layoutRects=[];
+  let slotIdx=0;
+  let cy=regionTop;
+  rows.forEach(rowN=>{
+    let cw=rowH*CARD_AR;
+    let totalW=rowN*cw+(rowN-1)*gap;
+    let ch=rowH;
+    const maxW=W-2*M;
+    if(totalW>maxW){
+      const k=maxW/totalW;
+      cw*=k;ch*=k;
+      totalW=maxW;
+    }
+    let cx0=(W-totalW)/2;
+    const cyMid=cy+(rowH-ch)/2;
+    for(let i=0;i<rowN;i++){
+      const slot=state.slots[slotIdx];
+      const rx=cx0+i*(cw+gap);
+      drawCard(x,slot,rx,cyMid,cw,ch,slotIdx);
+      _layoutRects.push({x:rx,y:cyMid,w:cw,h:ch,idx:slotIdx});
+      slotIdx++;
+    }
+    cy+=rowH+gap;
+  });
+  meta.textContent=BW+'×'+BH+(sc!==1?'  ·  preview ×'+sc.toFixed(2):'');
+}
+function drawCard(x,slot,cx,cy,cw,ch,idx){
+  const t=state.theme;
+  const stripH=state.cards.strip?Math.round(ch*.088):0;
+  const imgH=ch-stripH;
+  const img=slot.img||_demoPlayers[idx%_demoPlayers.length];
+  /* 影 */
+  x.save();
+  x.shadowColor='rgba(0,0,0,.55)';
+  x.shadowBlur=ch*.04;
+  x.shadowOffsetY=ch*.012;
+  x.fillStyle='#000';
+  x.fillRect(cx,cy,cw,ch);
+  x.restore();
+  if(img&&img.complete&&(img.naturalWidth||img.width)){
+    const treated=treatCard(img,Math.round(cw),Math.round(imgH),idx);
+    x.drawImage(treated,cx,cy);
+  }else{
+    x.fillStyle='#1a1a1f';
+    x.fillRect(cx,cy,cw,imgH);
+    x.fillStyle='rgba(230,230,239,.25)';
+    x.font='600 '+(cw*.08)+'px '+COND;
+    x.textAlign='center';
+    x.fillText('PHOTO',cx+cw/2,cy+imgH/2);
+  }
+  /* 白帯 */
+  if(stripH>0){
+    x.fillStyle=t.paper;
+    x.fillRect(cx,cy+imgH,cw,stripH);
+    const meta=DEMO_META[idx]||['','',''];
+    const pos=slot.pos||(slot.img?'':meta[0]);
+    const name=slot.name||(slot.img?'':meta[1]);
+    const num=slot.num||(slot.img?'':meta[2]);
+    const fs=stripH*.42;
+    x.save();
+    x.font='800 '+fs+'px '+COND;
+    x.fillStyle='#101013';
+    x.textBaseline='middle';
+    const pad=cw*.055,cym=cy+imgH+stripH/2+fs*.04;
+    x.textAlign='left';
+    if(pos)x.fillText(pos,cx+pad,cym);
+    x.textAlign='right';
+    if(num)x.fillText(num,cx+cw-pad,cym);
+    x.textAlign='center';
+    if(name){
+      let nm=name,nf=fs;
+      x.font='800 '+nf+'px '+COND;
+      const maxW=cw-pad*2-(pos?x.measureText(pos+'  ').width:0)-(num?x.measureText('  '+num).width:0);
+      while(x.measureText(nm).width>maxW&&nf>stripH*.26){
+        nf-=.5;x.font='800 '+nf+'px '+COND;
+      }
+      /* 字間を少し開ける */
+      x.fillText(nm.split('').join(' '),cx+cw/2,cym);
+    }
+    x.restore();
+  }
+}
+/* ============ demo assets ============ */
+const _demoPlayers=[];
+let _demoBg=null,_demoReady=0;
+function initDemo(){
+  _demoBg=makeDemoBg();
+  _demoBg.onload=()=>{_demoReady++;redraw()};
+  for(let i=0;i<6;i++){
+    const im=makeDemoPlayer(i);
+    im.onload=()=>{_demoReady++;redraw()};
+    _demoPlayers.push(im);
+  }
+}
+/* ============ redraw (debounced) ============ */
+let _redrawReq=0;
+function redraw(){
+  if(_redrawReq)return;
+  _redrawReq=requestAnimationFrame(()=>{
+    _redrawReq=0;
+    const[BW,BH]=fullSize();
+    const st=$('#stage');
+    const availW=Math.max(100,st.clientWidth-68),availH=Math.max(100,st.clientHeight-68);
+    const cssScale=Math.min(availW/BW,availH/BH);
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const sc=Math.min(cssScale*dpr,1.6);
+    renderPoster(sc,false);
+  });
+}
+window.addEventListener('resize',redraw);
+/* ============ UI widgets ============ */
+function fmtv(v){return String(Math.round(v*10)/10)}
+function mkRange(lbl,min,max,st,val,cb){
+  const row=ce('div','prow');
+  const def=val;
+  const inp=document.createElement('input');inp.type='range';inp.min=min;inp.max=max;inp.step=st;inp.value=val;
+  const pv=ce('span','pv',fmtv(val));
+  inp.addEventListener('input',()=>{pv.textContent=fmtv(+inp.value);cb(+inp.value);redraw()});
+  inp.addEventListener('dblclick',()=>{inp.value=def;pv.textContent=fmtv(def);cb(def);redraw()});
+  inp.title='ダブルクリックで初期値に戻す';
+  row.append(ce('span',null,lbl),inp,pv);
+  return{row,set:v=>{inp.value=v;pv.textContent=fmtv(+v)}};
+}
+function mkSel(lbl,opts,val,cb){
+  const row=ce('div','prow');
+  const sel=document.createElement('select');
+  opts.forEach(o=>{const op=document.createElement('option');op.value=o[0];op.textContent=o[1];sel.appendChild(op)});
+  sel.value=val;
+  sel.addEventListener('change',()=>{cb(sel.value);redraw()});
+  row.append(ce('span',null,lbl),sel);
+  return{row,set:v=>{sel.value=v}};
+}
+function mkChk(lbl,val,cb){
+  const row=ce('div','prow');
+  const inp=document.createElement('input');inp.type='checkbox';inp.checked=!!val;
+  inp.addEventListener('change',()=>{cb(inp.checked);redraw()});
+  row.append(ce('span',null,lbl),inp);
+  return{row,set:v=>{inp.checked=!!v}};
+}
+function mkTxt(lbl,val,cb,multi){
+  const row=ce('div','prow');
+  let inp;
+  if(multi){
+    inp=document.createElement('textarea');
+    inp.rows=2;
+    inp.style.cssText='flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;color:var(--text);font:11px var(--mono);padding:4px 6px;resize:vertical;min-width:0';
+  }else{
+    inp=document.createElement('input');inp.type='text';
+  }
+  inp.value=val;
+  inp.addEventListener('input',()=>{cb(inp.value);redraw()});
+  row.append(ce('span',null,lbl),inp);
+  return{row,set:v=>{inp.value=v}};
+}
+function mkCol(lbl,val,cb){
+  const row=ce('div','prow');
+  const inp=document.createElement('input');inp.type='color';inp.value=val;
+  inp.addEventListener('input',()=>{cb(inp.value);_rampCache=null;redraw()});
+  row.append(ce('span',null,lbl),inp);
+  return{row,set:v=>{inp.value=v}};
+}
+const UI={};
+/* ============ build panel ============ */
+function buildTheme(){
+  const c=$('#themeChips');
+  UI.themeChips={};
+  THEMES.forEach(th=>{
+    const ch=ce('button','chip','<i style="background:linear-gradient(90deg,'+th.ink+','+th.paper+')"></i>'+th.name);
+    ch.addEventListener('click',()=>{
+      state.theme={...th};
+      _rampCache=null;
+      refreshAll();redraw();
+    });
+    UI.themeChips[th.name]=ch;
+    c.appendChild(ch);
+  });
+  UI.ink=mkCol('インク色',state.theme.ink,v=>{state.theme.ink=v;state.theme.name='CUSTOM'});
+  UI.paper=mkCol('紙色',state.theme.paper,v=>{state.theme.paper=v;state.theme.name='CUSTOM'});
+  UI.dark=mkCol('背景ベース',state.theme.dark,v=>{state.theme.dark=v;state.theme.name='CUSTOM'});
+  $('#themeOpts').append(UI.ink.row,UI.paper.row,UI.dark.row);
+}
+function buildSize(){
+  const sb=$('#sizeBlock');
+  UI.sizeSel=mkSel('サイズ',[['45','4:5 (1080×1350)'],['11','1:1 (1080×1080)'],['916','9:16 (1080×1920)'],['169','16:9 (1920×1080)'],['custom','カスタム']],state.canvas.mode,v=>{state.canvas.mode=v;refreshAll()});
+  sb.appendChild(UI.sizeSel.row);
+  const cw=ce('div','prow');cw.id='customWH';
+  const iw=document.createElement('input');iw.type='number';iw.min=320;iw.max=4096;iw.value=state.canvas.w;
+  const ih=document.createElement('input');ih.type='number';ih.min=320;ih.max=4096;ih.value=state.canvas.h;
+  iw.addEventListener('change',()=>{state.canvas.w=clamp(iw.value|0,320,4096);redraw()});
+  ih.addEventListener('change',()=>{state.canvas.h=clamp(ih.value|0,320,4096);redraw()});
+  cw.append(ce('span',null,'サイズ px'),iw,ce('span','pv','×'),ih);
+  UI.customW=iw;UI.customH=ih;
+  sb.appendChild(cw);
+}
+function buildHeader(){
+  const h=state.header,c=$('#headerOpts');
+  UI.title=mkTxt('タイトル',h.title,v=>h.title=v,true);
+  UI.titleSize=mkRange('サイズ',50,160,1,h.size,v=>h.size=v);
+  UI.skew=mkChk('斜体(スキュー)',h.skew,v=>h.skew=v);
+  UI.spTitle=mkTxt('スポンサー名',h.spTitle,v=>h.spTitle=v);
+  UI.spSub=mkTxt('サブコピー',h.spSub,v=>h.spSub=v);
+  UI.spSize=mkRange('スポンサー寸法',50,160,1,h.spSize,v=>h.spSize=v);
+  const lb=ce('button','btn wide','スポンサーロゴ画像を選択…(白抜き推奨)');
+  lb.addEventListener('click',()=>$('#fileLogo').click());
+  const lc=ce('button','btn wide','ロゴ画像を外す');
+  lc.addEventListener('click',()=>{state.header.spLogo=null;redraw();toast('ロゴ画像を外しました(テキスト表示に戻ります)')});
+  c.append(UI.title.row,UI.titleSize.row,UI.skew.row,UI.spTitle.row,UI.spSub.row,UI.spSize.row,lb,lc,
+    ce('div','hint','タイトルは改行で2行に。ロゴ画像は自動で紙色に単色化'));
+}
+function buildCards(){
+  UI.count=mkRange('カード枚数',1,6,1,state.cards.count,v=>{state.cards.count=v;buildCardList()});
+  $('#cardCountRow').appendChild(UI.count.row);
+  buildCardList();
+}
+let _slotPick=-1;
+function buildCardList(){
+  const c=$('#cardList');
+  c.innerHTML='';
+  const n=clamp(state.cards.count,1,6);
+  for(let i=0;i<n;i++){
+    const s=state.slots[i];
+    const item=ce('div','card-item');
+    const head=ce('div','ci-head');
+    const numEl=ce('div','ci-num','#'+(i+1));
+    const th=document.createElement('img');
+    th.className='ci-thumb';
+    th.alt='';
+    if(s.img)th.src=s.img.src;
+    else{th.src=_demoPlayers[i]?_demoPlayers[i].src:'';th.style.opacity=.4}
+    th.title='クリックで写真を選択';
+    th.addEventListener('click',()=>{_slotPick=i;$('#fileCard').click()});
+    const fields=ce('div','ci-fields');
+    const nameIn=document.createElement('input');
+    nameIn.type='text';nameIn.placeholder='NAME(例: '+DEMO_META[i][1]+')';nameIn.value=s.name;
+    nameIn.className='ci-name-full';
+    nameIn.addEventListener('input',()=>{s.name=nameIn.value;redraw()});
+    const row2=ce('div','ci-row2');
+    const posIn=document.createElement('input');
+    posIn.type='text';posIn.placeholder=DEMO_META[i][0]||'POS';posIn.value=s.pos;
+    posIn.addEventListener('input',()=>{s.pos=posIn.value;redraw()});
+    const numIn=document.createElement('input');
+    numIn.type='text';numIn.placeholder=DEMO_META[i][2]||'#';numIn.value=s.num;
+    numIn.addEventListener('input',()=>{s.num=numIn.value;redraw()});
+    row2.append(posIn,numIn);
+    fields.append(nameIn,row2);
+    head.append(numEl,th,fields);
+    item.appendChild(head);
+    c.appendChild(item);
+  }
+}
+function buildFx(){
+  const c=$('#fxOpts'),fx=state.cards;
+  UI.smear=mkRange('スメア(縦ブレ)',0,100,1,fx.smear,v=>fx.smear=v);
+  UI.wash=mkRange('インクウォッシュ',0,100,1,fx.wash,v=>fx.wash=v);
+  UI.contrast=mkRange('コントラスト',0,100,1,fx.contrast,v=>fx.contrast=v);
+  UI.strip=mkChk('白帯(名前バー)',fx.strip,v=>fx.strip=v);
+  const sr=ce('div','prow');
+  const si=document.createElement('input');si.type='number';si.step=1;si.min=0;si.value=state.seed;
+  si.addEventListener('change',()=>{state.seed=Math.abs(parseInt(si.value,10)||0)>>>0;redraw()});
+  const sh=ce('button','btn','シャッフル');
+  sh.addEventListener('click',()=>{state.seed=(Math.random()*1e9)>>>0;si.value=state.seed;redraw()});
+  sr.append(ce('span',null,'ウォッシュ種'),si,sh);
+  UI.seedInp=si;
+  c.append(UI.smear.row,UI.wash.row,UI.contrast.row,UI.strip.row,sr,
+    ce('div','hint','ウォッシュの向き・下からの差し色はシードでカードごとに変化'));
+}
+function buildBg(){
+  const c=$('#bgOpts');
+  const pb=ce('button','btn wide','背景写真を選択…');
+  pb.style.marginTop='0';
+  pb.addEventListener('click',()=>$('#fileBg').click());
+  const rb=ce('button','btn wide','背景写真を外す(デモ背景)');
+  rb.addEventListener('click',()=>{state.bg.img=null;redraw()});
+  UI.bgDark=mkRange('暗さ',0,100,1,state.bg.dark,v=>state.bg.dark=v);
+  UI.bgGrain=mkRange('グレイン',0,100,1,state.bg.grain,v=>state.bg.grain=v);
+  c.append(pb,rb,UI.bgDark.row,UI.bgGrain.row,
+    ce('div','hint','背景は自動でモノクロ化+暗部ゲート。都市夜景や会場写真が合います'));
+}
+function buildFooter(){
+  const c=$('#footerOpts'),f=state.footer;
+  UI.fLeft=mkTxt('左',f.left,v=>f.left=v);
+  UI.fCenter=mkTxt('中央',f.center,v=>f.center=v);
+  UI.fRight=mkTxt('右',f.right,v=>f.right=v);
+  UI.fSize=mkRange('サイズ',50,160,1,f.size,v=>f.size=v);
+  c.append(UI.fLeft.row,UI.fCenter.row,UI.fRight.row,UI.fSize.row);
+}
+function refreshAll(){
+  Object.entries(UI.themeChips).forEach(([k,ch])=>ch.classList.toggle('on',k===state.theme.name));
+  UI.ink.set(state.theme.ink);UI.paper.set(state.theme.paper);UI.dark.set(state.theme.dark);
+  UI.sizeSel.set(state.canvas.mode);
+  $('#customWH').style.display=state.canvas.mode==='custom'?'':'none';
+  UI.customW.value=state.canvas.w;UI.customH.value=state.canvas.h;
+  UI.title.set(state.header.title);UI.titleSize.set(state.header.size);UI.skew.set(state.header.skew);
+  UI.spTitle.set(state.header.spTitle);UI.spSub.set(state.header.spSub);UI.spSize.set(state.header.spSize);
+  UI.count.set(state.cards.count);
+  UI.smear.set(state.cards.smear);UI.wash.set(state.cards.wash);UI.contrast.set(state.cards.contrast);UI.strip.set(state.cards.strip);
+  UI.seedInp.value=state.seed;
+  UI.bgDark.set(state.bg.dark);UI.bgGrain.set(state.bg.grain);
+  UI.fLeft.set(state.footer.left);UI.fCenter.set(state.footer.center);UI.fRight.set(state.footer.right);UI.fSize.set(state.footer.size);
+  redraw();
+}
+/* ============ file inputs ============ */
+function loadImageFromFile(f,cb){
+  if(!f||!f.type.startsWith('image/')){toast('画像ファイルを選んでください');return}
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const img=new Image();
+    img.onload=()=>cb(img);
+    img.onerror=()=>toast('画像の読み込みに失敗しました');
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+$('#fileCard').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';
+  if(_slotPick<0)return;
+  const idx=_slotPick;_slotPick=-1;
+  loadImageFromFile(f,img=>{
+    state.slots[idx].img=img;
+    buildCardList();redraw();
+    toast('カード#'+(idx+1)+'の写真を設定しました');
+  });
+});
+$('#fileBg').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';
+  loadImageFromFile(f,img=>{state.bg.img=img;redraw();toast('背景写真を設定しました')});
+});
+$('#fileLogo').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';
+  loadImageFromFile(f,img=>{state.header.spLogo=img;redraw();toast('スポンサーロゴを設定しました')});
+});
+/* ============ canvas drop / click ============ */
+const dropOv=$('#dropOv');
+['dragover','dragenter'].forEach(ev=>window.addEventListener(ev,e=>{e.preventDefault();dropOv.classList.add('on')}));
+['dragleave','dragend'].forEach(ev=>window.addEventListener(ev,e=>{if(e.target===document.documentElement||ev==='dragend'||!e.relatedTarget)dropOv.classList.remove('on')}));
+function hitCard(e){
+  const b=view.getBoundingClientRect();
+  const px=(e.clientX-b.left)/b.width*view.width;
+  const py=(e.clientY-b.top)/b.height*view.height;
+  for(const r of _layoutRects){
+    if(px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h)return r.idx;
+  }
+  return-1;
+}
+window.addEventListener('drop',e=>{
+  e.preventDefault();dropOv.classList.remove('on');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(!f)return;
+  const idx=e.target===view?hitCard(e):-1;
+  loadImageFromFile(f,img=>{
+    if(idx>=0&&idx<state.cards.count){
+      state.slots[idx].img=img;
+      toast('カード#'+(idx+1)+'の写真を差し替えました');
+    }else{
+      /* カード外へのドロップ: 空きスロットへ、埋まっていれば背景 */
+      const empty=state.slots.findIndex((s,i)=>i<state.cards.count&&!s.img);
+      if(empty>=0){state.slots[empty].img=img;toast('カード#'+(empty+1)+'に写真を設定しました')}
+      else{state.bg.img=img;toast('背景写真として設定しました')}
+    }
+    buildCardList();redraw();
+  });
+});
+view.addEventListener('click',e=>{
+  const idx=hitCard(e);
+  if(idx>=0&&idx<state.cards.count){_slotPick=idx;$('#fileCard').click()}
+});
+window.addEventListener('paste',e=>{
+  const items=e.clipboardData&&e.clipboardData.items;
+  if(!items)return;
+  for(const it of items){
+    if(it.type&&it.type.startsWith('image/')){
+      const f=it.getAsFile();
+      const empty=state.slots.findIndex((s,i)=>i<state.cards.count&&!s.img);
+      loadImageFromFile(f,img=>{
+        if(empty>=0){state.slots[empty].img=img;toast('カード#'+(empty+1)+'に写真を設定しました')}
+        else{state.bg.img=img;toast('背景写真として設定しました')}
+        buildCardList();redraw();
+      });
+      return;
+    }
+  }
+});
+/* ============ export ============ */
+function exportPng(scale){
+  const[BW,BH]=fullSize();
+  const W=BW*scale,H=BH*scale;
+  if(Math.max(W,H)>8192){toast('サイズが大きすぎます');return}
+  renderPoster(scale,true);
+  view.toBlob(b=>{
+    download(b,'lineup-poster_'+state.seed+'_'+W+'x'+H+'.png');
+    toast('PNG '+W+'×'+H+' を書き出しました');
+    redraw();
+  },'image/png');
+}
+$('#btnPng1').addEventListener('click',()=>exportPng(1));
+$('#btnPng2').addEventListener('click',()=>exportPng(2));
+/* ============ URL state ============ */
+function shareHash(){
+  const o=JSON.parse(JSON.stringify(state));
+  delete o.bg.img;delete o.header.spLogo;
+  o.slots=o.slots.map(s=>({pos:s.pos,name:s.name,num:s.num}));
+  return'#s='+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+}
+function restoreHash(){
+  if(!location.hash.startsWith('#s='))return false;
+  try{
+    const o=JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(3)))));
+    if(o.seed!=null)state.seed=o.seed;
+    ['canvas','theme','header','cards','bg','footer'].forEach(k=>{if(o[k])Object.assign(state[k],o[k])});
+    state.header.spLogo=null;state.bg.img=null;
+    if(Array.isArray(o.slots))o.slots.forEach((s,i)=>{if(state.slots[i])Object.assign(state.slots[i],s)});
+    _rampCache=null;
+    return true;
+  }catch(e){return false}
+}
+$('#btnUrl').addEventListener('click',()=>{
+  location.hash=shareHash().slice(1);
+  if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>toast('設定URLをコピーしました(写真は含まれません)'),()=>toast('コピーできませんでした'));
+  else toast('URLバーからコピーしてください');
+});
+/* ============ init ============ */
+buildTheme();
+buildSize();
+buildHeader();
+buildCards();
+buildFx();
+buildBg();
+buildFooter();
+restoreHash();
+initDemo();
+refreshAll();
+</script>
+</body>
+</html>

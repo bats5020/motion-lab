@@ -107,6 +107,34 @@ const CATEGORIES = [
 
 const TOOLS = [
   {
+    cat:"raster", name:"Lineup Poster",
+    desc:"スタメン告知ポスターを写真とテキストから生成。デュオトーン+縦スメアの選手カード、白帯ネームバー、配色テーマ、グレイン背景、PNG書き出し",
+    href:"tools/lineup-poster.html",
+    thumb:`<svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lp-card" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e8102a"/><stop offset=".55" stop-color="#f0607a"/><stop offset="1" stop-color="#f4f2ec"/></linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="#141417"/>
+      <rect width="400" height="240" fill="#0c0c0e"/>
+      <text x="26" y="52" fill="#f4f2ec" font-size="34" font-weight="900" font-family="'Arial Narrow',Helvetica,sans-serif" transform="skewX(-10)" letter-spacing="1">STARTING</text>
+      <text x="330" y="40" fill="#f4f2ec" font-size="18" font-weight="900" font-family="'Arial Narrow',Helvetica,sans-serif" text-anchor="end">TISSOT</text>
+      <g>
+        <rect x="42" y="74" width="88" height="118" fill="url(#lp-card)"/>
+        <ellipse cx="86" cy="118" rx="24" ry="30" fill="#2a0a10" opacity=".85"/>
+        <rect x="42" y="176" width="88" height="16" fill="#f4f2ec"/>
+        <rect x="156" y="74" width="88" height="118" fill="url(#lp-card)"/>
+        <ellipse cx="200" cy="118" rx="24" ry="30" fill="#2a0a10" opacity=".85"/>
+        <rect x="156" y="176" width="88" height="16" fill="#f4f2ec"/>
+        <rect x="270" y="74" width="88" height="118" fill="url(#lp-card)"/>
+        <ellipse cx="314" cy="118" rx="24" ry="30" fill="#2a0a10" opacity=".85"/>
+        <rect x="270" y="176" width="88" height="16" fill="#f4f2ec"/>
+      </g>
+      <text x="26" y="226" fill="#e8102a" font-size="16" font-weight="900" font-family="'Arial Narrow',Helvetica,sans-serif" transform="skewX(-10)">TOR</text>
+      <text x="200" y="226" fill="#e8102a" font-size="12" font-weight="900" font-family="'Arial Narrow',Helvetica,sans-serif" text-anchor="middle" transform="skewX(-10)">VS</text>
+      <text x="368" y="226" fill="#e8102a" font-size="16" font-weight="900" font-family="'Arial Narrow',Helvetica,sans-serif" text-anchor="end" transform="skewX(-10)">MIL</text>
+    </svg>`
+  },
+  {
     cat:"motion", name:"Egg Glass",
     desc:"卵形3Dの柄・ロゴ・光沢を編集。スクロールキーフレームと画像・動画・単体HTMLの書き出し。",
     href:"tools/egg-glass/",
