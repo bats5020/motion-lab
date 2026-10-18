@@ -105,10 +105,16 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
     <section><h2><b>03</b>スメア(縦ブレ)</h2>
       <div id="smearOpts"></div>
     </section>
-    <section><h2><b>04</b>ウォッシュ(色被り)</h2>
+    <section><h2><b>04</b>インクウォッシュ(乗算)</h2>
       <div id="washOpts"></div>
     </section>
-    <section><h2><b>05</b>トーン / 質感</h2>
+    <section><h2><b>05</b>インクグロー(発光)</h2>
+      <div id="glowOpts"></div>
+    </section>
+    <section><h2><b>06</b>白ライト帯</h2>
+      <div id="lightOpts"></div>
+    </section>
+    <section><h2><b>07</b>トーン / 質感</h2>
       <div id="toneOpts"></div>
     </section>
     <input type="file" id="fileMedia" accept="image/*" hidden>
@@ -134,10 +140,12 @@ function download(blob,name){
 const SIZE_PRESETS={'45':[1080,1350],'34':[1080,1440],'11':[1080,1080],'916':[1080,1920],'169':[1920,1080]};
 const state={
   canvas:{mode:'src',w:1080,h:1350},
-  theme:{name:'GAME RED',ink:'#e8102a',paper:'#f4f2ec',shadow:'#100e10'},
-  smear:{amount:60,up:100,down:30},
-  wash:{top:72,reach:52,angle:0,bottom:28,bottomReach:30},
-  tone:{contrast:58,brightness:50,mid:48,grain:30,vignette:12}
+  theme:{name:'GAME RED',ink:'#e8102a',paper:'#f4f2ec',shadow:'#100e10',tint:22},
+  smear:{amount:45,up:100,down:30},
+  wash:{top:40,reach:42,angle:0,bottom:10,bottomReach:25},
+  glow:{x:78,y:84,size:52,amount:72,x2:88,y2:6,size2:34,amount2:28},
+  light:{side:'left',width:34,amount:48},
+  tone:{contrast:64,brightness:47,mid:48,grain:46,vignette:26}
 };
 let srcImage=null,srcIsDemo=true;
 function fullSize(){
@@ -304,12 +312,39 @@ function render(scaleMul){
   /* 3. デュオトーン(グラデーションマップ) */
   const id=sx.getImageData(0,0,W,H),d=id.data;
   const lut=_rampCache||(_rampCache=buildRamp());
+  const tint=clamp(t.tint==null?100:t.tint,0,100)/100;
+  const shadowRGB=hex2rgb(t.shadow);
   for(let p=0;p<d.length;p+=4){
     const l=(d[p]*77+d[p+1]*150+d[p+2]*29)>>8;
-    d[p]=lut[l*3];d[p+1]=lut[l*3+1];d[p+2]=lut[l*3+2];
+    /* デュオトーン量: 0=素のB&W(影だけ締める) ↔ 100=全面LUT */
+    const lr=lut[l*3],lg=lut[l*3+1],lb=lut[l*3+2];
+    /* B&W側も真っ黒は影色へ寄せて馴染ませる */
+    const gf=l/255;
+    const gr=shadowRGB[0]+(255-shadowRGB[0])*gf;
+    const gg=shadowRGB[1]+(255-shadowRGB[1])*gf;
+    const gb=shadowRGB[2]+(255-shadowRGB[2])*gf;
+    d[p]=gr+(lr-gr)*tint;
+    d[p+1]=gg+(lg-gg)*tint;
+    d[p+2]=gb+(lb-gb)*tint;
   }
   sx.putImageData(id,0,0);
   x.drawImage(smc,0,0);
+  /* 3.5 白ライト帯(スクリーン): 片側から紙色の光 */
+  const li=state.light;
+  if(li.side!=='none'&&li.amount>.5){
+    x.save();
+    x.globalCompositeOperation='screen';
+    const lw2=W*(li.width/100);
+    const fromLeft=li.side==='left';
+    const lg2=x.createLinearGradient(fromLeft?0:W,0,fromLeft?lw2:W-lw2,0);
+    lg2.addColorStop(0,t.paper);
+    lg2.addColorStop(.55,t.paper+'88');
+    lg2.addColorStop(1,t.paper+'00');
+    x.fillStyle=lg2;
+    x.globalAlpha=li.amount/100;
+    x.fillRect(fromLeft?0:W-lw2,0,lw2,H);
+    x.restore();
+  }
   /* 4. 上からのインクウォッシュ(multiply) */
   if(wa.top>.5){
     x.save();
@@ -339,6 +374,24 @@ function render(scaleMul){
     x.fillRect(0,H*(1-br-.05),W,H*(br+.05));
     x.restore();
   }
+  /* 5.5 インクグロー(スクリーン): 暗部の上でも光る赤 */
+  const gw=state.glow;
+  function drawGlow(gx,gy,gs,ga){
+    if(ga<=.5)return;
+    x.save();
+    x.globalCompositeOperation='screen';
+    const r=Math.max(W,H)*(gs/100);
+    const rg=x.createRadialGradient(W*gx/100,H*gy/100,r*.05,W*gx/100,H*gy/100,r);
+    rg.addColorStop(0,t.ink);
+    rg.addColorStop(.5,t.ink+'b0');
+    rg.addColorStop(1,t.ink+'00');
+    x.fillStyle=rg;
+    x.globalAlpha=ga/100;
+    x.fillRect(0,0,W,H);
+    x.restore();
+  }
+  drawGlow(gw.x,gw.y,gw.size,gw.amount);
+  drawGlow(gw.x2,gw.y2,gw.size2,gw.amount2);
   /* 6. ビネット */
   if(tn.vignette>.5){
     x.save();
@@ -352,7 +405,8 @@ function render(scaleMul){
   /* 7. グレイン */
   if(tn.grain>.5){
     x.save();
-    x.globalAlpha=tn.grain/100*.42;
+    x.globalCompositeOperation='overlay';
+    x.globalAlpha=tn.grain/100*.9;
     for(let ty=0;ty<H;ty+=256)
       for(let tx2=0;tx2<W;tx2+=256)
         x.drawImage(noiseTile(),tx2,ty,256,256);
@@ -427,7 +481,8 @@ function buildTheme(){
   THEMES.forEach(th=>{
     const ch=ce('button','chip','<i style="background:linear-gradient(90deg,'+th.ink+','+th.paper+')"></i>'+th.name);
     ch.addEventListener('click',()=>{
-      state.theme={...th};
+      const tint=state.theme.tint;
+      state.theme={...th,tint};
       _rampCache=null;
       refreshAll();
     });
@@ -437,7 +492,9 @@ function buildTheme(){
   UI.ink=mkCol('インク色',state.theme.ink,v=>{state.theme.ink=v;state.theme.name='CUSTOM'});
   UI.paper=mkCol('ハイライト色',state.theme.paper,v=>{state.theme.paper=v;state.theme.name='CUSTOM'});
   UI.shadow=mkCol('シャドウ色',state.theme.shadow,v=>{state.theme.shadow=v;state.theme.name='CUSTOM'});
-  $('#themeOpts').append(UI.ink.row,UI.paper.row,UI.shadow.row);
+  UI.tint=mkRange('デュオトーン量',0,100,1,state.theme.tint,v=>state.theme.tint=v);
+  $('#themeOpts').append(UI.ink.row,UI.paper.row,UI.shadow.row,UI.tint.row,
+    ce('div','hint','0=B&W写真のまま(色はウォッシュ/グローだけ) / 100=全面デュオトーン'));
 }
 function buildSmear(){
   const c=$('#smearOpts'),sm=state.smear;
@@ -456,6 +513,28 @@ function buildWash(){
   UI.waBottomReach=mkRange('下の範囲',10,70,1,wa.bottomReach,v=>wa.bottomReach=v);
   c.append(UI.waTop.row,UI.waReach.row,UI.waAngle.row,UI.waBottom.row,UI.waBottomReach.row,
     ce('div','hint','インク色を乗算で被せる。ハイライトもインク色に沈む'));
+}
+function buildGlow(){
+  const c=$('#glowOpts'),gw=state.glow;
+  UI.g1Amount=mkRange('グロー1 強さ',0,100,1,gw.amount,v=>gw.amount=v);
+  UI.g1X=mkRange('グロー1 X',0,100,1,gw.x,v=>gw.x=v);
+  UI.g1Y=mkRange('グロー1 Y',0,100,1,gw.y,v=>gw.y=v);
+  UI.g1Size=mkRange('グロー1 大きさ',10,100,1,gw.size,v=>gw.size=v);
+  UI.g2Amount=mkRange('グロー2 強さ',0,100,1,gw.amount2,v=>gw.amount2=v);
+  UI.g2X=mkRange('グロー2 X',0,100,1,gw.x2,v=>gw.x2=v);
+  UI.g2Y=mkRange('グロー2 Y',0,100,1,gw.y2,v=>gw.y2=v);
+  UI.g2Size=mkRange('グロー2 大きさ',10,100,1,gw.size2,v=>gw.size2=v);
+  c.append(UI.g1Amount.row,UI.g1X.row,UI.g1Y.row,UI.g1Size.row,
+    UI.g2Amount.row,UI.g2X.row,UI.g2Y.row,UI.g2Size.row,
+    ce('div','hint','スクリーン合成の光。暗い服や背景の上でもインク色が発光する(リファレンス右下の赤)'));
+}
+function buildLight(){
+  const c=$('#lightOpts'),li=state.light;
+  UI.liSide=mkSel('側',[['left','左'],['right','右'],['none','なし']],li.side,v=>li.side=v);
+  UI.liWidth=mkRange('幅',10,80,1,li.width,v=>li.width=v);
+  UI.liAmount=mkRange('強さ',0,100,1,li.amount,v=>li.amount=v);
+  c.append(UI.liSide.row,UI.liWidth.row,UI.liAmount.row,
+    ce('div','hint','端から入るハイライト色の光(スクリーン)。スメアと合わせると白い尾が立つ'));
 }
 function buildTone(){
   const c=$('#toneOpts'),tn=state.tone;
@@ -476,6 +555,10 @@ function refreshAll(){
   UI.smAmount.set(state.smear.amount);UI.smUp.set(state.smear.up);UI.smDown.set(state.smear.down);
   UI.waTop.set(state.wash.top);UI.waReach.set(state.wash.reach);UI.waAngle.set(state.wash.angle);
   UI.waBottom.set(state.wash.bottom);UI.waBottomReach.set(state.wash.bottomReach);
+  UI.tint.set(state.theme.tint);
+  UI.g1Amount.set(state.glow.amount);UI.g1X.set(state.glow.x);UI.g1Y.set(state.glow.y);UI.g1Size.set(state.glow.size);
+  UI.g2Amount.set(state.glow.amount2);UI.g2X.set(state.glow.x2);UI.g2Y.set(state.glow.y2);UI.g2Size.set(state.glow.size2);
+  UI.liSide.set(state.light.side);UI.liWidth.set(state.light.width);UI.liAmount.set(state.light.amount);
   UI.contrast.set(state.tone.contrast);UI.brightness.set(state.tone.brightness);UI.mid.set(state.tone.mid);
   UI.grain.set(state.tone.grain);UI.vignette.set(state.tone.vignette);
   redraw();
@@ -536,7 +619,7 @@ function restoreHash(){
   if(!location.hash.startsWith('#s='))return false;
   try{
     const o=JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(3)))));
-    ['canvas','theme','smear','wash','tone'].forEach(k=>{if(o[k])Object.assign(state[k],o[k])});
+    ['canvas','theme','smear','wash','glow','light','tone'].forEach(k=>{if(o[k])Object.assign(state[k],o[k])});
     _rampCache=null;
     return true;
   }catch(e){return false}
@@ -551,6 +634,8 @@ buildSource();
 buildTheme();
 buildSmear();
 buildWash();
+buildGlow();
+buildLight();
 buildTone();
 restoreHash();
 makeDemoImage(img=>{
