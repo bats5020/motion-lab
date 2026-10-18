@@ -241,9 +241,9 @@ float mask(vec2 q){ return maskOf(uM, q); }
 `;
 
 const FS = {
-tone: `uniform sampler2D uTex; uniform float uSat,uCon,uBri,uHi,uSh,uLinear;
+tone: `uniform sampler2D uTex; uniform vec4 uCrop; uniform float uSat,uCon,uBri,uHi,uSh,uLinear;
 void main(){
-  vec3 c = texture(uTex, vUv).rgb; float l = dot(c, LUM);
+  vec3 c = texture(uTex, uCrop.xy + vUv*uCrop.zw).rgb; float l = dot(c, LUM);
   c = mix(vec3(l), c, uSat);
   c += uSh*.5*(1.-smoothstep(0.,.55,l));
   c += uHi*.5*smoothstep(.45,1.,l);
@@ -317,7 +317,7 @@ void main(){
   c += (og - texture(uBlur, vUv).rgb)*uAmt*m*2.;
   o = vec4(max(c, 0.), 1.);
 }`,
-final: `uniform sampler2D uIn, uSrc, uLut; uniform Mask uM2;
+final: `uniform sampler2D uIn, uSrc, uLut; uniform Mask uM2; uniform vec4 uCrop;
 uniform vec3 uCol, uFrameCol, uGlowCol;
 uniform float uFill,uOpac,uGrain,uGSize,uFrame,uFlip,uLinear,uColorOn,uShowOrig,uThermalMode;
 uniform int uMode;
@@ -330,7 +330,7 @@ float lumAt(vec2 uv){ vec3 c = texture(uIn, uv).rgb; if(uLinear > .5) c = pow(ma
 void main(){
   vec2 uv = uFlip > .5 ? vec2(vUv.x, 1.-vUv.y) : vUv;
   vec2 q = toQ(uv), pc = uv*uRes;
-  if(uShowOrig > .5){ o = vec4(texture(uSrc, uv).rgb, 1.); return; }
+  if(uShowOrig > .5){ o = vec4(texture(uSrc, uCrop.xy + uv*uCrop.zw).rgb, 1.); return; }
   vec3 c = vec3(0.);
   if(uThermalMode < .5){ c = texture(uIn, uv).rgb; if(uLinear > .5) c = pow(max(c,0.), vec3(1./2.2)); c = clamp(c, 0., 1.); }
   float l = dot(c, LUM);
@@ -448,6 +448,7 @@ function setU(prog, vals){
     else if(typeof v === 'number') gl.uniform1f(u.loc, v);
     else if(v.length === 2) gl.uniform2f(u.loc, v[0], v[1]);
     else if(v.length === 3) gl.uniform3f(u.loc, v[0], v[1], v[2]);
+    else if(v.length === 4) gl.uniform4f(u.loc, v[0], v[1], v[2], v[3]);
   }
 }
 function texParams(filter){
@@ -515,6 +516,8 @@ const lutCSS = key => `linear-gradient(90deg, ${PALETTES[key].stops.join(',')})`
 const mkMask = o => Object.assign({type:'none', inv:false, cx:.5, cy:.5, rx:.32, ry:.42, feather:.6, warp:0, thr:.5, ax:.35, ay:.5, bx:.65, by:.5}, o);
 const BASE = {
   mode:'portrait', canvas:'4:5',
+  crop:{aspect:'orig', zoom:1, cx:.5, cy:.5},
+  quick:{flow:.28, angle:180, redPos:.5, warp:.25, heat:.5, palette:'fire', grain:.36},
   flow:{scale:2.4, warp:.7, angle:-15, stretch:1.8, evolve:0, seed:7},
   tone:{sat:0, con:1.35, bri:0, hi:0, sh:0},
   zoom:{on:true, s:.2, cx:.5, cy:.62, mask:mkMask()},
@@ -522,9 +525,9 @@ const BASE = {
          mask:mkMask({type:'ellipse', cx:.5, cy:.48, rx:.36, ry:.48, feather:.55, warp:.25})},
   echo:{on:true, n:2, gap:.025, op:.3, scale:1.035, blend:'1', mask:mkMask()},
   detail:{on:true, amt:.6, restore:.15, rad:.008, mask:mkMask({type:'ellipse', cx:.5, cy:.56, rx:.16, ry:.2, feather:.75})},
-  color:{on:true, col:'#e5141d', mode:'0', fill:.82, op:1, mask:mkMask({type:'linear', ax:.36, ay:.5, bx:.64, by:.5, warp:.3})},
+  color:{on:true, col:'#e5141d', mode:'0', fill:.82, op:1, mask:mkMask({type:'linear', ax:.36, ay:.86, bx:.64, by:.86, warp:.3})},
   thermal:{on:true, palette:'fire', mix:.45, con:1.5, shift:0, bands:0, bandSoft:.6, op:.9, blend:'1',
-           mask:mkMask({type:'band', ax:.34, ay:.5, bx:.66, by:.5, warp:.7})},
+           mask:mkMask({type:'band', ax:.34, ay:.86, bx:.66, by:.86, warp:.7})},
   glow:{on:false, src:'0', side:'0', w:.004, amt:.8, iso:.5, useLut:'1', lutPos:.8, col:'#ff6a3d'},
   texture:{grain:.09, size:1.2, dither:'0', ditherAmt:.35, cell:2, scan:0, scanGap:3, speck:0},
   frame:{on:true, w:.012, col:'#2b2b2d'}
@@ -555,11 +558,25 @@ let S = clone(BASE);
 let userPresets = [];
 try { userPresets = JSON.parse(localStorage.getItem('smearworks.presets') || '[]'); } catch {}
 const RATIOS = {'4:5':[1600,2000], '3:4':[1500,2000], '1:1':[2000,2000], '9:16':[1125,2000], '16:9':[2000,1125], '3:2':[2000,1334]};
-const dims = () => S.mode === 'thermal' ? RATIOS[S.canvas] : [srcW, srcH];
+const ASPECTS = {'4:5':.8, '1:1':1, '3:4':.75, '9:16':9/16, '16:9':16/9, '3:2':1.5};
+function cropRect(){
+  const c = S.crop, As = srcW/srcH, Ao = ASPECTS[c.aspect] || As;
+  let cw = 1, ch = 1;
+  if(Ao > As) ch = As/Ao; else cw = Ao/As;
+  cw /= c.zoom; ch /= c.zoom;
+  c.cx = Math.min(1 - cw/2, Math.max(cw/2, c.cx));
+  c.cy = Math.min(1 - ch/2, Math.max(ch/2, c.cy));
+  return [c.cx - cw/2, c.cy - ch/2, cw, ch];
+}
+const dims = () => {
+  if(S.mode === 'thermal') return RATIOS[S.canvas];
+  const r = cropRect();
+  return [Math.max(2, Math.round(r[2]*srcW)), Math.max(2, Math.round(r[3]*srcH))];
+};
 
 /* ═════════ render ═════════ */
 const PREVIEW_MAX = 1600;
-let pv = null, blackTex = null;
+let pvCache = {}, blackTex = null;
 { blackTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, blackTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,255])); texParams(); }
 const hex3 = h => hexRGB(h).map(v => v/255);
 const KIND = {none:0, ellipse:1, linear:2, band:3, flow:4};
@@ -584,7 +601,7 @@ function runPipeline(set, final, w, h, opts = {}){
   const portrait = S.mode !== 'thermal';
   let cur = null;
   if(portrait){
-    pass(P.tone, set.A, {...base, ...NOMASK, uTex:srcTex, uSat:S.tone.sat, uCon:S.tone.con, uBri:S.tone.bri, uHi:S.tone.hi, uSh:S.tone.sh, uLinear:set.half ? 1 : 0});
+    pass(P.tone, set.A, {...base, ...NOMASK, uTex:srcTex, uCrop:cropRect(), uSat:S.tone.sat, uCon:S.tone.con, uBri:S.tone.bri, uHi:S.tone.hi, uSh:S.tone.sh, uLinear:set.half ? 1 : 0});
     cur = set.A;
     const next = () => cur === set.X ? set.Y : set.X;
     const z = S.zoom, sm = S.smear, ec = S.echo, dt = S.detail;
@@ -622,7 +639,7 @@ function runPipeline(set, final, w, h, opts = {}){
   const c = S.color, th = S.thermal, gw = S.glow, tx = S.texture, f = S.frame;
   const thermalOn = S.mode !== 'portrait' && th.on;
   pass(P.final, final, {...base, ...maskU(c.mask, a), ...maskU(th.mask, a, 'uM2'),
-    uIn:cur ? cur.tex : blackTex, uSrc:srcTex, uLut:lutTex, uLinear:set && set.half ? 1 : 0, uFlip:final ? 0 : 1,
+    uIn:cur ? cur.tex : blackTex, uSrc:srcTex, uCrop:cropRect(), uLut:lutTex, uLinear:set && set.half ? 1 : 0, uFlip:final ? 0 : 1,
     uShowOrig:opts.showOrig && portrait ? 1 : 0, uThermalMode:portrait ? 0 : 1,
     uColorOn:portrait && c.on ? 1 : 0, uCol:hex3(c.col), uMode:+c.mode, uFill:c.fill, uOpac:c.op,
     uThOn:thermalOn ? 1 : 0, uThMix:th.mix, uThCon:th.con, uThShift:th.shift, uThBands:th.bands, uThBandSoft:th.bandSoft, uThOp:th.op, uThBlend:+th.blend,
@@ -640,8 +657,10 @@ function runPipeline(set, final, w, h, opts = {}){
   }
 }
 let showOrig = false, showMask = false, raf = 0;
-function previewSize(){
-  const [W, H] = dims(), k = Math.min(1, PREVIEW_MAX/Math.max(W, H));
+let sliding = false;
+function previewSize(full){
+  const lim = !full && (sliding || drag) ? 900 : PREVIEW_MAX;
+  const [W, H] = dims(), k = Math.min(1, lim/Math.max(W, H));
   return [Math.max(2, Math.round(W*k)), Math.max(2, Math.round(H*k))];
 }
 function draw(){
@@ -650,8 +669,13 @@ function draw(){
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; fit(); }
   let set = null;
   if(S.mode !== 'thermal'){
-    if(!pv || pv.w !== w || pv.h !== h){ if(pv) freeSet(pv); pv = makeSet(w, h); }
-    set = pv;
+    const key = w + 'x' + h;
+    if(!pvCache[key]){
+      const keys = Object.keys(pvCache);
+      if(keys.length >= 2){ freeSet(pvCache[keys[0]]); delete pvCache[keys[0]]; }
+      pvCache[key] = makeSet(w, h);
+    }
+    set = pvCache[key];
   }
   runPipeline(set, null, w, h, {showOrig, maskView:showMask});
 }
@@ -670,6 +694,7 @@ new ResizeObserver(fit).observe($('#stage'));
 
 /* ═════════ UI schema ═════════ */
 const GROUPS = [
+  ['QUICK', ['quick','crop'], ['portrait','hybrid']],
   ['PORTRAIT', ['tone','zoom','smear','echo','detail'], ['portrait','hybrid']],
   ['OVERLAY', ['color'], ['portrait','hybrid']],
   ['THERMAL', ['thermal','glow'], ['portrait','thermal','hybrid']],
@@ -678,6 +703,17 @@ const GROUPS = [
 ];
 const PAL_OPTS = Object.entries(PALETTES).map(([k, p]) => [k, p.name]);
 const EFFECTS = {
+  quick:{name:'かんたん調整', en:'Quick', hint:'まずはこの5本で決めて、細部は下のカードで詰める。● でスミアの起点、2つの点で色の境界を動かせます', params:[
+    ['flow','流れの強さ',0,1,.01,'pct'],
+    {modes:['portrait'], p:['angle','流れの向き',-180,180,1,'deg']},
+    {modes:['portrait'], p:['redPos','赤の位置',0,1,.005,'pct']},
+    {modes:['hybrid'], p:['heat','熱の侵食量',0,1,.01,'pct']},
+    ['warp','境界のゆらぎ',0,1,.01,'pct'],
+    {modes:['hybrid'], p:['palette','パレット','select',PAL_OPTS]},
+    ['grain','粒感',0,1,.01,'pct']]},
+  crop:{name:'構図', en:'Crop', hint:'プレビューをドラッグで写真を移動、ホイールで拡大。書き出しは切り抜いた範囲の実ピクセル', params:[
+    ['aspect','比率','select',[['orig','元画像'],['4:5','4:5'],['1:1','1:1'],['3:4','3:4'],['9:16','9:16'],['16:9','16:9'],['3:2','3:2']]],
+    ['zoom','拡大',1,4,.01,'x'], ['cx','位置（横）',0,1,.001,'pct'], ['cy','位置（縦）',0,1,.001,'pct']]},
   tone:{name:'トーン', en:'Tone', params:[
     ['sat','彩度',0,1,.01,'pct'], ['con','コントラスト',.5,2.6,.01,'x'], ['bri','明るさ',-.4,.4,.005,'spct'],
     ['hi','ハイライト',-.6,.6,.01,'spct'], ['sh','シャドウ',-.6,.6,.01,'spct']]},
@@ -725,7 +761,39 @@ const FMT = {
 };
 const getP = p => p.split('.').reduce((o, k) => o?.[k], S);
 const setP = (p, v) => { const ks = p.split('.'), last = ks.pop(); ks.reduce((o, k) => o[k], S)[last] = v; };
-let active = 'smear';
+let active = 'quick';
+const cl01 = x => Math.min(1, Math.max(0, x));
+function quickFromState(){
+  const q = S.quick, cm = S.color.mask;
+  q.flow = cl01((S.smear.len - .02)/.36);
+  q.angle = S.smear.angle;
+  q.redPos = cl01((cm.ax + cm.bx)/2);
+  q.warp = cl01(cm.warp/1.2);
+  q.heat = cl01((S.thermal.op - .35)/.65);
+  q.palette = S.thermal.palette;
+  q.grain = cl01(S.texture.grain/.25);
+}
+function applyQuick(k){
+  const q = S.quick, v = q[k];
+  if(k === 'flow'){
+    S.smear.len = .02 + v*.36; S.smear.streak = .15 + v*.55; S.smear.stretch = v*.55; S.smear.slen = .1 + v*.3;
+    S.zoom.s = v*.32; S.echo.op = v*.45;
+  } else if(k === 'angle') S.smear.angle = v;
+  else if(k === 'redPos'){
+    const cm = S.color.mask, half = Math.max(.04, Math.abs(cm.bx - cm.ax)/2 || .14), dir = cm.bx >= cm.ax ? 1 : -1;
+    if(cm.type !== 'linear' && cm.type !== 'band') cm.type = 'linear';
+    cm.ax = v - half*dir; cm.bx = v + half*dir; cm.ay = cm.by = .86;
+    const tm = S.thermal.mask, th = Math.max(.04, Math.abs(tm.bx - tm.ax)/2 || .16);
+    tm.ax = v - th; tm.bx = v + th; tm.ay = tm.by = .86;
+  } else if(k === 'heat'){
+    S.thermal.op = .35 + v*.65; S.thermal.mix = .25 + v*.5;
+    const tm = S.thermal.mask;
+    if(tm.type === 'band' || tm.type === 'linear'){ const mid = (tm.ax + tm.bx)/2, h = .06 + v*.3; tm.ax = mid - h; tm.bx = mid + h; }
+  } else if(k === 'warp'){
+    S.color.mask.warp = v*1.2; S.thermal.mask.warp = v*1.4; S.smear.mask.warp = v*.6; S.smear.rough = v; S.flow.warp = .3 + v*.9;
+  } else if(k === 'palette'){ S.thermal.palette = v; buildLut(v); }
+  else if(k === 'grain'){ S.texture.grain = v*.25; S.texture.size = .9 + v*1.4; }
+}
 
 function el(tag, attrs = {}, html = ''){ const e = document.createElement(tag); for(const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if(html) e.innerHTML = html; return e; }
 function buildCards(){
@@ -742,6 +810,8 @@ function buildCards(){
       if(p === 'color.col') setTone();
       if(p === 'thermal.palette'){ buildLut(v); syncLut(); }
       if(p === 'flow.canvas') fit();
+      if(p.startsWith('quick.')){ applyQuick(p.slice(6)); syncUI(); }
+      if(p.startsWith('crop.')){ cropRect(); fit(); syncUI(); }
       if(p.endsWith('.on')) syncCardState();
       schedule();
     });
@@ -755,7 +825,7 @@ function buildCards(){
 }
 function buildCard(id, E, gmodes){
   const card = el('div', {class:'card', 'data-id':id, 'data-modes':(E.modes || gmodes).join(' ')});
-  if(['smear','color','thermal','flow'].includes(id)) card.classList.add('open');
+  if(['quick','crop'].includes(id)) card.classList.add('open');
   const head = el('div', {class:'card-h'});
   const tb = el('button', {type:'button', class:'title', 'aria-expanded':String(card.classList.contains('open'))}, `${E.en}<span class="jp">${E.name}</span>`);
   tb.addEventListener('click', () => { card.classList.toggle('open'); tb.setAttribute('aria-expanded', card.classList.contains('open')); setActive(id); });
@@ -763,7 +833,8 @@ function buildCard(id, E, gmodes){
   if(E.toggle) head.appendChild(el('label', {class:'sw', title:'オン / オフ'}, `<input type="checkbox" data-p="${id}.on" aria-label="${E.name}をオンにする"><span></span>`));
   card.appendChild(head);
   const body = el('div', {class:'card-b'}), grid = el('div', {class:'grid2'});
-  E.params.forEach(([k, label, ...rest]) => {
+  E.params.forEach(entry => {
+    const pm = Array.isArray(entry) ? null : entry.modes, [k, label, ...rest] = Array.isArray(entry) ? entry : entry.p;
     const p = `${id}.${k}`, cid = 'c_' + p.replace('.', '_');
     let c;
     if(rest[0] === 'lut') c = el('div', {class:'ctl wide'}, `<div class="lut" data-lut></div>`);
@@ -771,6 +842,7 @@ function buildCard(id, E, gmodes){
     else if(rest[0] === 'select') c = el('div', {class:'ctl' + (rest[2] === 'wide' ? ' wide' : '')}, `<label for="${cid}">${label}</label><select id="${cid}" data-p="${p}">${rest[1].map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`);
     else if(rest[0] === 'seed') c = el('div', {class:'ctl'}, `<label for="${cid}">${label}</label><div class="bar"><input id="${cid}" type="number" min="1" max="9999" step="1" data-p="${p}" style="width:70px"><button type="button" class="small" data-shuffle title="ランダムなシードに変更">ランダム</button></div>`);
     else { const [min, max, step, f] = rest; c = el('div', {class:'ctl'}, `<div class="row"><label for="${cid}">${label}</label><output data-o="${p}"></output></div><input id="${cid}" type="range" min="${min}" max="${max}" step="${step}" data-p="${p}" data-f="${f}">`); }
+    if(pm) c.setAttribute('data-modes', pm.join(' '));
     grid.appendChild(c);
   });
   body.appendChild(grid);
@@ -803,6 +875,7 @@ function showOut(inp){
 }
 function syncLut(){ document.querySelectorAll('[data-lut]').forEach(d => d.style.background = lutCSS(S.thermal.palette)); }
 function syncUI(){
+  quickFromState();
   document.querySelectorAll('[data-p]').forEach(inp => {
     const v = getP(inp.dataset.p);
     if(inp.type === 'checkbox') inp.checked = !!v; else inp.value = v;
@@ -814,7 +887,7 @@ function syncUI(){
   document.querySelectorAll('[data-modes]').forEach(c => c.hidden = !c.dataset.modes.split(' ').includes(S.mode));
   document.querySelectorAll('[data-gmodes]').forEach(g => g.hidden = !g.dataset.gmodes.split(' ').includes(S.mode));
   $('#before').disabled = S.mode === 'thermal';
-  if(document.querySelector(`.card[data-id="${active}"]`)?.hidden) setActive(S.mode === 'thermal' ? 'thermal' : 'smear', true);
+  if(document.querySelector(`.card[data-id="${active}"]`)?.hidden) setActive(S.mode === 'thermal' ? 'thermal' : 'quick', true);
   syncCardState(); setTone(); syncLut(); updateInfo();
 }
 function syncCardState(){
@@ -837,6 +910,7 @@ function setTone(){ return;
 let srcLabel = 'サンプル画像 · 画像をドロップして差し替え';
 function updateInfo(){
   const [W, H] = dims();
+  if(S.mode !== 'thermal'){ $('#info').innerHTML = `${srcLabel} · 出力 <strong>${W} × ${H}</strong>`; return; }
   $('#info').innerHTML = S.mode === 'thermal' ? `THERMAL · <strong>${S.canvas}</strong> · 書き出し最大 ${W >= H ? 4096 : Math.round(4096*W/H)} × ${H >= W ? 4096 : Math.round(4096*H/W)}px` : srcLabel;
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
@@ -858,89 +932,117 @@ function handle(x, y, key, shape, label){
     svg('circle', {cx:x, cy:y, r:16, fill:'transparent', class:'h', 'data-h':key, 'aria-label':label});
   } else svg('circle', {cx:x, cy:y, r:shape === 'small' ? 5.5 : 7.5, fill:'#fff', stroke:'#111', 'stroke-width':1.5, class:'h', 'data-h':key, 'aria-label':label});
 }
+function maskHandles(m, owner, W, H){
+  if(!m || m.type === 'none' || m.type === 'flow') return;
+  if(m.type === 'ellipse'){
+    const cx = m.cx*W, cy = m.cy*H, rx = m.rx*W, ry = m.ry*W, f = 1 - m.feather;
+    svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'rgba(0,0,0,.5)', 'stroke-width':3.5});
+    svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'#fff', 'stroke-width':1.3, 'stroke-dasharray':'6 5'});
+    if(f > .03) svg('ellipse', {cx, cy, rx:rx*f, ry:ry*f, fill:'none', stroke:'rgba(255,255,255,.55)', 'stroke-width':1, 'stroke-dasharray':'2 4'});
+    handle(cx, cy, owner + ':m.c', 'dot', 'マスクの中心');
+    handle(cx + rx, cy, owner + ':m.rx', 'small', 'マスクの横幅');
+    handle(cx, cy + ry, owner + ':m.ry', 'small', 'マスクの高さ');
+  } else {
+    const x1 = m.ax*W, y1 = m.ay*H, x2 = m.bx*W, y2 = m.by*H;
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, px = -dy/L*26, py = dx/L*26;
+    line(x1 - px, y1 - py, x1 + px, y1 + py); line(x2 - px, y2 - py, x2 + px, y2 + py);
+    if(m.type === 'band'){ const mx = (x1 + x2)/2, my = (y1 + y2)/2; line(mx - px*1.6, my - py*1.6, mx + px*1.6, my + py*1.6, true); }
+    line(x1, y1, x2, y2, true);
+    handle(x1, y1, owner + ':m.a', 'dot', 'マスクの始点');
+    handle(x2, y2, owner + ':m.b', 'dot', 'マスクの終点');
+  }
+}
+function smearHandles(W, H){
+  const st = S.smear, ox = st.ox*W, oy = st.oy*H, ang = st.angle*Math.PI/180, dx = Math.cos(ang), dy = Math.sin(ang);
+  const len = Math.max(st.len, .04)*W, tx = ox + dx*len, ty = oy + dy*len;
+  if(st.stretch > 0){
+    const px = -dy*40, py = dx*40;
+    line(ox - px, oy - py, ox + px, oy + py, true);
+    const sx = ox + dx*st.slen*W, sy = oy + dy*st.slen*W;
+    line(sx - px*.5, sy - py*.5, sx + px*.5, sy + py*.5, true);
+  }
+  line(ox, oy, tx, ty);
+  const ah = 10, l1 = ang + Math.PI*.82, l2 = ang - Math.PI*.82;
+  line(tx, ty, tx + Math.cos(l1)*ah, ty + Math.sin(l1)*ah); line(tx, ty, tx + Math.cos(l2)*ah, ty + Math.sin(l2)*ah);
+  handle(ox, oy, 'smear.o', 'dot', 'スミアの起点');
+  handle(tx, ty, 'smear.t', 'small', '方向と長さ');
+}
 function drawOverlay(){
   ov.innerHTML = '';
   const W = wrap.clientWidth, H = wrap.clientHeight;
   const id = active, st = S[id], E = EFFECTS[id];
+  ov.style.cursor = id === 'crop' ? 'grab' : '';
   $('#hint').textContent = (E.hint || '') + (S.mode !== 'thermal' ? ' · スペースキーでBefore' : '');
   if(!W || showOrig) return;
-  if(st.mask && st.mask.type !== 'none' && st.mask.type !== 'flow'){
-    const m = st.mask;
-    if(m.type === 'ellipse'){
-      const cx = m.cx*W, cy = m.cy*H, rx = m.rx*W, ry = m.ry*W, f = 1 - m.feather;
-      svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'rgba(0,0,0,.5)', 'stroke-width':3.5});
-      svg('ellipse', {cx, cy, rx, ry, fill:'none', stroke:'#fff', 'stroke-width':1.3, 'stroke-dasharray':'6 5'});
-      if(f > .03) svg('ellipse', {cx, cy, rx:rx*f, ry:ry*f, fill:'none', stroke:'rgba(255,255,255,.55)', 'stroke-width':1, 'stroke-dasharray':'2 4'});
-      handle(cx, cy, 'm.c', 'dot', 'マスクの中心');
-      handle(cx + rx, cy, 'm.rx', 'small', 'マスクの横幅');
-      handle(cx, cy + ry, 'm.ry', 'small', 'マスクの高さ');
-    } else {
-      const x1 = m.ax*W, y1 = m.ay*H, x2 = m.bx*W, y2 = m.by*H;
-      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, px = -dy/L*26, py = dx/L*26;
-      line(x1 - px, y1 - py, x1 + px, y1 + py); line(x2 - px, y2 - py, x2 + px, y2 + py);
-      if(m.type === 'band'){ const mx = (x1 + x2)/2, my = (y1 + y2)/2; line(mx - px*1.6, my - py*1.6, mx + px*1.6, my + py*1.6, true); }
-      line(x1, y1, x2, y2, true);
-      handle(x1, y1, 'm.a', 'dot', 'マスクの始点');
-      handle(x2, y2, 'm.b', 'dot', 'マスクの終点');
-    }
+  if(id === 'quick'){
+    if(S.color.on) maskHandles(S.color.mask, 'color', W, H);
+    else if(S.mode === 'hybrid' && S.thermal.on) maskHandles(S.thermal.mask, 'thermal', W, H);
+    if(S.smear.on) smearHandles(W, H);
+    return;
   }
+  if(id === 'crop') return;
+  if(st.mask) maskHandles(st.mask, id, W, H);
   if(S.mode === 'thermal') return;
   if(id === 'zoom') handle(st.cx*W, st.cy*H, 'zoom.c', 'ring', 'ブラーの中心');
   if(id === 'echo') handle(S.zoom.cx*W, S.zoom.cy*H, 'zoom.c', 'ring', '拡大の中心');
-  if(id === 'smear'){
-    const ox = st.ox*W, oy = st.oy*H, ang = st.angle*Math.PI/180, dx = Math.cos(ang), dy = Math.sin(ang);
-    const len = Math.max(st.len, .04)*W, tx = ox + dx*len, ty = oy + dy*len;
-    if(st.stretch > 0){
-      const px = -dy*40, py = dx*40;
-      line(ox - px, oy - py, ox + px, oy + py, true);
-      const sx = ox + dx*st.slen*W, sy = oy + dy*st.slen*W;
-      line(sx - px*.5, sy - py*.5, sx + px*.5, sy + py*.5, true);
-    }
-    line(ox, oy, tx, ty);
-    const ah = 10, l1 = ang + Math.PI*.82, l2 = ang - Math.PI*.82;
-    line(tx, ty, tx + Math.cos(l1)*ah, ty + Math.sin(l1)*ah); line(tx, ty, tx + Math.cos(l2)*ah, ty + Math.sin(l2)*ah);
-    handle(ox, oy, 'smear.o', 'dot', 'スミアの起点');
-    handle(tx, ty, 'smear.t', 'small', '方向と長さ');
-  }
+  if(id === 'smear') smearHandles(W, H);
 }
 let drag = null;
 function uvFrom(e){ const r = ov.getBoundingClientRect(); return [(e.clientX - r.left)/r.width, (e.clientY - r.top)/r.height]; }
 function primaryHandle(){
+  if(active === 'crop') return 'crop.pan';
   if(S.mode !== 'thermal'){
+    if(active === 'quick' || active === 'smear') return 'smear.o';
     if(active === 'zoom' || active === 'echo') return 'zoom.c';
-    if(active === 'smear') return 'smear.o';
   }
-  if(S[active].mask && S[active].mask.type === 'ellipse') return 'm.c';
+  if(S[active].mask && S[active].mask.type === 'ellipse') return active + ':m.c';
   return null;
 }
 ov.addEventListener('pointerdown', e => {
   const key = e.target.dataset?.h || primaryHandle();
   if(!key) return;
   e.preventDefault(); ov.setPointerCapture(e.pointerId);
-  drag = {key, id:active}; moveHandle(e);
+  const [u, v] = uvFrom(e);
+  drag = {key, u0:u, v0:v, cx:S.crop.cx, cy:S.crop.cy, rect:cropRect()};
+  if(key === 'crop.pan') ov.style.cursor = 'grabbing'; else moveHandle(e);
 });
 ov.addEventListener('pointermove', e => { if(drag) moveHandle(e); });
-const endDrag = () => { if(drag){ drag = null; syncUI(); } };
+const endDrag = () => { if(drag){ drag = null; syncUI(); schedule(); } };
 ov.addEventListener('pointerup', endDrag);
 ov.addEventListener('pointercancel', endDrag);
+ov.addEventListener('wheel', e => {
+  if(active !== 'crop' || S.mode === 'thermal') return;
+  e.preventDefault();
+  S.crop.zoom = Math.min(4, Math.max(1, S.crop.zoom*Math.exp(-e.deltaY*.0015)));
+  cropRect(); syncUI(); schedule();
+}, {passive:false});
 function moveHandle(e){
   const [u, v] = uvFrom(e), [W, H] = dims(), a = H/W, cl = x => Math.min(1.2, Math.max(-.2, x));
-  const k = drag.key, st = S[drag.id];
-  if(k === 'zoom.c'){ S.zoom.cx = cl(u); S.zoom.cy = cl(v); }
-  else if(k === 'smear.o'){ S.smear.ox = cl(u); S.smear.oy = cl(v); }
-  else if(k === 'smear.t'){
+  const key = drag.key;
+  if(key === 'crop.pan'){
+    const r = drag.rect;
+    S.crop.cx = drag.cx - (u - drag.u0)*r[2]; S.crop.cy = drag.cy - (v - drag.v0)*r[3];
+    cropRect(); schedule(); return;
+  }
+  if(key === 'zoom.c'){ S.zoom.cx = cl(u); S.zoom.cy = cl(v); }
+  else if(key === 'smear.o'){ S.smear.ox = cl(u); S.smear.oy = cl(v); }
+  else if(key === 'smear.t'){
     const dx = u - S.smear.ox, dy = (v - S.smear.oy)*a;
     S.smear.len = Math.min(.6, Math.max(0, Math.hypot(dx, dy)));
     S.smear.angle = Math.round(Math.atan2(dy, dx)*180/Math.PI);
     syncUI();
+  } else {
+    const [owner, k] = key.split(':'), m = S[owner].mask;
+    if(k === 'm.c'){ m.cx = cl(u); m.cy = cl(v); }
+    else if(k === 'm.rx'){ m.rx = Math.max(.01, Math.abs(u - m.cx)); }
+    else if(k === 'm.ry'){ m.ry = Math.max(.01, Math.abs(v - m.cy)*a); }
+    else if(k === 'm.a'){ m.ax = cl(u); m.ay = cl(v); }
+    else if(k === 'm.b'){ m.bx = cl(u); m.by = cl(v); }
   }
-  else if(k === 'm.c'){ st.mask.cx = cl(u); st.mask.cy = cl(v); }
-  else if(k === 'm.rx'){ st.mask.rx = Math.max(.01, Math.abs(u - st.mask.cx)); }
-  else if(k === 'm.ry'){ st.mask.ry = Math.max(.01, Math.abs(v - st.mask.cy)*a); }
-  else if(k === 'm.a'){ st.mask.ax = cl(u); st.mask.ay = cl(v); }
-  else if(k === 'm.b'){ st.mask.bx = cl(u); st.mask.by = cl(v); }
   schedule();
 }
+document.addEventListener('pointerdown', e => { if(e.target.matches?.('input[type=range]')) sliding = true; });
+document.addEventListener('pointerup', () => { if(sliding){ sliding = false; schedule(); } });
 $('#showMask').addEventListener('click', () => { showMask = !showMask; $('#showMask').setAttribute('aria-pressed', showMask); schedule(); });
 
 /* ═════════ image loading ═════════ */
@@ -974,6 +1076,7 @@ function loadFile(f){
     let src = img;
     if(s < 1){ src = document.createElement('canvas'); src.width = Math.round(img.naturalWidth*s); src.height = Math.round(img.naturalHeight*s); src.getContext('2d').drawImage(img, 0, 0, src.width, src.height); }
     uploadSource(src); URL.revokeObjectURL(url);
+    S.crop = {aspect:S.crop.aspect, zoom:1, cx:.5, cy:.5};
     fileName = (f.name || 'image').replace(/\.[^.]+$/, '');
     srcLabel = `<strong>${srcW} × ${srcH}</strong> · ${escapeHTML(f.name || '画像')}`;
     if(S.mode === 'thermal'){ S.mode = 'hybrid'; syncUI(); toast('写真を読み込んだのでHYBRIDに切り替えました'); }
@@ -1007,8 +1110,10 @@ function buildPresetSelect(){
     groups.map(g => `<optgroup label="${g}">${PRESETS.map((p, i) => p.group === g ? `<option value="b${i}">${p.name}</option>` : '').join('')}</optgroup>`).join('') +
     (userPresets.length ? `<optgroup label="保存した設定">${userPresets.map((p, i) => `<option value="u${i}">${escapeHTML(p.name)}</option>`).join('')}</optgroup>` : '');
 }
-function applyState(s){
+function applyState(s, keepCrop = true){
+  const crop = clone(S.crop);
   S = merge(BASE, s);
+  if(keepCrop && !s.crop) S.crop = crop;
   if(S.mode === 'thermal') S.mode = 'hybrid';
   buildLut(S.thermal.palette); syncUI(); fit(); schedule();
 }
@@ -1067,7 +1172,7 @@ async function save(name, data, fallback){
 async function exportImage(){
   const fmt = $('#exFmt').value;
   let w, h;
-  if($('#exSize').value === 'preview') [w, h] = previewSize();
+  if($('#exSize').value === 'preview') [w, h] = previewSize(true);
   else { const [W, H] = dims(), cap = Math.min(4096, MAXTEX), k = S.mode === 'thermal' ? cap/Math.max(W, H) : Math.min(1, cap/Math.max(W, H)); w = Math.round(W*k); h = Math.round(H*k); }
   toast(`${w} × ${h}px で書き出し中…`);
   await new Promise(r => setTimeout(r, 40));
