@@ -145,7 +145,7 @@ const state={
   wash:{top:40,reach:42,angle:0,bottom:10,bottomReach:25},
   glow:{x:78,y:84,size:52,amount:72,x2:88,y2:6,size2:34,amount2:28},
   light:{side:'left',width:34,amount:48},
-  tone:{contrast:64,brightness:47,mid:48,grain:46,vignette:26}
+  tone:{contrast:66,brightness:45,mid:48,grain:42,grainSize:1.8,vignette:26}
 };
 let srcImage=null,srcIsDemo=true;
 function fullSize(){
@@ -234,13 +234,14 @@ function makeDemoImage(cb){
 let _noiseCv=null;
 function noiseTile(){
   if(_noiseCv)return _noiseCv;
-  const s=256;
+  const s=192;
   const cv=document.createElement('canvas');cv.width=s;cv.height=s;
   const x=cv.getContext('2d');
   const id=x.createImageData(s,s),d=id.data;
   const rng=mulberry32(777);
   for(let p=0;p<d.length;p+=4){
-    const v=rng()*255;
+    /* 2乱数の平均≒三角分布: 極端な白点/黒点が出にくいフィルム寄りの粒 */
+    const v=128+((rng()+rng())-1)*86;
     d[p]=v;d[p+1]=v;d[p+2]=v;d[p+3]=255;
   }
   x.putImageData(id,0,0);
@@ -282,7 +283,7 @@ function render(scaleMul){
   /* 1. グレースケール+コントラスト+明るさ */
   const base=document.createElement('canvas');base.width=W;base.height=H;
   const bx=base.getContext('2d');
-  bx.filter='grayscale(1) contrast('+(1+ (tn.contrast-50)/100*1.4)+') brightness('+(.7+tn.brightness/100*.7)+')';
+  bx.filter='grayscale(1) contrast('+(1+(tn.contrast-50)/100*2.2)+') brightness('+(.62+tn.brightness/100*.8)+')';
   coverDraw(bx,srcImage,W,H);
   bx.filter='none';
   /* 2. 縦スメア(screen合成: 明部が尾を引く) */
@@ -406,10 +407,12 @@ function render(scaleMul){
   if(tn.grain>.5){
     x.save();
     x.globalCompositeOperation='overlay';
-    x.globalAlpha=tn.grain/100*.9;
-    for(let ty=0;ty<H;ty+=256)
-      for(let tx2=0;tx2<W;tx2+=256)
-        x.drawImage(noiseTile(),tx2,ty,256,256);
+    x.globalAlpha=tn.grain/100*.55;
+    x.imageSmoothingEnabled=true;
+    const gs=192*(tn.grainSize||1.8)*(H/1350);
+    for(let ty=0;ty<H;ty+=gs)
+      for(let tx2=0;tx2<W;tx2+=gs)
+        x.drawImage(noiseTile(),tx2,ty,gs,gs);
     x.restore();
   }
   meta.textContent=BW+'×'+BH+(scaleMul!==1?'  ·  preview ×'+scaleMul.toFixed(2):'');
@@ -542,8 +545,9 @@ function buildTone(){
   UI.brightness=mkRange('明るさ',0,100,1,tn.brightness,v=>tn.brightness=v);
   UI.mid=mkRange('インクの広さ',0,100,1,tn.mid,v=>tn.mid=v,true);
   UI.grain=mkRange('グレイン',0,100,1,tn.grain,v=>tn.grain=v);
+  UI.grainSize=mkRange('粒の大きさ',1,4,.1,tn.grainSize,v=>tn.grainSize=v);
   UI.vignette=mkRange('ビネット',0,100,1,tn.vignette,v=>tn.vignette=v);
-  c.append(UI.contrast.row,UI.brightness.row,UI.mid.row,UI.grain.row,UI.vignette.row,
+  c.append(UI.contrast.row,UI.brightness.row,UI.mid.row,UI.grain.row,UI.grainSize.row,UI.vignette.row,
     ce('div','hint','インクの広さ=中間調がインク色になる範囲。右で広く(暗く濃い画)、左で狭く(白が残る画)'));
 }
 function refreshAll(){
@@ -560,7 +564,7 @@ function refreshAll(){
   UI.g2Amount.set(state.glow.amount2);UI.g2X.set(state.glow.x2);UI.g2Y.set(state.glow.y2);UI.g2Size.set(state.glow.size2);
   UI.liSide.set(state.light.side);UI.liWidth.set(state.light.width);UI.liAmount.set(state.light.amount);
   UI.contrast.set(state.tone.contrast);UI.brightness.set(state.tone.brightness);UI.mid.set(state.tone.mid);
-  UI.grain.set(state.tone.grain);UI.vignette.set(state.tone.vignette);
+  UI.grain.set(state.tone.grain);UI.grainSize.set(state.tone.grainSize||1.8);UI.vignette.set(state.tone.vignette);
   redraw();
 }
 /* ============ media input ============ */
