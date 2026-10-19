@@ -396,7 +396,7 @@ function gradFromTF(d, name){
   const a = (f.aniso || 0)/50;
   return {
     name, stops:l.stops.map(s => ({p:+s.p, c:s.c, h:+s.h || 0})), invert:!!l.invert, shift:(l.shift || 0)/100,
-    src:line ? 'dir' : 'lum',
+    src:'lum', lineShape:line,
     ang:f.linAng ?? 270, w:Math.min(400, Math.max(10, f.linWidth ?? 100))/100, pos:Math.min(100, Math.max(-100, f.linPosition ?? 0))/100,
     scale:.5*Math.pow(2, (f.scale ?? 14)/25), oct:Math.min(6, Math.max(1, f.octaves | 0 || 3)), warp:f.warp1 ?? 0,
     aniso:[Math.pow(2, a), Math.pow(2, -a)], seedOff:[(seed%1000)*.137, (Math.floor(seed/1000)%1000)*.113],
@@ -415,7 +415,7 @@ function parseTF(url){
 const TF_PRESET = {v:1, seed:20260816, lut:{stops:[{p:0,c:'#54B6DF',h:0},{p:.12,c:'#F2EFC9',h:0},{p:.315,c:'#E6A06D',h:0},{p:.42,c:'#FF5A2A',h:0},{p:.55,c:'#E6A06D',h:0},{p:.7,c:'#F2EFC9',h:0},{p:.86,c:'#54B6DF',h:0},{p:1,c:'#89C9D3',h:0}], bands:0, invert:false, shift:0},
   field:{mode:'linear', linAng:270, linShape:'line', linWidth:100, linPosition:0, scale:14, octaves:3, warp1:12, aniso:0, gamma:40, contrast:36, offset:-20}};
 let GRADS = [gradFromTF(TF_PRESET, 'Thermal Flow プリセット 1'),
-  {name:'赤 → 黒', stops:[{p:0,c:'#ff2a1a',h:0},{p:.55,c:'#c4001a',h:0},{p:1,c:'#2a0006',h:0}], invert:false, shift:0, src:'dir', ang:0, w:1, pos:0, scale:.74, oct:3, warp:10, aniso:[1, 1], seedOff:[11.2, 3.1], gamma:1, con:1, off:0}];
+  {name:'赤 → 黒', stops:[{p:0,c:'#ff2a1a',h:0},{p:.55,c:'#c4001a',h:0},{p:1,c:'#2a0006',h:0}], invert:false, shift:0, src:'lum', ang:0, w:1, pos:0, scale:.74, oct:3, warp:10, aniso:[1, 1], seedOff:[11.2, 3.1], gamma:1, con:1, off:0}];
 const hex3 = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
 
 function pass(prog, t, vals){
@@ -548,7 +548,7 @@ $('#tfLoad').addEventListener('click', () => {
     const g = gradFromTF(d, `Thermal Flow プリセット ${GRADS.filter(x => x.name.startsWith('Thermal Flow')).length + 1}`);
     GRADS.push(g); S.gi = GRADS.length - 1; S.cmode = 'grad'; G = JSON.parse(JSON.stringify(g)); buildLut(G);
     $('#tfUrl').value = ''; sync(); schedule();
-    toast(g.src === 'dir' ? '読み込みました（色・向き・ゆらぎを適用）' : '読み込みました。直線以外の形は使えないため、色を写真の明るさに合わせて適用しました');
+    toast(g.lineShape ? '読み込みました（写真の明るさで適用。「画面の向き」でThermal Flowと同じ向き・ゆらぎになります）' : '読み込みました（写真の明るさで適用。この形は「画面の向き」では再現できません）');
   } catch(e){ toast('読み込めませんでした。Thermal Flowの共有URL（#以降を含む）を貼り付けてください'); }
 });
 document.querySelectorAll('[data-aspect]').forEach(b => b.addEventListener('click', () => { S.aspect = b.dataset.aspect; cropRect(); sync(); fit(); schedule(); }));
