@@ -63,6 +63,10 @@ input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;bac
 .sw{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);outline:1px solid var(--line);padding:0;cursor:pointer}
 .sw[aria-pressed="true"]{outline:2px solid var(--text)}
 input[type=color]{width:34px;height:28px;border:1px solid var(--line);background:#1c1c21;padding:2px;border-radius:4px;cursor:pointer}
+.lutbar{height:16px;border-radius:3px;outline:1px solid var(--line)}
+.imp{display:flex;gap:6px}
+.imp input{flex:1;min-width:0;font:11px/1.2 var(--mono);padding:8px;border:1px solid var(--line);background:#1c1c21;color:var(--text);border-radius:4px}
+select{font:12px var(--jp);padding:7px 8px;border:1px solid var(--line);background:#1c1c21;color:var(--text);border-radius:4px;width:100%}
 .check{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .foot{margin-top:auto;padding:16px 18px 56px;display:grid;gap:8px}
 .note{margin:0;font-size:11px;color:var(--faint)}
@@ -116,12 +120,28 @@ input[type=color]{width:34px;height:28px;border:1px solid var(--line);background
 
   <section>
     <h2>COLOR 色面</h2>
-    <div class="colors">
+    <div class="seg" role="group" aria-label="色の種類">
+      <button type="button" data-cmode="grad">グラデーション</button>
+      <button type="button" data-cmode="solid">単色</button>
+    </div>
+    <div class="colors" data-for="solid">
       <button type="button" class="sw" data-c="#e2001a" style="background:#e2001a" aria-label="赤"></button>
       <button type="button" class="sw" data-c="#1f4dff" style="background:#1f4dff" aria-label="青"></button>
       <button type="button" class="sw" data-c="#f2cf00" style="background:#f2cf00" aria-label="黄"></button>
       <button type="button" class="sw" data-c="#ff5a1f" style="background:#ff5a1f" aria-label="オレンジ"></button>
       <input type="color" id="col" data-k="col" aria-label="色を選ぶ">
+    </div>
+    <div data-for="grad" style="display:grid;gap:10px">
+      <select id="gradSel" aria-label="グラデーション"></select>
+      <div class="lutbar" id="lutbar"></div>
+      <div class="seg" role="group" aria-label="グラデーションの基準">
+        <button type="button" data-gsrc="dir">画面の向き</button>
+        <button type="button" data-gsrc="lum">写真の明るさ</button>
+      </div>
+      <div class="ctl" data-gsrcfor="dir"><div class="top"><label for="gang">向き</label><output data-o="gang"></output></div><input id="gang" type="range" min="0" max="360" step="1" data-g="ang"></div>
+      <div class="ctl"><div class="top"><label for="goff">色の位置</label><output data-o="goff"></output></div><input id="goff" type="range" min="-0.6" max="0.6" step="0.005" data-g="off"></div>
+      <div class="ctl" data-gsrcfor="dir"><div class="top"><label for="gwarp">ゆらぎ</label><output data-o="gwarp"></output></div><input id="gwarp" type="range" min="0" max="100" step="1" data-g="warp"></div>
+      <div class="imp"><input id="tfUrl" type="text" placeholder="Thermal FlowのURLを貼り付け" aria-label="Thermal FlowのURL"><button type="button" id="tfLoad">読み込む</button></div>
     </div>
     <div class="ctl"><div class="top"><label for="soft">境界のぼかし</label><output data-o="soft"></output></div><input id="soft" type="range" min="0.05" max="1" step="0.01" data-k="soft"></div>
     <div class="ctl"><div class="top"><label for="hl">明るい部分の抜け</label><output data-o="hl"></output></div><input id="hl" type="range" min="0" max="1" step="0.01" data-k="hl"></div>
@@ -194,9 +214,50 @@ void main(){
   float g = texture(uIn, q/uRes).r;
   o = vec4(vec3(b*(1. - uE*w) + g*uE*w), 1.);
 }`,
-  /* 4) 楕円の外を色面（明部だけ薄く抜ける）＋粒子＋枠 */
-  final: `uniform sampler2D uIn, uSrc; uniform vec4 uCrop; uniform vec3 uCol; uniform vec4 uEl;
+  /* 4) 楕円の外を色面（単色 or Thermal Flow互換グラデーション）＋粒子＋枠 */
+  final: `uniform sampler2D uIn, uSrc, uLut; uniform vec4 uCrop; uniform vec3 uCol; uniform vec4 uEl;
 uniform float uS0, uS1, uHl, uGrain, uFrame, uFlip, uOrig, uSeed;
+uniform int uCMode, uGSrc, uOct; uniform float uLinAng, uLinW, uLinPos, uGScale, uW1, uGGamma, uGCon, uGOff; uniform vec2 uSeedOff, uAniso;
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1./6.,1./3.); const vec4 D=vec4(0.,.5,1.,2.);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+  float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.+1.; vec4 s1=floor(b1)*2.+1.; vec4 sh=-step(h,vec4(0.));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.); m=m*m;
+  return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+float fbm(vec3 p){
+  float a=.5,sum=0.,norm=0.;
+  for(int i=0;i<6;i++){ if(i>=uOct)break; sum+=a*snoise(p);norm+=a;a*=.55; p=vec3(p.xy*mat2(1.6,1.2,-1.2,1.6),p.z*1.9+7.3); }
+  return sum/max(norm,1e-4);
+}
+/* Thermal Flowの linear（line）と同じ値の求め方。uvは下が0になるよう反転して合わせる */
+float gradT(vec2 uv, float b){
+  float t;
+  if(uGSrc == 1) t = b;
+  else {
+    vec2 tuv = vec2(uv.x, 1. - uv.y), asp = vec2(uRes.x/uRes.y, 1.);
+    t = (dot((tuv - .5)*asp, vec2(cos(uLinAng), sin(uLinAng))) - uLinPos)/uLinW + .5;
+    if(uW1 > .001) t += fbm(vec3((tuv - .5)*asp*uGScale*uAniso + uSeedOff, 0.))*uW1*.12;
+  }
+  t = pow(clamp(t, 0., 1.), uGGamma);
+  return clamp((t - .5)*uGCon + .5 + uGOff, 0., 1.);
+}
 void main(){
   vec2 uv = uFlip > .5 ? vec2(vUv.x, 1.-vUv.y) : vUv;
   if(uOrig > .5){ o = vec4(texture(uSrc, uCrop.xy + uv*uCrop.zw).rgb, 1.); return; }
@@ -204,9 +265,11 @@ void main(){
   float b = texture(uIn, uv).r;
   float d = length((uv - uEl.xy)/uEl.zw);
   float m = smoothstep(uS0, uS1, d);
-  vec3 base = uCol*(.82 + .18*clamp(b/.5, 0., 1.));
+  vec3 C = uCMode == 1 ? texture(uLut, vec2(gradT(uv, b), .5)).rgb : uCol;
+  vec3 base = uGSrc == 1 && uCMode == 1 ? C : C*(.82 + .18*clamp(b/.5, 0., 1.));
   float hl = pow(clamp((b - .78)/.22, 0., 1.), 1.4)*uHl;
-  vec3 red = base + (vec3(1., .86, .84) - base)*hl;
+  vec3 tgt = uCMode == 1 ? mix(C, vec3(1.), .8) : vec3(1., .86, .84);
+  vec3 red = base + (tgt - base)*hl;
   vec3 c = mix(vec3(b), red, m);
   if(uGrain > 0.){
     vec2 g = floor(pc/max(uRes.x/990., 1.));
@@ -238,12 +301,13 @@ try {
     P[k] = {p, u};
   }
 } catch(e){ console.error(e); fatal('シェーダーの初期化に失敗しました。'); return; }
+const INTS = new Set(['uCMode', 'uGSrc', 'uOct']);
 function setU(prog, vals){
   let unit = 0;
   for(const [k, v] of Object.entries(vals)){
     const loc = prog.u[k]; if(!loc) continue;
     if(v instanceof WebGLTexture){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, v); gl.uniform1i(loc, unit++); }
-    else if(typeof v === 'number') gl.uniform1f(loc, v);
+    else if(typeof v === 'number') (INTS.has(k) ? gl.uniform1i(loc, v|0) : gl.uniform1f(loc, v));
     else if(v.length === 2) gl.uniform2f(loc, v[0], v[1]);
     else if(v.length === 3) gl.uniform3f(loc, v[0], v[1], v[2]);
     else gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
@@ -275,7 +339,7 @@ function upload(img){
 const DEF = {
   aspect:'2:3', zoom:1, ox:.5, oy:.5,
   cx:.24, cy:.47, blur:.45, flat:.68, focus:.45, echo:.45,
-  col:'#e2001a', ex:.17, ey:.44, erx:.44, ery:.52, soft:.63, hl:.375,
+  col:'#e2001a', cmode:'grad', gi:0, ex:.17, ey:.44, erx:.44, ery:.52, soft:.63, hl:.375,
   con:1.7, lift:.38, grain:.5, frame:true
 };
 let S = {...DEF};
@@ -289,6 +353,65 @@ function cropRect(){
   return [S.ox - cw/2, S.oy - ch/2, cw, ch];
 }
 const outAspect = () => { const r = cropRect(); return (r[2]*srcW)/(r[3]*srcH); };
+/* Thermal Flow のLUT（ストップの硬さ付き）を作る */
+const lutTex = gl.createTexture();
+const hexF = h => { const n = parseInt(String(h).replace('#', ''), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a)/Math.max(1e-6, b - a))); return t*t*(3 - 2*t); };
+function sampleStops(st, t){
+  if(t <= st[0].p) return hexF(st[0].c);
+  if(t >= st[st.length-1].p) return hexF(st[st.length-1].c);
+  let k = 0; while(k < st.length - 2 && t > st[k+1].p) k++;
+  const a = st[k], b = st[k+1];
+  let u = (t - a.p)/Math.max(1e-6, b.p - a.p);
+  const h = (b.h || 0)/100;
+  u = h >= .995 ? (u < .5 ? 0 : 1) : sstep(.5*h, 1 - .5*h, u);
+  const ca = hexF(a.c), cb = hexF(b.c);
+  return [0, 1, 2].map(i => ca[i] + (cb[i] - ca[i])*u);
+}
+function buildLut(g){
+  const st = [...g.stops].sort((a, b) => a.p - b.p), N = 1024, d = new Uint8Array(N*4);
+  for(let i=0;i<N;i++){
+    let t = i/(N - 1);
+    if(g.invert) t = 1 - t;
+    if(g.shift) t = ((t + g.shift)%1 + 1)%1;
+    const c = sampleStops(st, t);
+    for(let ch=0;ch<3;ch++) d[i*4+ch] = Math.round(Math.min(1, Math.max(0, c[ch]))*255);
+    d[i*4+3] = 255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, lutTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, d);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  $('#lutbar').style.background = `linear-gradient(90deg, ${st.map(s => `${s.c} ${(s.p*100).toFixed(1)}%`).join(', ')})`;
+}
+/* Thermal Flow の設定（URLのハッシュ）からグラデーションを作る */
+function gradFromTF(d, name){
+  const f = d.field || {}, l = d.lut || {}, seed = d.seed ?? 0;
+  if(!Array.isArray(l.stops) || l.stops.length < 2) throw new Error('nostops');
+  const line = f.mode === 'linear' && (f.linShape || 'line') === 'line';
+  const a = (f.aniso || 0)/50;
+  return {
+    name, stops:l.stops.map(s => ({p:+s.p, c:s.c, h:+s.h || 0})), invert:!!l.invert, shift:(l.shift || 0)/100,
+    src:line ? 'dir' : 'lum',
+    ang:f.linAng ?? 270, w:Math.min(400, Math.max(10, f.linWidth ?? 100))/100, pos:Math.min(100, Math.max(-100, f.linPosition ?? 0))/100,
+    scale:.5*Math.pow(2, (f.scale ?? 14)/25), oct:Math.min(6, Math.max(1, f.octaves | 0 || 3)), warp:f.warp1 ?? 0,
+    aniso:[Math.pow(2, a), Math.pow(2, -a)], seedOff:[(seed%1000)*.137, (Math.floor(seed/1000)%1000)*.113],
+    gamma:Math.pow(2, (50 - (f.gamma ?? 50))/25), con:Math.pow(2, ((f.contrast ?? 50) - 50)/25), off:(f.offset ?? 0)/100
+  };
+}
+function parseTF(url){
+  const h = String(url).trim().split('#')[1];
+  if(!h) throw new Error('nohash');
+  let b = decodeURIComponent(h).replace(/-/g, '+').replace(/_/g, '/');
+  b += '='.repeat((4 - b.length%4)%4);
+  const bin = atob(b), bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+/* 添付URLのプリセット（Thermal Flow） */
+const TF_PRESET = {v:1, seed:20260816, lut:{stops:[{p:0,c:'#54B6DF',h:0},{p:.12,c:'#F2EFC9',h:0},{p:.315,c:'#E6A06D',h:0},{p:.42,c:'#FF5A2A',h:0},{p:.55,c:'#E6A06D',h:0},{p:.7,c:'#F2EFC9',h:0},{p:.86,c:'#54B6DF',h:0},{p:1,c:'#89C9D3',h:0}], bands:0, invert:false, shift:0},
+  field:{mode:'linear', linAng:270, linShape:'line', linWidth:100, linPosition:0, scale:14, octaves:3, warp1:12, aniso:0, gamma:40, contrast:36, offset:-20}};
+let GRADS = [gradFromTF(TF_PRESET, 'Thermal Flow プリセット 1'),
+  {name:'赤 → 黒', stops:[{p:0,c:'#ff2a1a',h:0},{p:.55,c:'#c4001a',h:0},{p:1,c:'#2a0006',h:0}], invert:false, shift:0, src:'dir', ang:0, w:1, pos:0, scale:.74, oct:3, warp:10, aniso:[1, 1], seedOff:[11.2, 3.1], gamma:1, con:1, off:0}];
 const hex3 = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
 
 function pass(prog, t, vals){
@@ -303,8 +426,14 @@ function run(set, out, opts = {}){
   pass(P.zoom, set.B, {uRes:res, uIn:set.A.tex, uC:C, uS:S.blur, uSy:1 - S.flat, uF0:f0, uF1:f1});
   pass(P.echo, set.A, {uRes:res, uIn:set.B.tex, uC:C, uE:S.echo, uK:1 + S.echo*.4, uF0:f0, uF1:f1});
   pass(P.final, out, {uRes:res, uIn:set.A.tex, uSrc:src, uCrop:crop, uCol:hex3(S.col), uEl:[S.ex, S.ey, S.erx, S.ery],
+    ...gradU(), uLut:lutTex,
     uS0:1 - S.soft*.6, uS1:1 + S.soft*.45, uHl:S.hl*.8, uGrain:S.grain*.07, uFrame:S.frame ? .0101 : 0, uSeed:7.,
     uFlip:out ? 0 : 1, uOrig:opts.orig ? 1 : 0});
+}
+let G = JSON.parse(JSON.stringify(GRADS[0]));
+function gradU(){
+  return {uCMode:S.cmode === 'grad' ? 1 : 0, uGSrc:G.src === 'lum' ? 1 : 0, uOct:G.oct, uLinAng:G.ang*Math.PI/180, uLinW:G.w, uLinPos:G.pos,
+    uGScale:G.scale, uW1:G.warp*.02, uGGamma:G.gamma, uGCon:G.con, uGOff:G.off, uSeedOff:G.seedOff, uAniso:G.aniso};
 }
 let cache = {}, before = false, sliding = false, dragging = false, raf = 0;
 function previewSize(){
@@ -384,6 +513,16 @@ function sync(){
   });
   document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', b.dataset.c.toLowerCase() === S.col.toLowerCase()));
   document.querySelectorAll('[data-aspect]').forEach(b => b.setAttribute('aria-pressed', b.dataset.aspect === S.aspect));
+  document.querySelectorAll('[data-cmode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.cmode === S.cmode));
+  document.querySelectorAll('[data-for]').forEach(d => d.hidden = d.dataset.for !== S.cmode);
+  document.querySelectorAll('[data-gsrc]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gsrc === G.src));
+  document.querySelectorAll('[data-gsrcfor]').forEach(d => d.hidden = d.dataset.gsrcfor !== G.src);
+  $('#gang').value = G.ang; $('#goff').value = G.off; $('#gwarp').value = G.warp;
+  document.querySelector('output[data-o="gang"]').textContent = Math.round(G.ang) + '°';
+  document.querySelector('output[data-o="goff"]').textContent = (G.off > 0 ? '+' : '') + Math.round(G.off*100) + '%';
+  document.querySelector('output[data-o="gwarp"]').textContent = Math.round(G.warp);
+  $('#gradSel').innerHTML = GRADS.map((g, i) => `<option value="${i}">${g.name.replace(/[<>&]/g, '')}</option>`).join('');
+  $('#gradSel').value = S.gi;
   const r = cropRect();
   $('#info').textContent = `${label} · 切り抜き ${Math.round(r[2]*srcW)} × ${Math.round(r[3]*srcH)}px`;
 }
@@ -393,10 +532,23 @@ document.querySelectorAll('[data-k]').forEach(i => i.addEventListener('input', (
   sync(); schedule();
 }));
 document.querySelectorAll('.sw').forEach(b => b.addEventListener('click', () => { S.col = b.dataset.c; sync(); schedule(); }));
+document.querySelectorAll('[data-cmode]').forEach(b => b.addEventListener('click', () => { S.cmode = b.dataset.cmode; sync(); schedule(); }));
+document.querySelectorAll('[data-gsrc]').forEach(b => b.addEventListener('click', () => { G.src = b.dataset.gsrc; sync(); schedule(); }));
+document.querySelectorAll('[data-g]').forEach(i => i.addEventListener('input', () => { G[i.dataset.g] = parseFloat(i.value); sync(); schedule(); }));
+$('#gradSel').addEventListener('change', e => { S.gi = +e.target.value; G = JSON.parse(JSON.stringify(GRADS[S.gi])); buildLut(G); sync(); schedule(); });
+$('#tfLoad').addEventListener('click', () => {
+  try {
+    const d = parseTF($('#tfUrl').value);
+    const g = gradFromTF(d, `Thermal Flow プリセット ${GRADS.filter(x => x.name.startsWith('Thermal Flow')).length + 1}`);
+    GRADS.push(g); S.gi = GRADS.length - 1; S.cmode = 'grad'; G = JSON.parse(JSON.stringify(g)); buildLut(G);
+    $('#tfUrl').value = ''; sync(); schedule();
+    toast(g.src === 'dir' ? '読み込みました（色・向き・ゆらぎを適用）' : '読み込みました。直線以外の形は使えないため、色を写真の明るさに合わせて適用しました');
+  } catch(e){ toast('読み込めませんでした。Thermal Flowの共有URL（#以降を含む）を貼り付けてください'); }
+});
 document.querySelectorAll('[data-aspect]').forEach(b => b.addEventListener('click', () => { S.aspect = b.dataset.aspect; cropRect(); sync(); fit(); schedule(); }));
 document.addEventListener('pointerdown', e => { if(e.target.matches?.('input[type=range]')) sliding = true; });
 document.addEventListener('pointerup', () => { if(sliding){ sliding = false; schedule(); } });
-$('#reset').addEventListener('click', () => { const {aspect, zoom, ox, oy} = S; S = {...DEF, aspect, zoom, ox, oy}; sync(); schedule(); toast('加工を初期値に戻しました（構図はそのまま）'); });
+$('#reset').addEventListener('click', () => { const {aspect, zoom, ox, oy} = S; S = {...DEF, aspect, zoom, ox, oy}; G = JSON.parse(JSON.stringify(GRADS[0])); buildLut(G); sync(); schedule(); toast('加工を初期値に戻しました（構図はそのまま）'); });
 function setBefore(on){ if(before === on) return; before = on; $('#before').setAttribute('aria-pressed', on); schedule(); }
 $('#before').addEventListener('pointerdown', () => setBefore(true));
 ['pointerup','pointerleave','pointercancel'].forEach(ev => $('#before').addEventListener(ev, () => setBefore(false)));
@@ -487,6 +639,7 @@ $('#export').addEventListener('click', async () => {
 });
 
 /* ───── boot：埋め込みサンプル（プレビュー版のみ）があればそれを使う ───── */
+buildLut(G);
 if(window.SW_SAMPLE){
   const img = new Image();
   img.onload = () => { label = 'サンプル写真 · 写真をドロップして差し替え'; useImage(img, window.SW_SAMPLE_CROP || {}); };
