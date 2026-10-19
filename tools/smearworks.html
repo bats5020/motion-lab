@@ -136,11 +136,13 @@ select{font:12px var(--jp);padding:7px 8px;border:1px solid var(--line);backgrou
       <div class="lutbar" id="lutbar"></div>
       <div class="seg" role="group" aria-label="グラデーションの基準">
         <button type="button" data-gsrc="dir">画面の向き</button>
+        <button type="button" data-gsrc="ring">円の中心から</button>
         <button type="button" data-gsrc="lum">写真の明るさ</button>
       </div>
+      <div class="ctl" data-gsrcfor="ring"><div class="top"><label for="gspread">広がり</label><output data-o="gspread"></output></div><input id="gspread" type="range" min="0.3" max="4" step="0.01" data-g="spread"></div>
       <div class="ctl" data-gsrcfor="dir"><div class="top"><label for="gang">向き</label><output data-o="gang"></output></div><input id="gang" type="range" min="0" max="360" step="1" data-g="ang"></div>
       <div class="ctl"><div class="top"><label for="goff">色の位置</label><output data-o="goff"></output></div><input id="goff" type="range" min="-0.6" max="0.6" step="0.005" data-g="off"></div>
-      <div class="ctl" data-gsrcfor="dir"><div class="top"><label for="gwarp">ゆらぎ</label><output data-o="gwarp"></output></div><input id="gwarp" type="range" min="0" max="100" step="1" data-g="warp"></div>
+      <div class="ctl" data-gsrcfor="dir ring"><div class="top"><label for="gwarp">ゆらぎ</label><output data-o="gwarp"></output></div><input id="gwarp" type="range" min="0" max="100" step="1" data-g="warp"></div>
       <div class="imp"><input id="tfUrl" type="text" placeholder="Thermal FlowのURLを貼り付け" aria-label="Thermal FlowのURL"><button type="button" id="tfLoad">読み込む</button></div>
     </div>
     <div class="ctl"><div class="top"><label for="soft">境界のぼかし</label><output data-o="soft"></output></div><input id="soft" type="range" min="0.05" max="1" step="0.01" data-k="soft"></div>
@@ -217,7 +219,7 @@ void main(){
   /* 4) 楕円の外を色面（単色 or Thermal Flow互換グラデーション）＋粒子＋枠 */
   final: `uniform sampler2D uIn, uSrc, uLut; uniform vec4 uCrop; uniform vec3 uCol; uniform vec4 uEl;
 uniform float uS0, uS1, uHl, uGrain, uFrame, uFlip, uOrig, uSeed;
-uniform int uCMode, uGSrc, uOct; uniform float uLinAng, uLinW, uLinPos, uGScale, uW1, uGGamma, uGCon, uGOff; uniform vec2 uSeedOff, uAniso;
+uniform int uCMode, uGSrc, uOct; uniform float uSpread, uLinAng, uLinW, uLinPos, uGScale, uW1, uGGamma, uGCon, uGOff; uniform vec2 uSeedOff, uAniso;
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
 vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
 vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
@@ -252,7 +254,9 @@ float gradT(vec2 uv, float b){
   if(uGSrc == 1) t = b;
   else {
     vec2 tuv = vec2(uv.x, 1. - uv.y), asp = vec2(uRes.x/uRes.y, 1.);
-    t = (dot((tuv - .5)*asp, vec2(cos(uLinAng), sin(uLinAng))) - uLinPos)/uLinW + .5;
+    /* 2：楕円の中心から、楕円の形に沿って外へ広がる */
+    if(uGSrc == 2) t = (length((uv - uEl.xy)/uEl.zw) - .6)/uSpread;
+    else t = (dot((tuv - .5)*asp, vec2(cos(uLinAng), sin(uLinAng))) - uLinPos)/uLinW + .5;
     if(uW1 > .001) t += fbm(vec3((tuv - .5)*asp*uGScale*uAniso + uSeedOff, 0.))*uW1*.12;
   }
   t = pow(clamp(t, 0., 1.), uGGamma);
@@ -432,7 +436,7 @@ function run(set, out, opts = {}){
 }
 let G = JSON.parse(JSON.stringify(GRADS[0]));
 function gradU(){
-  return {uCMode:S.cmode === 'grad' ? 1 : 0, uGSrc:G.src === 'lum' ? 1 : 0, uOct:G.oct, uLinAng:G.ang*Math.PI/180, uLinW:G.w, uLinPos:G.pos,
+  return {uCMode:S.cmode === 'grad' ? 1 : 0, uGSrc:{dir:0, lum:1, ring:2}[G.src] || 0, uSpread:G.spread || 1.6, uOct:G.oct, uLinAng:G.ang*Math.PI/180, uLinW:G.w, uLinPos:G.pos,
     uGScale:G.scale, uW1:G.warp*.02, uGGamma:G.gamma, uGCon:G.con, uGOff:G.off, uSeedOff:G.seedOff, uAniso:G.aniso};
 }
 let cache = {}, before = false, sliding = false, dragging = false, raf = 0;
@@ -516,7 +520,9 @@ function sync(){
   document.querySelectorAll('[data-cmode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.cmode === S.cmode));
   document.querySelectorAll('[data-for]').forEach(d => d.hidden = d.dataset.for !== S.cmode);
   document.querySelectorAll('[data-gsrc]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gsrc === G.src));
-  document.querySelectorAll('[data-gsrcfor]').forEach(d => d.hidden = d.dataset.gsrcfor !== G.src);
+  document.querySelectorAll('[data-gsrcfor]').forEach(d => d.hidden = !d.dataset.gsrcfor.split(' ').includes(G.src));
+  if(G.spread == null) G.spread = 1.6;
+  $('#gspread').value = G.spread; document.querySelector('output[data-o="gspread"]').textContent = '×' + (+G.spread).toFixed(2);
   $('#gang').value = G.ang; $('#goff').value = G.off; $('#gwarp').value = G.warp;
   document.querySelector('output[data-o="gang"]').textContent = Math.round(G.ang) + '°';
   document.querySelector('output[data-o="goff"]').textContent = (G.off > 0 ? '+' : '') + Math.round(G.off*100) + '%';
