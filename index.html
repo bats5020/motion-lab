@@ -194,6 +194,20 @@ const TOOLS = [
     }
   },
   {
+    cat:"raster", name:"Smearworks",
+    desc:"白黒ポートレートに頬を中心とした放射ブラーと残像、顔の左側を残して周りに赤い色面。写真1枚からPNG書き出し。",
+    href:"tools/smearworks.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="sw-split" x1="0" x2="1"><stop offset=".38" stop-color="#d9d9de"/><stop offset=".62" stop-color="#e5141d"/></linearGradient><filter id="sw-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6 .2"/></filter></defs><rect width="120" height="66" fill="#141417"/><rect x="34" y="4" width="52" height="58" fill="url(#sw-split)"/><g id="d" filter="url(#sw-blur)"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"),NS="http://www.w3.org/2000/svg";
+      for(let i=0;i<9;i++){
+        const y=12+i*5.4, len=10+((i*37)%17), r=document.createElementNS(NS,"rect");
+        r.setAttribute("x",60-len);r.setAttribute("y",y);r.setAttribute("width",len);r.setAttribute("height",2.2);
+        r.setAttribute("fill",i%3?"#1c1c21":"#6a6a74");r.setAttribute("opacity",".85");g.appendChild(r);
+      }
+    }
+  },
+  {
     cat:"raster", name:"Grid Stretch",
     desc:"画像をグリッド分割してピクセルストレッチ。注釈オーバーレイ付きのグリッチ表現",
     href:"tools/grid-stretch.html",
