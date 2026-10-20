@@ -67,6 +67,10 @@ input[type=color]{width:34px;height:28px;border:1px solid var(--line);background
 .imp{display:flex;gap:6px}
 .imp input{flex:1;min-width:0;font:11px/1.2 var(--mono);padding:8px;border:1px solid var(--line);background:#1c1c21;color:var(--text);border-radius:4px}
 select{font:12px var(--jp);padding:7px 8px;border:1px solid var(--line);background:#1c1c21;color:var(--text);border-radius:4px;width:100%}
+.pname{flex:1;min-width:0;font:12.5px var(--jp);padding:8px 9px;border:1px solid var(--line);background:#1c1c21;color:var(--text);border-radius:4px}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.danger{color:#ff8a80}
+button.danger.armed{background:#c62828;border-color:#c62828;color:#fff}
 .check{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .foot{margin-top:auto;padding:16px 18px 56px;display:grid;gap:8px}
 .note{margin:0;font-size:11px;color:var(--faint)}
@@ -97,6 +101,22 @@ select{font:12px var(--jp);padding:7px 8px;border:1px solid var(--line);backgrou
     </div>
     <input id="file" type="file" accept="image/*" hidden>
   </header>
+
+  <section>
+    <h2>PRESET プリセット</h2>
+    <select id="presetSel" aria-label="保存したプリセット"></select>
+    <div class="row">
+      <input type="text" id="presetName" class="pname" placeholder="名前をつけて保存" maxlength="40" aria-label="プリセット名">
+      <button type="button" id="presetSave">保存</button>
+    </div>
+    <div class="row">
+      <button type="button" id="presetDel" class="danger grow" disabled>削除</button>
+      <button type="button" id="presetOut" class="grow">書き出し</button>
+      <button type="button" id="presetIn" class="grow">読み込み</button>
+    </div>
+    <input id="presetFile" type="file" accept="application/json,.json" hidden>
+    <p class="note" id="presetNote">このブラウザに保存されます。写真の拡大・位置は保存しません</p>
+  </section>
 
   <section>
     <h2>FRAME 構図</h2>
@@ -555,6 +575,96 @@ document.querySelectorAll('[data-aspect]').forEach(b => b.addEventListener('clic
 document.addEventListener('pointerdown', e => { if(e.target.matches?.('input[type=range]')) sliding = true; });
 document.addEventListener('pointerup', () => { if(sliding){ sliding = false; schedule(); } });
 $('#reset').addEventListener('click', () => { const {aspect, zoom, ox, oy} = S; S = {...DEF, aspect, zoom, ox, oy}; G = JSON.parse(JSON.stringify(GRADS[0])); buildLut(G); sync(); schedule(); toast('加工を初期値に戻しました（構図はそのまま）'); });
+/* ───── presets（このブラウザのlocalStorageに保存） ───── */
+const PKEY = 'smearworks.presets.v1';
+const LOOK_KEYS = ['aspect','cx','cy','blur','flat','focus','echo','col','cmode','ex','ey','erx','ery','soft','hl','con','lift','grain','frame'];
+let presets = [], storeOK = true;
+try { presets = JSON.parse(localStorage.getItem(PKEY) || '[]'); if(!Array.isArray(presets)) presets = []; } catch { storeOK = false; presets = []; }
+function storePresets(){
+  try { localStorage.setItem(PKEY, JSON.stringify(presets)); return true; }
+  catch { storeOK = false; toast('このブラウザでは保存できません。「書き出し」でファイルに残してください'); return false; }
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+function snapshot(name){
+  const look = {}; LOOK_KEYS.forEach(k => look[k] = S[k]);
+  return {name, v:1, saved:new Date().toISOString(), look, grad:clone(G)};
+}
+function validPreset(p){ return p && typeof p.name === 'string' && p.name.trim() && p.look && typeof p.look === 'object'; }
+function applyPreset(p){
+  const keep = {zoom:S.zoom, ox:S.ox, oy:S.oy};
+  const look = {}; LOOK_KEYS.forEach(k => { if(p.look[k] !== undefined) look[k] = p.look[k]; });
+  S = {...DEF, ...look, ...keep};
+  if(p.grad && Array.isArray(p.grad.stops) && p.grad.stops.length >= 2){
+    const sig = JSON.stringify(p.grad.stops);
+    let i = GRADS.findIndex(g => g.name === p.grad.name && JSON.stringify(g.stops) === sig);
+    if(i < 0){ GRADS.push(clone(p.grad)); i = GRADS.length - 1; }
+    S.gi = i; G = clone(p.grad);
+  } else { S.gi = 0; G = clone(GRADS[0]); }
+  buildLut(G); cropRect(); sync(); fit(); schedule();
+}
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderPresets(selected){
+  const sel = $('#presetSel');
+  sel.innerHTML = `<option value="">${presets.length ? 'プリセットを選ぶ' : '保存したプリセットはありません'}</option>` +
+    presets.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+  sel.value = selected == null ? '' : String(selected);
+  $('#presetDel').disabled = sel.value === '';
+  disarm(); updateSaveLabel();
+  if(!storeOK) $('#presetNote').textContent = 'このブラウザでは保存できません。「書き出し」でファイルに残してください';
+}
+function updateSaveLabel(){
+  const n = $('#presetName').value.trim();
+  $('#presetSave').textContent = n && presets.some(p => p.name === n) ? '上書き保存' : '保存';
+}
+$('#presetName').addEventListener('input', updateSaveLabel);
+$('#presetName').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); $('#presetSave').click(); } });
+$('#presetSave').addEventListener('click', () => {
+  const name = $('#presetName').value.trim();
+  if(!name){ $('#presetName').focus(); toast('プリセットの名前を入力してください'); return; }
+  const snap = snapshot(name), i = presets.findIndex(p => p.name === name);
+  if(i >= 0) presets[i] = snap; else presets.push(snap);
+  if(storePresets()) toast(i >= 0 ? `「${name}」を上書き保存しました` : `「${name}」を保存しました`);
+  renderPresets(i >= 0 ? i : presets.length - 1);
+});
+$('#presetSel').addEventListener('change', e => {
+  const v = e.target.value; $('#presetDel').disabled = v === ''; disarm();
+  if(v === '') return;
+  const p = presets[+v]; applyPreset(p);
+  $('#presetName').value = p.name; updateSaveLabel();
+  toast(`「${p.name}」を適用しました`);
+});
+/* 削除は2回押しで確定（確認ダイアログを使わない） */
+let armT = 0;
+function disarm(){ clearTimeout(armT); const b = $('#presetDel'); b.classList.remove('armed'); b.textContent = '削除'; }
+$('#presetDel').addEventListener('click', () => {
+  const v = $('#presetSel').value; if(v === '') return;
+  const b = $('#presetDel');
+  if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'もう一度押して削除'; armT = setTimeout(disarm, 3000); return; }
+  const [gone] = presets.splice(+v, 1);
+  storePresets(); renderPresets(null);
+  if($('#presetName').value.trim() === gone.name) $('#presetName').value = '';
+  updateSaveLabel(); toast(`「${gone.name}」を削除しました`);
+});
+$('#presetOut').addEventListener('click', () => {
+  const list = presets.length ? presets : [snapshot('現在の設定')];
+  const blob = new Blob([JSON.stringify({app:'smearworks', v:1, presets:list}, null, 2)], {type:'application/json'});
+  save(`smearworks-presets.json`, blob);
+});
+$('#presetIn').addEventListener('click', () => $('#presetFile').click());
+$('#presetFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const list = (Array.isArray(j) ? j : j.presets || [j]).filter(validPreset);
+    if(!list.length) throw new Error('empty');
+    let added = 0, replaced = 0;
+    list.forEach(p => { const i = presets.findIndex(q => q.name === p.name); if(i >= 0){ presets[i] = p; replaced++; } else { presets.push(p); added++; } });
+    storePresets(); renderPresets(null);
+    toast(`読み込みました（追加 ${added}件${replaced ? `・同名を上書き ${replaced}件` : ''}）`);
+  } catch { toast('読み込めませんでした。Smearworksで書き出したJSONを選んでください'); }
+});
+renderPresets(null);
 function setBefore(on){ if(before === on) return; before = on; $('#before').setAttribute('aria-pressed', on); schedule(); }
 $('#before').addEventListener('pointerdown', () => setBefore(true));
 ['pointerup','pointerleave','pointercancel'].forEach(ev => $('#before').addEventListener(ev, () => setBefore(false)));
@@ -612,7 +722,7 @@ document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items
 /* ───── export ───── */
 let tt = 0;
 function toast(m){ const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3200); }
-function fallback(blob){ $('#modalImg').src = URL.createObjectURL(blob); $('#modal').hidden = false; }
+function fallback(blob){ if(!String(blob.type).startsWith('image/')){ toast('この画面ではファイルを保存できません'); return; } $('#modalImg').src = URL.createObjectURL(blob); $('#modal').hidden = false; }
 $('#modalClose').addEventListener('click', () => $('#modal').hidden = true);
 async function save(filename, blob){
   if(window.claude?.use){
