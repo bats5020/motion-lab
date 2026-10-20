@@ -434,7 +434,13 @@ function parseTF(url){
 /* 添付URLのプリセット（Thermal Flow） */
 const TF_PRESET = {v:1, seed:20260816, lut:{stops:[{p:0,c:'#54B6DF',h:0},{p:.12,c:'#F2EFC9',h:0},{p:.315,c:'#E6A06D',h:0},{p:.42,c:'#FF5A2A',h:0},{p:.55,c:'#E6A06D',h:0},{p:.7,c:'#F2EFC9',h:0},{p:.86,c:'#54B6DF',h:0},{p:1,c:'#89C9D3',h:0}], bands:0, invert:false, shift:0},
   field:{mode:'linear', linAng:270, linShape:'line', linWidth:100, linPosition:0, scale:14, octaves:3, warp1:12, aniso:0, gamma:40, contrast:36, offset:-20}};
-let GRADS = [gradFromTF(TF_PRESET, 'Thermal Flow プリセット 1'),
+/* 共有されたプリセット2：ディープティール（Thermal Flowの流体リボン。形は再現せず色の並びを使う） */
+const TF_TEAL = {v:1, seed:3098806323, lut:{stops:[{p:0,c:'#010A13',h:0},{p:.22,c:'#0A323C',h:0},{p:.45,c:'#005A82',h:0},{p:.65,c:'#0AC8B9',h:0},{p:.85,c:'#C8AA6E',h:0},{p:1,c:'#F0E6D2',h:0}], bands:0, invert:false, shift:0},
+  field:{mode:'ribbon', linShape:'ribbon', scale:0, octaves:1, warp1:70, aniso:79, gamma:50, contrast:50, offset:0}};
+/* 共有されたプリセット3：ダークゴールド（同じく流体リボン。色の並びを使う） */
+const TF_GOLD = {v:1, seed:3098806323, lut:{stops:[{p:0,c:'#010A13',h:0},{p:.3,c:'#32281E',h:0},{p:.55,c:'#785A28',h:0},{p:.78,c:'#C89B3C',h:0},{p:1,c:'#F0E6D2',h:0}], bands:0, invert:false, shift:0},
+  field:{mode:'ribbon', linShape:'ribbon', scale:0, octaves:1, warp1:70, aniso:79, gamma:50, contrast:50, offset:0}};
+let GRADS = [gradFromTF(TF_PRESET, 'Thermal Flow プリセット 1'), gradFromTF(TF_TEAL, 'ディープティール'), gradFromTF(TF_GOLD, 'ダークゴールド'),
   {name:'赤 → 黒', stops:[{p:0,c:'#ff2a1a',h:0},{p:.55,c:'#c4001a',h:0},{p:1,c:'#2a0006',h:0}], invert:false, shift:0, src:'lum', ang:0, w:1, pos:0, scale:.74, oct:3, warp:10, aniso:[1, 1], seedOff:[11.2, 3.1], gamma:1, con:1, off:0}];
 const hex3 = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
 
