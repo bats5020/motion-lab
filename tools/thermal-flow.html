@@ -1844,7 +1844,7 @@ function buildField(){
   shf.addEventListener('click',()=>{pushUndo();state.seed=(Math.random()*1e9)>>>0;_blobs=blobState();$('#seed').value=state.seed;redraw()});
   oBlob.append(UI.blobN.row,UI.blobSize.row,UI.blobSoft.row,shf);
   fm.append(oLin,oWarp,oFlame,oBlob);
-  UI.pinRad=mkRange('ピン半径',4,50,1,15,v=>{const p=selPinObj();if(p){p.r=v/100;drawOverlay()}});
+  UI.pinRad=mkRange('ピン半径',4,150,1,15,v=>{const p=selPinObj();if(p){p.r=v/100;drawOverlay()}});
   UI.pinAng=mkRange('回転角°',-720,720,5,200,v=>{const p=selPinObj();if(p)p.a=v});
   const pinDel=ce('button','btn','選択ピンを削除');
   pinDel.addEventListener('click',()=>{
@@ -2465,7 +2465,7 @@ ov.addEventListener('pointermove',e=>{
     p.x=u.x;p.y=u.y;
   }else if(_pinDrag.mode==='resize'){
     const x=p.x*ov.width,y=(1-p.y)*ov.height;
-    p.r=clamp(Math.hypot(px-x,py-y)/ov.height,.04,.5);
+    p.r=clamp(Math.hypot(px-x,py-y)/ov.height,.04,1.5);
   }else{
     ov.style.cursor='grabbing';
     const x=p.x*ov.width,y=(1-p.y)*ov.height;
