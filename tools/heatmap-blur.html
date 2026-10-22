@@ -241,7 +241,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
     <section id="secAnim">
       <h2><span><b>05</b>アニメーション</span></h2>
       <div class="sub">タイムライン・キーフレーム</div>
-      <div class="prow"><span>尺</span><input type="range" id="len" min="1" max="30" step="0.5"><span class="pv"></span></div>
+      <div class="prow"><span>尺</span><input type="range" id="len" min="1" max="60" step="0.1"><span class="pv"></span></div>
       <div class="btnrow"><button class="btn" id="kClear">キーを全部消す</button></div>
       <div class="hint">AE と同じ操作です。上段の目盛りをドラッグで時間移動、下段でキーを選択（Shift で追加・空いた所をドラッグで範囲選択）、選んだキーはドラッグで移動。◆（⌥K）で今の時間にキー、キーがある状態でスライダーを動かすと今の時間のキーに記録（なければ自動で追加）。キーの形：◆リニア／⧗イーズ／■停止。<br>ショートカット：Space 再生／J・K 前後のキー／PageUp・PageDown（⌘←→）1コマ（Shift で10コマ）／Home・End／Delete 選択キー削除／F9 イーズ／⌘⌥H 停止／⌘クリック リニア⇄イーズ／⌘Z 取り消し・⌘⇧Z やり直し。配色・フォント・モードの切り替えはキーの対象外です。</div>
       <div class="sub">ブラーマップ・ストレッチのループ</div>
@@ -379,7 +379,7 @@ function load(){
   // 配色はプリセットから選ぶだけ。以前に個別編集した配色は、いちばん近いプリセットへ戻す
   if(!d.layout||!Array.isArray(d.layout.items)) d.layout=clone(LAYOUT_PRESETS[d.layoutPreset]||LAYOUT_PRESETS["u19-qualifier"]);
   d.kf = Array.isArray(d.kf) ? d.kf.filter(k=>k&&isFinite(k.t)&&k.v&&typeof k.v==="object").map(k=>({t:+k.t,ease:["smooth","linear","hold"].includes(k.ease)?k.ease:"smooth",v:k.v})).sort((a,b)=>a.t-b.t) : [];
-  d.len = Math.min(30,Math.max(1,+d.len||6));
+  d.len = Math.min(600,Math.max(1,+d.len||6));
   if(!PALETTES[d.palette]) d.palette=nearestPalette(d.stops);
   d.stops = clone(PALETTES[d.palette]);
   return d;
@@ -1176,7 +1176,7 @@ const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), szAdapt:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
-  dur:v=>(+v).toFixed(1)+"s", len:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
+  dur:v=>(+v).toFixed(1)+"s", len:v=>(Math.abs(v*10-Math.round(v*10))<1e-6?(+v).toFixed(1):(+v).toFixed(2))+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
 const SRC_KEYS=new Set(["szAdapt","layout","goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
@@ -1366,7 +1366,13 @@ function adoptVideo(v,file,url){
   const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
   let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
   $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒${v.isPngMov?"・ロスレスMOV":""}）`;
-  S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
+  // 尺（書き出しの長さ）を動画の長さにそろえる（コマ単位に丸める）
+  if(isFinite(v.duration)&&v.duration>0){
+    const d=Math.max(1/FPS_SNAP,Math.round(v.duration*FPS_SNAP)/FPS_SNAP), el=$("len");
+    if(d>+el.max) el.max=Math.ceil(d); S.len=d; el.value=d; el.parentElement.querySelector(".pv").textContent=fmt.len(d);
+    note+=`・尺を ${d.toFixed(2)} 秒に合わせました`;
+  }
+  S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); changed("len"); videoDirty=true;
   v.play().catch(()=>{});
   toast("動画を読み込みました"+note);
 }
@@ -1421,6 +1427,7 @@ function buildLayoutUI(){
 $("layoutPreset").addEventListener("change",()=>{ S.layoutPreset=$("layoutPreset").value; S.layout=clone(LAYOUT_PRESETS[S.layoutPreset]); buildLayoutUI(); changed("layout"); });
 buildLayoutUI(); updateLFStatus();
 $("adobeKit").value=S.adobeKit||"";
+if(S.len>+$("len").max){ $("len").max=Math.ceil(S.len); $("len").value=S.len; }
 $("adobeLoad").onclick=()=>{ S.adobeKit=$("adobeKit").value.trim(); save(); loadAdobeKit(S.adobeKit); };
 $("adobeKit").addEventListener("keydown",e=>{ if(e.key==="Enter") $("adobeLoad").click(); });
 loadAdobeKit(S.adobeKit);
