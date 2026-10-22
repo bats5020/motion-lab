@@ -6,6 +6,7 @@
 <title>Heatmap Blur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://use.typekit.net/yhz3hqi.css">
 <link id="gfonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400&family=Archivo:wdth,wght@62..125,100..900&family=Unbounded:wght@400..900&family=Krona+One&family=Syncopate:wght@700&family=Dela+Gothic+One&display=swap">
 <style>
 :root{
@@ -151,9 +152,10 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 
       <div id="srcLayout" class="hide">
         <div class="prow"><span>レイアウト</span><select id="layoutPreset"></select></div>
-        <div class="sub">フォント（Figma と同じ書体を読み込む）</div>
-        <div class="btnrow"><button class="btn" id="lfBold">Wide Bold 読込</button><button class="btn" id="lfSemi">Wide Semibold 読込</button></div>
+        <div class="sub">フォント</div>
+        <div class="prow"><span>Adobe Fonts</span><input type="text" id="adobeKit" spellcheck="false" aria-label="Adobe Fonts のキットID" style="flex:1"><button class="btn" id="adobeLoad">読込</button></div>
         <div class="hint" id="lfStatus"></div>
+        <div class="btnrow"><button class="btn" id="lfBold">予備：Bold ファイル</button><button class="btn" id="lfSemi">予備：Semibold ファイル</button></div>
         <div class="sub">テキスト</div>
         <div id="layoutItems"></div>
         <div class="hint">位置・サイズ・行間は Figma（1920×1080）のまま配置します。文字の伸縮は画面全体の文字にまたがって順番にかかります（和文と記号は伸ばしません）。</div>
@@ -343,6 +345,7 @@ const PALETTES = {
   "MONO": [[0,"#000000"],[1,"#ffffff"]],
 };
 const FONTS = [
+  {id:"adobe", name:"Obviously Wide（Adobe Fonts）", family:"HB Adobe Kit", stretch:"extra-expanded", weight:700, wide:1},
   {id:"archivo", name:"Archivo Expanded", family:"Archivo", stretch:"expanded", weight:900, wide:1.06},
   {id:"unbounded", name:"Unbounded", family:"Unbounded", weight:800, wide:1},
   {id:"krona", name:"Krona One", family:"Krona One", weight:400, wide:1, fixedWeight:true},
@@ -353,7 +356,7 @@ const FONTS = [
 const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
-  layoutPreset:"u19-qualifier", layout:null,
+  layoutPreset:"u19-qualifier", layout:null, adobeKit:"yhz3hqi",
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
   minB:3, maxB:32, curve:1.8, aniso:1.8, szAdapt:1,
@@ -599,8 +602,28 @@ function glyphRaster(ch,fs,stretchKw,sx,scale,inkL,inkR,gH,baseY,pad){
 }
 /* ---------- レイアウト（Figma の配置をそのまま再現） ---------- */
 const LF={}, layoutLineCanvases=[], layoutMeasure=new Map();
+/* Adobe Fonts：キットの CSS から可変フォントの所在を読み、幅（wdth）と太さ（wght）の範囲つきで登録し直す。
+   キット側の宣言は幅が normal 固定なので、そのままだと canvas で Wide にできないため。 */
+const ADOBE={ok:false, fam:"HB Adobe Kit", err:"", name:""};
+async function loadAdobeKit(id){
+  id=(id||"").trim(); ADOBE.ok=false; ADOBE.err=""; if(!id){ updateLFStatus(); return; }
+  ADOBE.err="読み込み中…"; updateLFStatus();
+  try{
+    const r=await fetch(`https://use.typekit.net/${encodeURIComponent(id)}.css`); if(!r.ok) throw new Error("キットが見つかりません（"+r.status+"）");
+    const css=await r.text(); const name=(css.match(/font-family:\s*"([^"]+)"/)||[])[1]||id;
+    const srcs=[...css.matchAll(/url\("([^"]+)"\)\s*format\("([^"]+)"\)/g)].map(m=>`url("${m[1]}") format("${m[2]}")`).join(", ");
+    if(!srcs) throw new Error("キットにフォントがありません");
+    const fam="HB Adobe Kit "+id; const ff=new FontFace(fam,srcs,{weight:"200 900",stretch:"50% 200%"}); await ff.load(); document.fonts.add(ff);
+    Object.assign(ADOBE,{ok:true,fam,name,err:""});
+    const fo=FONTS.find(f=>f.id==="adobe"); if(fo) fo.family=fam;
+    fontsChanged(); if(!playing) render(playhead);
+  }catch(e){ ADOBE.ok=false; ADOBE.err=(e&&e.message&&!/Failed to fetch|NetworkError|Load failed/.test(e.message))?e.message:"このページからは読み込めません（キットに登録したドメイン、例：bats5020.github.io で使えます）"; }
+  updateLFStatus();
+}
 function layoutFont(it){
   if(it.font==="jp") return {css:px=>`400 ${px}px "Noto Sans JP", "Hiragino Sans", sans-serif`, stretch:"normal"};
+  // Obviously（可変）：Wide＝幅150（extra-expanded）、Bold＝700／Semibold＝600。Figma の Wide Bold と同じ字幅になる
+  if(ADOBE.ok) return {css:px=>`${it.font==="bold"?700:600} extra-expanded ${px}px "${ADOBE.fam}", sans-serif`, stretch:"extra-expanded"};
   const lf=LF[it.font]; if(lf) return {css:px=>`${px}px "${lf.fam}"`, stretch:"normal"};
   return {css:px=>`${it.font==="bold"?800:700} expanded ${px}px "Archivo", sans-serif`, stretch:"expanded"}; // 読み込むまでの代わり
 }
@@ -1300,9 +1323,10 @@ async function loadLayoutFont(slot,buf,name){
   LF[slot]={fam,name}; fontsChanged(); updateLFStatus(); if(!playing) render(playhead);
 }
 function updateLFStatus(){
-  const s=k=>LF[k]?`${LF[k].name}`:"未読込（代わりに Archivo Expanded で表示）";
-  $("lfStatus").innerHTML=`Bold：${s("bold")}<br>Semibold：${s("semibold")}<br>読み込んだフォントはこのブラウザに保存され、次回も使えます。`;
-  $("lfBold").classList.toggle("primary",!LF.bold); $("lfSemi").classList.toggle("primary",!LF.semibold);
+  if(ADOBE.ok){ $("lfStatus").innerHTML=`Adobe Fonts：${ADOBE.name} を読み込みました（Wide Bold／Wide Semibold で表示）`; return; }
+  const s=k=>LF[k]?`${LF[k].name}`:"未読込";
+  const fb=(LF.bold||LF.semibold)?"予備のフォントファイルで表示中":"代わりに Archivo Expanded で表示中";
+  $("lfStatus").innerHTML=`Adobe Fonts：${ADOBE.err||"未読込"}<br>${fb}（Bold：${s("bold")}／Semibold：${s("semibold")}）`;
 }
 let lfSlot="bold";
 $("lfBold").onclick=()=>{ lfSlot="bold"; $("fileLF").click(); };
@@ -1319,6 +1343,10 @@ function buildLayoutUI(){
 }
 $("layoutPreset").addEventListener("change",()=>{ S.layoutPreset=$("layoutPreset").value; S.layout=clone(LAYOUT_PRESETS[S.layoutPreset]); buildLayoutUI(); changed("layout"); });
 buildLayoutUI(); updateLFStatus();
+$("adobeKit").value=S.adobeKit||"";
+$("adobeLoad").onclick=()=>{ S.adobeKit=$("adobeKit").value.trim(); save(); loadAdobeKit(S.adobeKit); };
+$("adobeKit").addEventListener("keydown",e=>{ if(e.key==="Enter") $("adobeLoad").click(); });
+loadAdobeKit(S.adobeKit);
 for(const slot of ["bold","semibold"]) FONTDB.get(slot).then(v=>{ if(v&&v.buf) return loadLayoutFont(slot,v.buf,v.name); }).catch(()=>{});
 // blur map points
 function buildPts(){
