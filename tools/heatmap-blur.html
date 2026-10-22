@@ -168,7 +168,6 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="prow"><span>伸び量</span><input type="range" id="sAmount" min="0" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow sSeq"><span>切り替え回数</span><input type="range" id="sSteps" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="prow"><span>変化の長さ</span><input type="range" id="sTrans" min="0.05" max="0.5" step="0.01"><span class="pv"></span></div>
-      <div class="prow sTrack"><span>行間の寄せ</span><input type="range" id="sLead" min="0" max="1" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>くっつき</span><input type="range" id="goo" min="0" max="1" step="0.01"><span class="pv"></span></div>
       <div class="prow sSeq"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、行全体を縮めて幅をそろえる</span></div>
       <div class="btnrow sSeq"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
@@ -295,7 +294,7 @@ const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
-  sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0, sLead:0.5,
+  sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
   dur:3, keys:3, ease:"ease", rtype:"fire",
@@ -555,7 +554,7 @@ function drawText(c,W,H,cx,cy,fit){
   const amt=S.sAmount*capH*scale;
   // 字間（伸縮）：ループの頭と終わりで字間を詰めて文字を重ね、間は普段の字間に開く
   const dTrack=-curTrackEnv*S.sAmount*.3*base*sx*scale;
-  const leadK=1-curTrackEnv*S.sLead*.4; // 詰まるときの行間の寄せ（伸び量とは独立）
+  const leadK=1; // 行間は寄せない（横方向だけ詰める）
   c.save(); c.translate(cx,cy); c.transform(1,0,-Math.tan(S.skew*Math.PI/180),1,0,0);
   let y=-(capH+(L.length-1)*lead*leadK)/2+capH, gi=0;
   for(const line of L){
@@ -823,8 +822,8 @@ const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
-  dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sLead:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["sLead","goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+  dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
+const SRC_KEYS=new Set(["goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -861,9 +860,8 @@ bindSeg("sModeSeg","sMode",()=>{
   syncStretchUI(); });
 function syncStretchUI(){
   document.querySelectorAll("#secStretch .sSeq").forEach(el=>el.classList.toggle("hide",S.sMode==="track"));
-  document.querySelectorAll("#secStretch .sTrack").forEach(el=>el.classList.toggle("hide",S.sMode!=="track"));
   $("sHint").textContent = S.sMode==="track"
-    ? "ループの頭と終わりで字間がぎゅっと詰まって文字が重なり、間は普段の字間に開いて止まります。伸び量で横の詰まり具合、行間の寄せで上下の詰まり具合（0で行間は動かない）、変化の長さで詰まっている時間、くっつきで重なりの溶け合い方を調整します。"
+    ? "ループの頭と終わりで字間がぎゅっと詰まって文字が重なり、間は普段の字間に開いて止まります。伸び量で横の詰まり具合（行間は動きません）、変化の長さで詰まっている時間、くっつきで重なりの溶け合い方を調整します。"
     : "動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。くっつきを上げると、重なった文字が丸く溶け合います。";
 }
 syncStretchUI(); bindSeg("sMethodSeg","sMethod");
