@@ -163,15 +163,16 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 
     <section id="secStretch">
       <h2><span><b>02</b>文字ストレッチ</span></h2>
-      <div class="seg" id="sModeSeg"><button data-v="seq">動画風（順番に）</button><button data-v="wave">ウェーブ</button><button data-v="off">オフ</button></div>
-      <div class="prow"><span>伸ばし方</span><div class="seg" id="sMethodSeg" style="flex:1;margin:0"><button data-v="split">中央を伸ばす</button><button data-v="scale">横に拡大</button></div></div>
+      <div class="seg" id="sModeSeg"><button data-v="seq">動画風（順番に）</button><button data-v="wave">ウェーブ</button><button data-v="track">字間（伸縮）</button><button data-v="off">オフ</button></div>
+      <div class="prow sSeq"><span>伸ばし方</span><div class="seg" id="sMethodSeg" style="flex:1;margin:0"><button data-v="split">中央を伸ばす</button><button data-v="scale">横に拡大</button></div></div>
       <div class="prow"><span>伸び量</span><input type="range" id="sAmount" min="0" max="3" step="0.05"><span class="pv"></span></div>
-      <div class="prow"><span>切り替え回数</span><input type="range" id="sSteps" min="1" max="8" step="1"><span class="pv"></span></div>
+      <div class="prow sSeq"><span>切り替え回数</span><input type="range" id="sSteps" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="prow"><span>変化の長さ</span><input type="range" id="sTrans" min="0.05" max="0.5" step="0.01"><span class="pv"></span></div>
-      <div class="prow"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、行全体を縮めて幅をそろえる</span></div>
-      <div class="btnrow"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
-      <div class="prow"><span>伸びる順番</span><span id="sPlan" style="flex:1;color:var(--text);font-size:12px;letter-spacing:.06em"></span></div>
-      <div class="hint">動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。</div>
+      <div class="prow"><span>くっつき</span><input type="range" id="goo" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="prow sSeq"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、行全体を縮めて幅をそろえる</span></div>
+      <div class="btnrow sSeq"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
+      <div class="prow sSeq"><span>伸びる順番</span><span id="sPlan" style="flex:1;color:var(--text);font-size:12px;letter-spacing:.06em"></span></div>
+      <div class="hint" id="sHint"></div>
     </section>
 
     <section id="secBlur">
@@ -293,7 +294,7 @@ const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
-  sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
+  sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
   dur:3, keys:3, ease:"ease", rtype:"fire",
@@ -345,6 +346,9 @@ void main(){ // ソース（文字・画像・動画のコマ）を熱源マス�
   if(u_invert==1) v=1.-v;
   v=clamp((v-u_lo)/max(.001,u_hi-u_lo),0.,1.);
   o=vec4(v,0,0,1); }`;
+const FS_THRESH = `#version 300 es
+precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_t; uniform float u_c;
+void main(){ float v=texture(u_t,v_uv).r; o=vec4(smoothstep(u_c-.07,u_c+.07,v),0,0,1); }`; // しきい値を下げるほど線が太って溶ける // ぼかして二値化＝重なった文字が丸く溶け合う
 const FS_DOWN = `#version 300 es
 precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_t; uniform vec2 u_texel;
 void main(){ // 4タップのボックス（2×2平均×4 = 4×4範囲）でエイリアスを抑えて半分に
@@ -469,7 +473,7 @@ void main(){
 function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
 function prog(fs){const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.bindAttribLocation(p,0,"p");gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
   const u={};const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);for(let i=0;i<n;i++){const a=gl.getActiveUniform(p,i);const nm=a.name.replace(/\[0\]$/,"");u[nm]=gl.getUniformLocation(p,a.name)}return{p,u}}
-const P_PREP=prog(FS_PREP), P_DOWN=prog(FS_DOWN), P_BLUR=prog(FS_BLUR), P_COMP=prog(FS_COMP);
+const P_PREP=prog(FS_PREP), P_THRESH=prog(FS_THRESH), P_DOWN=prog(FS_DOWN), P_BLUR=prog(FS_BLUR), P_COMP=prog(FS_COMP);
 const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vbo); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 
@@ -548,15 +552,19 @@ function drawText(c,W,H,cx,cy,fit){
   const fsPx=fontStr(f,base*scale), stretchKw=f.stretch||"normal";
   const pad=Math.ceil(base*scale*.3), gH=Math.ceil((asc+desc)*scale)+pad*2, baseY=pad+Math.ceil(asc*scale);
   const amt=S.sAmount*capH*scale;
+  // 字間（伸縮）：ループの頭と終わりで字間を詰めて文字を重ね、間は普段の字間に開く
+  const dTrack=-curTrackEnv*S.sAmount*.3*base*sx*scale;
+  const leadK=1-curTrackEnv*.16*Math.min(1.6,S.sAmount); // 詰まるときは行間も寄せて上下の行を溶け合わせる
   c.save(); c.translate(cx,cy); c.transform(1,0,-Math.tan(S.skew*Math.PI/180),1,0,0);
-  let y=-blockH/2+capH, gi=0;
+  let y=-(capH+(L.length-1)*lead*leadK)/2+capH, gi=0;
   for(const line of L){
     const natW=Math.max(1,(line.right-line.left)*sx*scale);
-    const ex=line.gl.map((g,i)=>(curStretch[gi+i]||0)*amt); const exT=ex.reduce((a,b)=>a+b,0);
+    const ex=line.gl.map((g,i)=>(curStretch[gi+i]||0)*amt); const exT=ex.reduce((a,b)=>a+b,0)+Math.max(0,line.gl.length-1)*dTrack;
     const li=L.indexOf(line); const lc=lineCanvases[li]||(lineCanvases[li]=document.createElement("canvas"));
-    lc.width=Math.ceil(natW+exT)+pad*2; lc.height=gH; // サイズ代入で中身もクリアされる
+    lc.width=Math.max(1,Math.ceil(natW+exT)+pad*2); lc.height=gH; // サイズ代入で中身もクリアされる
     const lx=lc.getContext("2d"); let off=0;
     line.gl.forEach((g,i)=>{
+      if(i>0) off+=dTrack;
       if(!g.ch.trim()) { off+=ex[i]; return; }
       const r=glyphRaster(g.ch,fsPx,stretchKw,sx,scale,g.inkL,g.inkR,gH,baseY,pad);
       const gx=pad+(g.x-line.left)*sx*scale+off-r.ox0; const e=ex[i];
@@ -571,15 +579,20 @@ function drawText(c,W,H,cx,cy,fit){
       off+=e;
     });
     gi+=line.gl.length;
-    const kx=S.sKeep?natW/(natW+exT):1;
+    const kx=S.sKeep&&S.sMode!=="track"?natW/Math.max(1,natW+exT):1;
     c.save(); c.translate(0,y*scale); c.scale(kx,1); c.drawImage(lc,-(natW+exT)/2-pad,-baseY); c.restore();
-    y+=lead;
+    y+=lead*leadK;
   }
   c.restore();
 }
 
 /* ---------- 文字ストレッチの段取り ---------- */
-let curStretch=[], lastSK="", PLAN={count:0,steps:[]};
+let curStretch=[], curTrackEnv=0, lastSK="", PLAN={count:0,steps:[]};
+function trackAt(t){
+  if(S.src!=="text"||S.sMode!=="track") return 0;
+  const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, tr=Math.max(.05,S.sTrans), ease=x=>x*x*(3-2*x);
+  return u<tr?1-ease(u/tr):u>1-tr?ease((u-(1-tr))/tr):0; // 頭と終わりで詰まり、間は開いたまま
+}
 function stretchable(ch){ return ch.trim() && !/[Iil1|.,:;'"!?\-ー・、。「」]/.test(ch); }
 function buildStretchPlan(){
   const lines=textLines(); const glyphs=[]; lines.forEach((l,li)=>[...l].forEach(ch=>glyphs.push({li,ch})));
@@ -601,7 +614,7 @@ function buildStretchPlan(){
 function planLabel(){ return PLAN.steps.map(st=>st.map(i=>PLAN.glyphs[i].ch).join("・")||"—").join(" → "); }
 function stretchAt(t){
   const n=PLAN.count, v=new Array(n).fill(0);
-  if(S.src!=="text"||S.sMode==="off"||!n) return v;
+  if(S.src!=="text"||S.sMode==="off"||S.sMode==="track"||!n) return v;
   const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, ease=x=>x*x*(3-2*x);
   if(S.sMode==="wave"){ const w=Math.min(.9,Math.max(.1,S.sTrans*2.2)); for(let i=0;i<n;i++){ if(!stretchable(PLAN.glyphs[i].ch)) continue; const p=((u-i/n)%1+1)%1; if(p<w){ const q=Math.sin(Math.PI*p/w); v[i]=q*q; } } return v; }
   const K=Math.max(1,S.sSteps), x=u*K, k=Math.floor(x)%K, f=x-Math.floor(x), tr=S.sTrans;
@@ -672,6 +685,13 @@ function rebuildLevels(){
   gl.uniform1i(P_PREP.u.u_alphaMode,(S.src==="image"&&userImageAlpha)?1:0); gl.uniform1i(P_PREP.u.u_invert,media&&S.invert?1:0);
   gl.uniform1f(P_PREP.u.u_lo,media?S.lo:0); gl.uniform1f(P_PREP.u.u_hi,media?Math.max(S.lo+.01,S.hi):1);
   drawTo(maskTex,W,H);
+  if(S.src==="text"&&S.goo>0){ // くっつき：マスクを少しぼかしてからしきい値で戻す
+    const g1=poolTex(tmpPool,"g1",W,H), g2=poolTex(tmpPool,"g2",W,H), sg=Math.max(.5,S.goo*16*(H/1080)), r=Math.min(120,Math.ceil(sg*3));
+    gl.useProgram(P_BLUR.p); gl.uniform1i(P_BLUR.u.u_t,0); gl.uniform1f(P_BLUR.u.u_s,sg); gl.uniform1i(P_BLUR.u.u_r,r);
+    gl.bindTexture(gl.TEXTURE_2D,maskTex.t); gl.uniform2f(P_BLUR.u.u_step,1/W,0); drawTo(g1,W,H);
+    gl.bindTexture(gl.TEXTURE_2D,g1.t); gl.uniform2f(P_BLUR.u.u_step,0,1/H); drawTo(g2,W,H);
+    gl.useProgram(P_THRESH.p); gl.uniform1i(P_THRESH.u.u_t,0); gl.uniform1f(P_THRESH.u.u_c,.5-.16*curTrackEnv); gl.bindTexture(gl.TEXTURE_2D,g2.t); drawTo(maskTex,W,H);
+  }
   if(S.src==="video"){ // 動画はブラーを使わないので、マスクだけ作って終わり
     levels=new Array(NLV).fill(maskTex); LVSIG=[0]; for(let k=1;k<NLV;k++) LVSIG.push(SIG1*Math.pow(2,k-1)); return; }
   // mip chain
@@ -748,8 +768,8 @@ function render(t, q){
   const W=Math.round(OW*qq), H=Math.round(OH*qq);
   if(view.width!==W||view.height!==H){ view.width=W; view.height=H; }
   if(W!==RW||H!==RH){ ensureTargets(W,H); dirtySrc=true; }
-  const sv=stretchAt(t), sk=sv.map(x=>x.toFixed(3)).join(",");
-  if(sk!==lastSK){ lastSK=sk; curStretch=sv; dirtySrc=true; }
+  const sv=stretchAt(t), te=trackAt(t), sk=sv.map(x=>x.toFixed(3)).join(",")+"|"+te.toFixed(3);
+  if(sk!==lastSK){ lastSK=sk; curStretch=sv; curTrackEnv=te; dirtySrc=true; }
   if(dirtySrc){ rebuildLevels(); dirtySrc=false; }
   if(dirtyLUT){ buildLUT(); dirtyLUT=false; }
   const P=P_COMP; gl.useProgram(P.p);
@@ -802,8 +822,8 @@ const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
-  dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+  dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
+const SRC_KEYS=new Set(["goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -835,7 +855,16 @@ function buildRtypes(){
 }
 buildRtypes();
 $("partial").checked=S.partial; $("partial").addEventListener("change",()=>{ S.partial=$("partial").checked; changed("partial"); });
-bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
+bindSeg("sModeSeg","sMode",()=>{
+  if(S.sMode==="track"&&S.goo===0){ S.goo=.55; $("goo").value=S.goo; $("goo").parentElement.querySelector(".pv").textContent=Math.round(S.goo*100); } // 動画のように重なりを溶け合わせる
+  syncStretchUI(); });
+function syncStretchUI(){
+  document.querySelectorAll("#secStretch .sSeq").forEach(el=>el.classList.toggle("hide",S.sMode==="track"));
+  $("sHint").textContent = S.sMode==="track"
+    ? "ループの頭と終わりで字間がぎゅっと詰まって文字が重なり、間は普段の字間に開いて止まります。伸び量で詰まり具合、変化の長さで詰まっている時間、くっつきで重なりの溶け合い方を調整します。"
+    : "動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。くっつきを上げると、重なった文字が丸く溶け合います。";
+}
+syncStretchUI(); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
 $("sDice").onclick=()=>{
   // 前と違う組み合わせになるまで引き直す
