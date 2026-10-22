@@ -6,7 +6,7 @@
 <title>Heatmap Blur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link id="gfonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Unbounded:wght@400..900&family=Krona+One&family=Syncopate:wght@700&family=Dela+Gothic+One&display=swap">
+<link id="gfonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400&family=Archivo:wdth,wght@62..125,100..900&family=Unbounded:wght@400..900&family=Krona+One&family=Syncopate:wght@700&family=Dela+Gothic+One&display=swap">
 <style>
 :root{
   --bg:#0a0a0b;--panel:#141417;--panel2:#1c1c21;--line:#2a2a31;--line-hover:#3d3d46;
@@ -146,7 +146,17 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
     <section>
       <h2><span><b>01</b>ソース</span></h2>
       <div class="seg" id="srcSeg">
-        <button data-v="text">テキスト</button><button data-v="flame">炎</button><button data-v="pattern">模様</button><button data-v="image">画像</button><button data-v="video">動画</button>
+        <button data-v="text">テキスト</button><button data-v="layout">レイアウト</button><button data-v="flame">炎</button><button data-v="pattern">模様</button><button data-v="image">画像</button><button data-v="video">動画</button>
+      </div>
+
+      <div id="srcLayout" class="hide">
+        <div class="prow"><span>レイアウト</span><select id="layoutPreset"></select></div>
+        <div class="sub">フォント（Figma と同じ書体を読み込む）</div>
+        <div class="btnrow"><button class="btn" id="lfBold">Wide Bold 読込</button><button class="btn" id="lfSemi">Wide Semibold 読込</button></div>
+        <div class="hint" id="lfStatus"></div>
+        <div class="sub">テキスト</div>
+        <div id="layoutItems"></div>
+        <div class="hint">位置・サイズ・行間は Figma（1920×1080）のまま配置します。文字の伸縮は画面全体の文字にまたがって順番にかかります（和文と記号は伸ばしません）。</div>
       </div>
 
       <div id="srcText">
@@ -188,8 +198,8 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
         <div class="hint">黒レベルを上げると暗い背景が消えて、明るい部分だけが熱を持ちます。</div>
       </div>
 
-      <div class="prow"><span>大きさ</span><input type="range" id="fit" min="20" max="100" step="1"><span class="pv"></span></div>
-      <div class="prow"><span>位置 Y</span><input type="range" id="posy" min="-50" max="50" step="1"><span class="pv"></span></div>
+      <div class="prow" id="fitRow"><span>大きさ</span><input type="range" id="fit" min="20" max="100" step="1"><span class="pv"></span></div>
+      <div class="prow" id="posyRow"><span>位置 Y</span><input type="range" id="posy" min="-50" max="50" step="1"><span class="pv"></span></div>
     </section>
 
     <section id="secStretch">
@@ -286,6 +296,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 </div>
 <input type="file" id="fileImg" accept="image/*,.svg">
 <input type="file" id="fileVid" accept="video/*,.mov,.mp4,.webm">
+<input type="file" id="fileLF" accept=".ttf,.otf,.woff,.woff2" style="display:none">
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2">
 <div id="toast"></div>
 
@@ -302,6 +313,17 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 ================================================================== */
 
 /* ---------- presets ---------- */
+// Figma のレイアウト（座標・サイズは Figma のフレーム基準。x,w はテキスト枠、y は枠の上端）
+const LAYOUT_PRESETS={
+  "u19-qualifier":{ name:"U19 ONLINE QUALIFIER（Figma）", w:1920, h:1080, items:[
+    {id:"jp",    label:"見出し",     text:"(   予選   )",    font:"jp",       size:18,     x:924, y:278, w:73,  lh:1.35},
+    {id:"title", label:"メイン",     text:"ONLINE\nQUALIFIER", font:"bold",   size:124.69, x:468, y:339, w:984, lh:0.9},
+    {id:"d1",    label:"日付（左）", text:"11.14",          font:"bold",     size:90,     x:651, y:657, w:252, lh:1},
+    {id:"w1",    label:"曜日（左）", text:"SAT",            font:"semibold", size:34.811, x:728, y:771, w:98,  lh:1},
+    {id:"d2",    label:"日付（右）", text:"11.15",          font:"bold",     size:90,     x:1023,y:657, w:247, lh:1},
+    {id:"w2",    label:"曜日（右）", text:"SUN",            font:"semibold", size:34.811, x:1090,y:771, w:112, lh:1},
+  ]},
+};
 const RTYPES=[["fire","炎（上へ）"],["smoke","煙"],["haze","陽炎"],["water","水面"],["flicker","チラつき"],["radial","放射"]];
 const PALETTES = {
   "HEAT（動画）": [
@@ -330,6 +352,7 @@ const FONTS = [
 const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
+  layoutPreset:"u19-qualifier", layout:null,
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
   minB:3, maxB:32, curve:1.8, aniso:1.8,
@@ -350,6 +373,7 @@ function load(){
   if(d.src==="image"||d.src==="video") d.src="text"; // 画像・動画そのものは保存されないので、開き直したときはテキストに戻す
   d.maxB=Math.min(80,d.maxB); d.minB=Math.min(40,d.minB);
   // 配色はプリセットから選ぶだけ。以前に個別編集した配色は、いちばん近いプリセットへ戻す
+  if(!d.layout||!Array.isArray(d.layout.items)) d.layout=clone(LAYOUT_PRESETS[d.layoutPreset]||LAYOUT_PRESETS["u19-qualifier"]);
   d.kf = Array.isArray(d.kf) ? d.kf.filter(k=>k&&isFinite(k.t)&&k.v&&typeof k.v==="object").map(k=>({t:+k.t,ease:["smooth","linear","hold"].includes(k.ease)?k.ease:"smooth",v:k.v})).sort((a,b)=>a.t-b.t) : [];
   d.len = Math.min(30,Math.max(1,+d.len||6));
   if(!PALETTES[d.palette]) d.palette=nearestPalette(d.stops);
@@ -549,12 +573,17 @@ function drawSource(W,H){
   c.fillStyle="#fff";
   const cx=W/2, cy=H/2+S.posy/100*H, fit=S.fit/100;
   if(S.src==="text") drawText(c,W,H,cx,cy,fit);
+  else if(S.src==="layout") drawLayout(c,W,H);
   else if(S.src==="flame") drawFlame(c,W,H,cx,cy,fit);
   else if(S.src==="pattern") drawPattern(c,W,H,cx,cy,fit);
   else if(S.src==="image") drawImage(c,W,H,cx,cy,fit);
   else if(S.src==="video") drawVideo(c,W,H,cx,cy,fit);
 }
 function textLines(){ return (S.text||" ").split("\n").map(x=>x.trimEnd()).filter((x,i,a)=>x.length||a.length===1); }
+const itemLines=it=>(it.text||"").split("\n");
+// 文字伸縮の対象になる行（テキスト＝入力した行、レイアウト＝全テキストの行を上から順に）
+function stretchLines(){ return S.src==="layout"?S.layout.items.flatMap(itemLines):textLines(); }
+const hasLetters=()=>S.src==="text"||S.src==="layout";
 const glyphCache=new Map(), layoutCache={key:""}, lineCanvases=[];
 function glyphRaster(ch,fs,stretchKw,sx,scale,inkL,inkR,gH,baseY,pad){
   const key=[ch,fs,sx.toFixed(4),scale.toFixed(5),gH,baseY].join("|");
@@ -566,6 +595,68 @@ function glyphRaster(ch,fs,stretchKw,sx,scale,inkL,inkR,gH,baseY,pad){
   x.translate(ox0,baseY); x.scale(sx,1); x.fillText(ch,0,0);
   g={cv,ox0,split:Math.round(ox0+(inkL+inkR)/2*sx*scale),inkLpx:pad}; glyphCache.set(key,g); return g;
 }
+/* ---------- レイアウト（Figma の配置をそのまま再現） ---------- */
+const LF={}, layoutLineCanvases=[], layoutMeasure=new Map();
+function layoutFont(it){
+  if(it.font==="jp") return {css:px=>`400 ${px}px "Noto Sans JP", "Hiragino Sans", sans-serif`, stretch:"normal"};
+  const lf=LF[it.font]; if(lf) return {css:px=>`${px}px "${lf.fam}"`, stretch:"normal"};
+  return {css:px=>`${it.font==="bold"?800:700} expanded ${px}px "Archivo", sans-serif`, stretch:"expanded"}; // 読み込むまでの代わり
+}
+function measureLine(c,text){
+  const key=c.font+"|"+text; let m=layoutMeasure.get(key); if(m) return m;
+  const gl=[]; let acc="";
+  for(const ch of [...text]){ const mm=c.measureText(ch); acc+=ch; gl.push({ch,x:c.measureText(acc).width-mm.width,inkL:-mm.actualBoundingBoxLeft,inkR:mm.actualBoundingBoxRight}); }
+  const t=c.measureText(text||" "), f=c.measureText("Hg");
+  m={gl,left:-t.actualBoundingBoxLeft,right:t.actualBoundingBoxRight,fA:f.fontBoundingBoxAscent,fD:f.fontBoundingBoxDescent,capH:c.measureText("H").actualBoundingBoxAscent};
+  if(layoutMeasure.size>200) layoutMeasure.clear(); layoutMeasure.set(key,m); return m;
+}
+const gooTmp=document.createElement("canvas");
+function gooLine(lc,sigma,center){ // 行ごとに「ぼかし→しきい値」。小さい文字でも形が残る
+  if(sigma<.4) return;
+  const w=lc.width,h=lc.height; gooTmp.width=w; gooTmp.height=h;
+  const t=gooTmp.getContext("2d",{willReadFrequently:true}); t.filter=`blur(${sigma.toFixed(2)}px)`; t.drawImage(lc,0,0); t.filter="none";
+  const d=t.getImageData(0,0,w,h), a=d.data, lo=(center-.07)*255, hi=(center+.07)*255, k=255/(hi-lo);
+  for(let i=3;i<a.length;i+=4){ let v=(a[i]-lo)*k; v=v<0?0:v>255?255:v; v=v*v*(3-2*v/255)/255; a[i-3]=a[i-2]=a[i-1]=255; a[i]=v; }
+  const lx=lc.getContext("2d"); lx.clearRect(0,0,w,h); lx.putImageData(d,0,0);
+}
+function drawLayout(c,W,H){
+  const Lo=S.layout, sc=Math.min(W/Lo.w,H/Lo.h), ox=(W-Lo.w*sc)/2, oy=(H-Lo.h*sc)/2;
+  let gi=0, li=0;
+  for(const it of Lo.items){
+    const f=layoutFont(it), px=it.size*sc, fs=f.css(px);
+    c.font=fs; try{c.fontStretch=f.stretch}catch(e){} c.letterSpacing="0px"; c.textAlign="left"; c.textBaseline="alphabetic"; c.fontKerning="normal";
+    const lines=itemLines(it), LH=it.lh*px, cx=ox+(it.x+it.w/2)*sc;
+    lines.forEach((text,i)=>{
+      const m=measureLine(c,text), pad=Math.ceil(px*.3), gH=Math.ceil(m.fA+m.fD)+pad*2, baseY=pad+Math.ceil(m.fA);
+      const amt=S.sAmount*m.capH, dTrack=-curTrackEnv*S.sAmount*.3*px;
+      const natW=Math.max(1,m.right-m.left);
+      const ex=m.gl.map((g,j)=>(curStretch[gi+j]||0)*amt), exT=ex.reduce((a,b)=>a+b,0)+Math.max(0,m.gl.length-1)*dTrack;
+      const lc=layoutLineCanvases[li]||(layoutLineCanvases[li]=document.createElement("canvas"));
+      lc.width=Math.max(1,Math.ceil(natW+exT)+pad*2); lc.height=gH;
+      const lx=lc.getContext("2d"); let off=0;
+      m.gl.forEach((g,j)=>{
+        if(j>0) off+=dTrack;
+        if(!g.ch.trim()){ off+=ex[j]; return; }
+        const r=glyphRaster(g.ch,fs,f.stretch,1,1,g.inkL,g.inkR,gH,baseY,pad);
+        const gx=pad+(g.x-m.left)+off-r.ox0, e=ex[j];
+        if(e<.05) lx.drawImage(r.cv,gx,0);
+        else if(S.sMethod==="scale"){ const iw=Math.max(1,g.inkR-g.inkL); lx.save(); lx.translate(gx+r.inkLpx,0); lx.scale((iw+e)/iw,1); lx.drawImage(r.cv,-r.inkLpx,0); lx.restore(); }
+        else { const k=r.split, w=r.cv.width;
+          lx.drawImage(r.cv,0,0,k,gH,gx,0,k,gH); lx.drawImage(r.cv,k,0,w-k,gH,gx+k+e,0,w-k,gH); lx.drawImage(r.cv,k-1,0,2,gH,gx+k-1.5,0,e+3,gH); }
+        off+=e;
+      });
+      if(S.goo>0) gooLine(lc,S.goo*px*.09,.5-.16*curTrackEnv); // くっつき：文字の大きさに合わせた強さで溶け合わせる
+      gi+=m.gl.length; li++;
+      // CSS と同じ行の置き方：行の高さの中で字面（ascent+descent）を上下中央に置き、その中のベースラインに揃える
+      const base=oy+it.y*sc+i*LH+(LH-(m.fA+m.fD))/2+m.fA;
+      // 枠の中央を基準に伸び縮みさせる（Figma の中央揃えの見た目を保つ）
+      const left=ox+it.x*sc+(it.w*sc-natW)/2;
+      const kx=S.sKeep&&S.sMode!=="track"?natW/Math.max(1,natW+exT):1;
+      c.save(); c.translate(left+natW/2,base); c.scale(kx,1); c.drawImage(lc,-(natW+exT)/2-pad,-baseY); c.restore();
+    });
+  }
+}
+
 function drawText(c,W,H,cx,cy,fit){
   const f=fontDef(); const lines=textLines();
   const base=200; c.font=fontStr(f,base); try{c.fontStretch=f.stretch||"normal"}catch(e){} c.letterSpacing=(S.track/100*base)+"px";
@@ -628,13 +719,13 @@ function drawText(c,W,H,cx,cy,fit){
 /* ---------- 文字ストレッチの段取り ---------- */
 let curStretch=[], curTrackEnv=0, lastSK="", PLAN={count:0,steps:[]};
 function trackAt(t){
-  if(S.src!=="text"||S.sMode!=="track") return 0;
+  if(!hasLetters()||S.sMode!=="track") return 0;
   const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, tr=Math.max(.05,S.sTrans), ease=x=>x*x*(3-2*x);
   return u<tr?1-ease(u/tr):u>1-tr?ease((u-(1-tr))/tr):0; // 頭と終わりで詰まり、間は開いたまま
 }
-function stretchable(ch){ return ch.trim() && !/[Iil1|.,:;'"!?\-ー・、。「」]/.test(ch); }
+function stretchable(ch){ return ch.trim() && !/[Iil1|.,:;'"!?\-ー・、。「」()（）]/.test(ch) && !/[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/.test(ch); }
 function buildStretchPlan(){
-  const lines=textLines(); const glyphs=[]; lines.forEach((l,li)=>[...l].forEach(ch=>glyphs.push({li,ch})));
+  const lines=stretchLines(); const glyphs=[]; lines.forEach((l,li)=>[...l].forEach(ch=>glyphs.push({li,ch})));
   const r=rng(S.sSeed+"/stretch"); const elig=glyphs.map((g,i)=>stretchable(g.ch)?i:-1).filter(i=>i>=0);
   const steps=[]; let prev=new Set();
   for(let k=0;k<S.sSteps;k++){
@@ -653,7 +744,7 @@ function buildStretchPlan(){
 function planLabel(){ return PLAN.steps.map(st=>st.map(i=>PLAN.glyphs[i].ch).join("・")||"—").join(" → "); }
 function stretchAt(t){
   const n=PLAN.count, v=new Array(n).fill(0);
-  if(S.src!=="text"||S.sMode==="off"||S.sMode==="track"||!n) return v;
+  if(!hasLetters()||S.sMode==="off"||S.sMode==="track"||!n) return v;
   const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, ease=x=>x*x*(3-2*x);
   if(S.sMode==="wave"){ const w=Math.min(.9,Math.max(.1,S.sTrans*2.2)); for(let i=0;i<n;i++){ if(!stretchable(PLAN.glyphs[i].ch)) continue; const p=((u-i/n)%1+1)%1; if(p<w){ const q=Math.sin(Math.PI*p/w); v[i]=q*q; } } return v; }
   const K=Math.max(1,S.sSteps), x=u*K, k=Math.floor(x)%K, f=x-Math.floor(x), tr=S.sTrans;
@@ -998,7 +1089,7 @@ function undo(){ if(!HIST.length) return toast("これ以上取り消せませ�
 function redo(){ if(!REDO.length) return toast("やり直せる操作はありません"); HIST.push(JSON.stringify(S)); restoreState(REDO.pop()); toast("やり直しました"); }
 function syncAllUI(){
   for(const id of Object.keys(fmt)){ const el=$(id); if(!el) continue; el.value=S[id]; const pv=el.parentElement.querySelector(".pv"); if(pv) pv.textContent=fmt[id](S[id]); }
-  $("text").value=S.text; fillFonts(); $("pattern").value=S.pattern; $("size").value=S.size; $("seed").value=S.seed; $("bgColor").value=S.bgColor;
+  $("text").value=S.text; fillFonts(); buildLayoutUI(); $("pattern").value=S.pattern; $("size").value=S.size; $("seed").value=S.seed; $("bgColor").value=S.bgColor;
   for(const [id,key] of [["srcSeg","src"],["easeSeg","ease"],["sModeSeg","sMode"],["sMethodSeg","sMethod"],["bgSeg","bg"],["qSeg","q"],["pdirSeg","pdir"]])
     $(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===String(S[key])));
   for(const id of ["invert","cover","partial","wrap","gmove","sKeep","showMap"]) $(id).checked=!!S[id];
@@ -1037,7 +1128,7 @@ function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
   dur:v=>(+v).toFixed(1)+"s", len:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+const SRC_KEYS=new Set(["layout","goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -1048,7 +1139,7 @@ function changed(id){
   if(id==="fit"&&(S.src==="image"||S.src==="video")&&S.cover){ S.cover=false; $("cover").checked=false; updateSrcUI(); } // 「大きさ」を触ったら全面表示を解除
   if(SRC_KEYS.has(id)) dirtySrc=true;
   if(KEY_KEYS.has(id)) buildKeys();
-  if(id==="text"||id==="sSteps"||id==="sSeed") buildStretchPlan();
+  if(id==="text"||id==="layout"||id==="src"||id==="sSteps"||id==="sSeed") buildStretchPlan();
   if(SRC_KEYS.has(id)) lastSK="";
   if(id==="len"){ playhead=Math.min(playhead,S.len-1e-4); drawRuler(); drawMarks(); recLabel(); }
   if(id==="pth"||id==="pdir"||id==="partial") updateRampMark();
@@ -1093,7 +1184,9 @@ $("bgColor").addEventListener("input",()=>{ S.bgColor=$("bgColor").value; if(S.b
 bindSeg("qSeg","q");
 function updateSrcUI(fromUser){
   const media=S.src==="image"||S.src==="video";
-  $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern");
+  $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",!hasLetters());
+  $("srcLayout").classList.toggle("hide",S.src!=="layout"); $("fitRow").classList.toggle("hide",S.src==="layout"); $("posyRow").classList.toggle("hide",S.src==="layout");
+  if(S.src==="layout"){ buildStretchPlan(); document.fonts.load('400 18px "Noto Sans JP"',"予選").then(()=>{ fontsChanged(); }).catch(()=>{}); } $("srcPattern").classList.toggle("hide",S.src!=="pattern");
   $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
   $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
   for(const id of ["secBlur","secMap","secAnim","secGrain"]) $(id).classList.toggle("hide",S.src==="video");
@@ -1131,7 +1224,7 @@ $("fileFont").addEventListener("change",async e=>{
   e.target.value="";
 });
 function fontsThen(){ const f=fontDef(); if(S.src!=="text") return; document.fonts.load(fontStr(f,80),S.text||"A").then(()=>{ fontsChanged(); if(!playing) render(playhead); }).catch(()=>{}); }
-function fontsChanged(){ glyphCache.clear(); layoutCache.key=""; dirtySrc=true; lastSK=""; }
+function fontsChanged(){ glyphCache.clear(); layoutCache.key=""; layoutMeasure.clear(); dirtySrc=true; lastSK=""; }
 document.fonts.addEventListener && document.fonts.addEventListener("loadingdone",fontsChanged);
 // pattern / image
 $("pattern").value=S.pattern; $("pattern").addEventListener("change",()=>{ S.pattern=$("pattern").value; changed("pattern"); });
@@ -1172,6 +1265,37 @@ $("fileVid").addEventListener("change",e=>{
   v.onerror=()=>{ URL.revokeObjectURL(url); toast("この動画は再生できません（ブラウザが対応していない形式です）"); };
   v.src=url;
 });
+// layout
+const FONTDB={
+  open(){ return new Promise((res,rej)=>{ const r=indexedDB.open("motion-lab-heatmap-blur",1); r.onupgradeneeded=()=>r.result.createObjectStore("fonts"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); },
+  async put(k,v){ const db=await this.open(); return new Promise(res=>{ const tx=db.transaction("fonts","readwrite"); tx.objectStore("fonts").put(v,k); tx.oncomplete=res; tx.onerror=res; }); },
+  async get(k){ const db=await this.open(); return new Promise(res=>{ const q=db.transaction("fonts").objectStore("fonts").get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>res(null); }); },
+};
+async function loadLayoutFont(slot,buf,name){
+  const fam="HB Layout "+slot+" "+Date.now(); const ff=new FontFace(fam,buf); await ff.load(); document.fonts.add(ff);
+  LF[slot]={fam,name}; fontsChanged(); updateLFStatus(); if(!playing) render(playhead);
+}
+function updateLFStatus(){
+  const s=k=>LF[k]?`${LF[k].name}`:"未読込（代わりに Archivo Expanded で表示）";
+  $("lfStatus").innerHTML=`Bold：${s("bold")}<br>Semibold：${s("semibold")}<br>読み込んだフォントはこのブラウザに保存され、次回も使えます。`;
+  $("lfBold").classList.toggle("primary",!LF.bold); $("lfSemi").classList.toggle("primary",!LF.semibold);
+}
+let lfSlot="bold";
+$("lfBold").onclick=()=>{ lfSlot="bold"; $("fileLF").click(); };
+$("lfSemi").onclick=()=>{ lfSlot="semibold"; $("fileLF").click(); };
+$("fileLF").addEventListener("change",async e=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  try{ const buf=await file.arrayBuffer(); await loadLayoutFont(lfSlot,buf,file.name); try{ await FONTDB.put(lfSlot,{buf,name:file.name}); }catch(err){} toast(`${lfSlot==="bold"?"Bold":"Semibold"} に ${file.name} を読み込みました`); }
+  catch(err){ toast("フォントを読み込めませんでした"); }
+});
+function buildLayoutUI(){
+  $("layoutPreset").innerHTML=Object.entries(LAYOUT_PRESETS).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join(""); $("layoutPreset").value=S.layoutPreset;
+  $("layoutItems").innerHTML=S.layout.items.map((it,i)=>`<div class="prow" style="align-items:flex-start"><span style="padding-top:5px">${it.label}</span><textarea data-i="${i}" rows="${itemLines(it).length}" spellcheck="false" style="min-height:0;font-size:12px;padding:5px 8px">${it.text.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</textarea></div>`).join("");
+  $("layoutItems").querySelectorAll("textarea").forEach(el=>el.addEventListener("input",()=>{ S.layout.items[+el.dataset.i].text=el.value; el.rows=Math.max(1,el.value.split("\n").length); changed("layout"); }));
+}
+$("layoutPreset").addEventListener("change",()=>{ S.layoutPreset=$("layoutPreset").value; S.layout=clone(LAYOUT_PRESETS[S.layoutPreset]); buildLayoutUI(); changed("layout"); });
+buildLayoutUI(); updateLFStatus();
+for(const slot of ["bold","semibold"]) FONTDB.get(slot).then(v=>{ if(v&&v.buf) return loadLayoutFont(slot,v.buf,v.name); }).catch(()=>{});
 // blur map points
 function buildPts(){
   $("pts").innerHTML=S.vals.map((v,i)=>`<div class="pt"><span>点${i+1}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}" aria-label="点${i+1}の熱さ"><b>${Math.round(v*100)}</b></div>`).join("");
