@@ -244,6 +244,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="prow"><span>尺</span><input type="range" id="len" min="1" max="60" step="0.1"><span class="pv"></span></div>
       <div class="btnrow"><button class="btn" id="kClear">キーを全部消す</button></div>
       <div class="hint">AE と同じ操作です。上段の目盛りをドラッグで時間移動、下段でキーを選択（Shift で追加・空いた所をドラッグで範囲選択）、選んだキーはドラッグで移動。◆（⌥K）で今の時間にキー、キーがある状態でスライダーを動かすと今の時間のキーに記録（なければ自動で追加）。キーの形：◆リニア／⧗イーズ／■停止。<br>ショートカット：Space 再生／J・K 前後のキー／PageUp・PageDown（⌘←→）1コマ（Shift で10コマ）／Home・End／Delete 選択キー削除／F9 イーズ／⌘⌥H 停止／⌘クリック リニア⇄イーズ／⌘Z 取り消し・⌘⇧Z やり直し。配色・フォント・モードの切り替えはキーの対象外です。</div>
+      <div id="animLoop">
       <div class="sub">ブラーマップ・ストレッチのループ</div>
       <div class="prow"><span>ループ</span><input type="range" id="dur" min="1" max="12" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
@@ -251,6 +252,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button><button data-v="fire">ランダム</button></div>
       <div id="rtypeRow" class="hide"><div class="sub">ランダムの種類</div><div class="chips" id="rtypes"></div></div>
       <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「ランダム」は点の位置を使わず、ノイズで不規則にぼける場所が変わります（炎・煙・陽炎・水面・チラつき・放射）。各点の熱さ（4点まとめて）は全体の熱さになり、高いほどぼける部分が増えます。</div>
+      </div>
     </section>
 
     <section>
@@ -998,7 +1000,7 @@ function sampleKeys(t){
 }
 let kfUIDirty=false, dragEl=null;
 function applyKeys(t){
-  if(!S.kf.length||S.src==="video") return;
+  if(!S.kf.length) return;
   const v=sampleKeys(t); if(!v) return;
   for(const p of KF_PARAMS){
     const nv=v[p]; if(nv===undefined) continue; const cur=S[p];
@@ -1019,7 +1021,7 @@ function syncKfUI(){ // 再生中、スライダーをキーの値に追従さ�
   }
 }
 function kfEdit(p){ // キーがある状態での編集 → 今の時刻のキーに記録（なければ追加）
-  if(!S.kf.length||S.src==="video"||recording||!KF_SET.has(p)) return;
+  if(!S.kf.length||recording||!KF_SET.has(p)) return;
   playing=false;
   let k=keyAt(playhead);
   if(!k){ k={t:snapT(playhead),ease:"smooth",v:snapshot()}; S.kf.push(k); S.kf.sort((a,b)=>a.t-b.t); toast(`${tc(k.t)} にキーを追加しました`); }
@@ -1053,7 +1055,7 @@ function drawKeys(){
 const drawMarks=drawKeys;
 function seekTo(t){
   playing=false;
-  if(videoMode()){ userVideo.pause(); userVideo.currentTime=Math.min(t,userVideo.duration); playhead=userVideo.currentTime; syncBar(); return; }
+  if(videoMode()){ userVideo.pause(); userVideo.currentTime=Math.min(Math.max(0,t),userVideo.duration); playhead=Math.min(Math.max(0,t),userVideo.duration); render(playhead); syncBar(); return; } // コマは seeked で描き直す
   playhead=Math.min(Math.max(0,t),S.len-1e-4); render(playhead); syncBar();
 }
 function stepFrames(n){ seekTo(snapT(playhead)+n/FPS_SNAP); }
@@ -1069,7 +1071,7 @@ function syncKctl(){
 function easeTargets(){ const k=keyAt(playhead); return SEL.size?[...SEL]:(k?[k]:[]); }
 function setEase(v){ const tg=easeTargets(); if(!tg.length) return toast("キーを選んでください"); histArmed=true; for(const k of tg) k.ease=v; drawKeys(); save(); toast({smooth:"イージーイーズ",linear:"リニア",hold:"停止"}[v]+"にしました"); }
 function toggleKey(){
-  if(S.src==="video"||recording) return;
+  if(recording) return;
   histArmed=true; const k=keyAt(playhead); playing=false;
   if(k){ S.kf=S.kf.filter(x=>x!==k); SEL.delete(k); toast(S.kf.length?"キーを削除しました":"キーを削除しました（キーがなくなったので値は固定です）"); }
   else { const nk={t:snapT(playhead),ease:"smooth",v:snapshot()}; S.kf.push(nk); S.kf.sort((a,b)=>a.t-b.t); playhead=nk.t; toast(`${tc(nk.t)} にキーを打ちました`); }
@@ -1089,7 +1091,7 @@ function bindTimeline(){
     const r=tl.getBoundingClientRect(), x0=e.clientX-r.left, y0=e.clientY-r.top, mk=e.target.closest(".kmark");
     e.preventDefault(); tl.setPointerCapture(e.pointerId); histArmed=true;
     let move=null;
-    if(mk&&S.src!=="video"){
+    if(mk){
       const k=S.kf[+mk.dataset.i]; if(!k) return;
       if(e.metaKey||e.ctrlKey){ k.ease=k.ease==="linear"?"smooth":"linear"; drawKeys(); save(); render(playhead); return; } // AE：⌘クリックでリニア⇄イーズ
       if(e.shiftKey){ SEL.has(k)?SEL.delete(k):SEL.add(k); drawKeys(); return; }
@@ -1110,7 +1112,7 @@ function bindTimeline(){
         if(ev.shiftKey){ const near=S.kf.reduce((b,k)=>Math.abs(t2x(k.t)-t2x(t))<Math.abs(t2x(b?b.t:1e9)-t2x(t))?k:b,null); if(near&&Math.abs(t2x(near.t)-t2x(t))<10) t=near.t; } // Shift でキーに吸着
         seekTo(t); };
       seek(e); move=seek;
-    } else if(S.src!=="video"){
+    } else {
       if(!e.shiftKey) SEL.clear(); const base=new Set(SEL); drawKeys();
       move=ev=>{ const x1=ev.clientX-r.left, a=Math.min(x0,x1), b=Math.max(x0,x1);
         mq.style.display="block"; mq.style.left=a+"px"; mq.style.width=(b-a)+"px";
@@ -1238,14 +1240,14 @@ function updateSrcUI(fromUser){
   if(S.src==="layout"){ buildStretchPlan(); document.fonts.load('400 18px "Noto Sans JP"',"予選").then(()=>{ fontsChanged(); }).catch(()=>{}); } $("srcPattern").classList.toggle("hide",S.src!=="pattern");
   $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
   $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
-  for(const id of ["secBlur","secMap","secAnim","secGrain"]) $(id).classList.toggle("hide",S.src==="video");
+  for(const id of ["secBlur","secMap","secGrain","animLoop"]) $(id).classList.toggle("hide",S.src==="video"); // 動画はタイムライン・キーフレームだけ使う
   $("partialBox").classList.toggle("hide",S.src!=="video"); updateRampMark();
   if(fromUser&&S.src==="image"&&!userImage) $("fileImg").click();
   if(fromUser&&S.src==="video"&&!userVideo) $("fileVid").click();
   if(S.src!=="video"&&userVideo&&!userVideo.paused) userVideo.pause();
   if(S.src==="video") playhead=userVideo?userVideo.currentTime:0;
   else playhead=Math.min(playhead,S.len-1e-4);
-  $("kctl").classList.toggle("hide",S.src==="video"); $("kmarks").classList.toggle("hide",S.src==="video");
+  $("kctl").classList.remove("hide"); $("kmarks").classList.remove("hide");
   drawRuler(); drawKeys();
   recLabel();
 }
@@ -1253,9 +1255,9 @@ function recLabel(){
   const vid=S.src==="video";
   $("rec").disabled=vid; $("rec").style.opacity=vid?.4:1;
   if(!recording) $("rec").textContent="● MP4 / WebM（実時間）";
-  $("mov").disabled=vid; $("mov").style.opacity=vid?.4:1; if(!recording) $("mov").textContent="ロスレスMOV（コマ落ちなし）";
+  $("mov").disabled=false; $("mov").style.opacity=1; if(!recording) $("mov").textContent="ロスレスMOV（コマ落ちなし）";
   $("recHint").textContent=vid
-    ? "動画ソースではプレビューでグラデーションマップを確認できます。PNG保存で今のコマを書き出せます（動画の録画は対象外）。"
+    ? "動画ソースはロスレスMOVで書き出せます。動画を1コマずつ送りながらグラデーションマップ（とキーフレーム）をかけるので、コマ落ちしません（音声は入りません）。MP4/WebM（実時間）は動画ソースでは使えません。"
     : `尺（${S.len.toFixed(1)}秒）を30fpsで書き出します。ロスレスMOVは1コマずつPNGで固めるので描画が重くてもコマ落ち・スローにならず、After Effects にそのまま読み込めます（背景を透過にすると透過付き・容量は大きめ）。MP4/WebMは実時間で収録するので軽いですが、描画が追いつかないと実際より長くなります。尺がループの倍数で、最初と最後のキーが同じ値なら継ぎ目なくループします。`;
 }
 // text
@@ -1464,7 +1466,7 @@ $("reset").onclick=()=>{ try{localStorage.removeItem(LSKEY)}catch(e){} location.
 // transport
 function syncBar(){
   const T=totalDur(); $("cti").style.left=t2x(Math.min(playhead,T))+"px"; $("tlabel").textContent=tc(playhead); $("tcEnd").textContent="/ "+tc(T);
-  if(S.src!=="video") syncKctl();
+  syncKctl();
   $("play").textContent=playing?"❚❚":"▶";
 }
 $("play").onclick=()=>{ playing=!playing; };
@@ -1570,15 +1572,18 @@ function makeLosslessMov(frames,w,h,fps){
 const canvasPNG=()=>new Promise((res,rej)=>view.toBlob(b=>b?res(b):rej(new Error("PNGに変換できませんでした")),"image/png"));
 $("mov").onclick=async()=>{
   if(recording){ recording.stop=true; return; }
-  if(S.src==="video") return;
-  const fps=REC_FPS, N=Math.max(1,Math.round(S.len*fps)), LIMIT=1536*1024*1024;
+  const vid=S.src==="video"; if(vid&&!videoMode()) return toast("動画を読み込んでください");
+  const fps=REC_FPS, len=vid?Math.min(S.len,userVideo.duration):S.len, N=Math.max(1,Math.round(len*fps)), LIMIT=1536*1024*1024;
+  if(vid) userVideo.pause();
   const session={stop:false, wasPlaying:playing, head:playhead, alpha:true}; recording=session; playing=false; forceQ=1;
   const frames=[]; let bytes=0;
   $("mov").classList.add("rec"); $("rec").disabled=true;
   try{
     for(let i=0;i<N;i++){
       if(session.stop) break;
-      playhead=i/fps; render(playhead,1); syncBar();
+      playhead=i/fps;
+      if(vid){ await seekVideoExact(userVideo,Math.min(playhead,userVideo.duration-1e-3)); dirtySrc=true; }
+      render(playhead,1); syncBar();
       const data=new Uint8Array(await (await canvasPNG()).arrayBuffer()); frames.push(data); bytes+=data.length;
       if(bytes>LIMIT) throw new Error("1.5GBを超えました。サイズか尺を小さくしてください");
       $("mov").textContent=`■ 書き出し中 ${i+1}/${N}（${(bytes/1048576).toFixed(0)}MB）`;
@@ -1588,8 +1593,19 @@ $("mov").onclick=async()=>{
     else{ const [w,h]=outSize(); dl(makeLosslessMov(frames,w,h,fps),`heatmap-blur-${stamp()}_${fps}fps.mov`); toast(`MOVを保存しました（${N}フレーム・${(bytes/1048576).toFixed(0)}MB）`); }
   }catch(err){ toast("書き出しに失敗しました："+err.message); }
   recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head; $("rec").disabled=S.src==="video";
+  if(vid&&userVideo){ userVideo.currentTime=session.head; }
   $("mov").classList.remove("rec"); recLabel();
 };
+// 書き出し用：指定の時刻のコマが確実に描ける状態になるまで待つ
+function seekVideoExact(v,t){
+  return new Promise(res=>{
+    if(v.isPngMov){ v.currentTime=t; const want=v._want; const chk=()=>{ if(v._idx===want&&!v._busy) res(); else setTimeout(chk,4); }; chk(); return; }
+    if(Math.abs(v.currentTime-(t+.25/FPS_SNAP))<1e-4&&v.readyState>=2){ res(); return; }
+    let done=false; const fin=()=>{ if(done) return; done=true; res(); };
+    v.addEventListener("seeked",()=>{ if("requestVideoFrameCallback" in v){ let ok=false; v.requestVideoFrameCallback(()=>{ ok=true; fin(); }); setTimeout(()=>{ if(!ok) fin(); },120); } else fin(); },{once:true});
+    setTimeout(fin,3000); v.currentTime=Math.min(v.duration-1e-3,t+.25/FPS_SNAP); // コマの境目ちょうどだと1コマ前に落ちることがあるので、少し内側へ
+  });
+}
 function pickMime(){
   const [OW,OH]=outSize(); const big=OW*OH>1920*1088;
   const mimes=[big?"video/mp4;codecs=avc1.640033":"video/mp4;codecs=avc1.640028","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
