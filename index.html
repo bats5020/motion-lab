@@ -312,6 +312,27 @@ const TOOLS = [
     }
   },
   {
+    cat:"motion", name:"Heatmap Blur",
+    desc:"4点グラデのブラーマップで文字を部分的にぼかし、文字の横伸び＋輝度をヒート配色へ。テキスト・炎・模様・画像・動画（配色のみ）、ループ動画／PNG書き出し。",
+    href:"tools/heatmap-blur.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="hmb-b1" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="3.2 1.4"/></filter>
+        <filter id="hmb-b2" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="1.6 .8"/></filter>
+        <linearGradient id="hmb-g" x1="0" x2="1"><stop offset="0" stop-color="#ef6800"/><stop offset=".45" stop-color="#ffcf24"/><stop offset="1" stop-color="#fbfbf6"/></linearGradient>
+      </defs>
+      <rect width="120" height="66" fill="#000"/>
+      <g font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="19" text-anchor="middle" transform="translate(60 0) scale(1.35 1)">
+        <text y="31" fill="#4b1468" filter="url(#hmb-b1)">HEAT</text>
+        <text y="31" fill="#d33412" filter="url(#hmb-b2)">HEAT</text>
+        <text y="31" fill="url(#hmb-g)">HEAT</text>
+        <text y="50" fill="#4b1468" filter="url(#hmb-b1)">BLUR</text>
+        <text y="50" fill="#ef6800" filter="url(#hmb-b1)" opacity=".9">BLUR</text>
+        <text y="50" fill="#ffcf24" filter="url(#hmb-b2)">BLUR</text>
+      </g>
+    </svg>`
+  },
+  {
     cat:"motion", name:"Glass Lab",
     desc:"グロー球体を型板ガラス越しに歪ませる fluted glass シェーダー。画像・動画ソース／WebM録画／設定URL共有",
     href:"tools/glass-lab.html",
