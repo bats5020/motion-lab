@@ -28,7 +28,6 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #scrub{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:#33333c;outline:none;cursor:pointer}
 #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent)}
 #tlabel{flex:0 0 92px;text-align:right;color:var(--sub);font-size:11px}
-#keys{position:relative;flex:1;height:3px}
 #panel{flex:0 0 330px;width:330px;height:100%;overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:0 0 60px}
 #panel::-webkit-scrollbar{width:8px}
 #panel::-webkit-scrollbar-thumb{background:#2c2c34;border-radius:4px}
@@ -166,7 +165,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>伸び量</span><input type="range" id="sAmount" min="0" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>切り替え回数</span><input type="range" id="sSteps" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="prow"><span>変化の長さ</span><input type="range" id="sTrans" min="0.05" max="0.5" step="0.01"><span class="pv"></span></div>
-      <div class="prow"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、ほかの文字を詰める</span></div>
+      <div class="prow"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、行全体を縮めて幅をそろえる</span></div>
       <div class="btnrow"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
       <div class="prow"><span>伸びる順番</span><span id="sPlan" style="flex:1;color:var(--text);font-size:12px;letter-spacing:.06em"></span></div>
       <div class="hint">動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。</div>
@@ -174,8 +173,8 @@ details summary:hover{color:var(--text)}
 
     <section>
       <h2><span><b>03</b>ブラー</span></h2>
-      <div class="prow"><span>最小ブラー</span><input type="range" id="minB" min="0" max="60" step="0.5"><span class="pv"></span></div>
-      <div class="prow"><span>最大ブラー</span><input type="range" id="maxB" min="0" max="160" step="0.5"><span class="pv"></span></div>
+      <div class="prow"><span>最小ブラー</span><input type="range" id="minB" min="0" max="40" step="0.5"><span class="pv"></span></div>
+      <div class="prow"><span>最大ブラー</span><input type="range" id="maxB" min="0" max="80" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>カーブ</span><input type="range" id="curve" min="0.3" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>横流れ</span><input type="range" id="aniso" min="1" max="4" step="0.05"><span class="pv"></span></div>
       <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて1.8）。</div>
@@ -295,6 +294,8 @@ function clone(o){return JSON.parse(JSON.stringify(o))}
 function load(){
   const d = clone(DEFAULTS); d.stops = clone(PALETTES[d.palette]);
   try{ const s = JSON.parse(localStorage.getItem(LSKEY)||"null"); if(s) Object.assign(d, s); }catch(e){}
+  if(d.src==="image") d.src="text"; // 画像そのものは保存されないので、開き直したときはテキストに戻す
+  d.maxB=Math.min(80,d.maxB); d.minB=Math.min(40,d.minB);
   if(!Array.isArray(d.stops)||d.stops.length<2) d.stops = clone(PALETTES["HEAT（動画）"]);
   return d;
 }
@@ -407,9 +408,9 @@ function drawSource(W,H){
   else if(S.src==="image") drawImage(c,W,H,cx,cy,fit);
 }
 function textLines(){ return (S.text||" ").split("\n").map(x=>x.trimEnd()).filter((x,i,a)=>x.length||a.length===1); }
-const glyphCache=new Map();
+const glyphCache=new Map(), layoutCache={key:""}, lineCanvases=[];
 function glyphRaster(ch,fs,stretchKw,sx,scale,inkL,inkR,gH,baseY,pad){
-  const key=[ch,fs,sx.toFixed(4),scale.toFixed(5),gH].join("|");
+  const key=[ch,fs,sx.toFixed(4),scale.toFixed(5),gH,baseY].join("|");
   let g=glyphCache.get(key); if(g) return g;
   if(glyphCache.size>400) glyphCache.clear();
   const ox0=pad-inkL*sx*scale; const w=Math.max(1,Math.ceil((inkR-inkL)*sx*scale)+pad*2);
@@ -424,13 +425,19 @@ function drawText(c,W,H,cx,cy,fit){
   c.textAlign="left"; c.textBaseline="alphabetic"; c.fontKerning="normal";
   const sx=S.stretch/100*(f.wide||1);
   // 行ごとにグリフの位置（カーニング・字間込み）と字面を測る
-  let maxW=1, asc=base*.72, desc=0; const L=[];
-  for(const l of lines){
-    const gl=[]; let acc="";
-    for(const ch of [...l]){ const x=c.measureText(acc).width; acc+=ch; const m=c.measureText(ch); gl.push({ch,x,inkL:-m.actualBoundingBoxLeft,inkR:m.actualBoundingBoxRight}); }
-    const m=c.measureText(l); const left=-m.actualBoundingBoxLeft, right=m.actualBoundingBoxRight;
-    L.push({gl,left,right}); maxW=Math.max(maxW,(right-left)*sx); asc=Math.max(asc,m.actualBoundingBoxAscent); desc=Math.max(desc,m.actualBoundingBoxDescent);
+  const lkey=[c.font,c.letterSpacing,lines.join("\n")].join("|");
+  if(layoutCache.key!==lkey){
+    let asc=base*.72, desc=0; const L=[];
+    for(const l of lines){
+      const gl=[]; let acc="";
+      for(const ch of [...l]){ const m=c.measureText(ch); acc+=ch; const x=c.measureText(acc).width-m.width; // 直前の文字とのカーニング込みの位置
+        gl.push({ch,x,inkL:-m.actualBoundingBoxLeft,inkR:m.actualBoundingBoxRight}); }
+      const m=c.measureText(l); L.push({gl,left:-m.actualBoundingBoxLeft,right:m.actualBoundingBoxRight});
+      asc=Math.max(asc,m.actualBoundingBoxAscent); desc=Math.max(desc,m.actualBoundingBoxDescent);
+    }
+    Object.assign(layoutCache,{key:lkey,L,asc,desc});
   }
+  const {L,asc,desc}=layoutCache; let maxW=1; for(const l of L) maxW=Math.max(maxW,(l.right-l.left)*sx);
   const capH=asc; const lead=capH*S.lead/100*1.18;
   const blockH=capH+(lines.length-1)*lead;
   const scale=Math.min(W*fit/maxW, H*fit*.92/blockH);
@@ -442,7 +449,8 @@ function drawText(c,W,H,cx,cy,fit){
   for(const line of L){
     const natW=Math.max(1,(line.right-line.left)*sx*scale);
     const ex=line.gl.map((g,i)=>(curStretch[gi+i]||0)*amt); const exT=ex.reduce((a,b)=>a+b,0);
-    const lc=document.createElement("canvas"); lc.width=Math.ceil(natW+exT)+pad*2; lc.height=gH;
+    const li=L.indexOf(line); const lc=lineCanvases[li]||(lineCanvases[li]=document.createElement("canvas"));
+    lc.width=Math.ceil(natW+exT)+pad*2; lc.height=gH; // サイズ代入で中身もクリアされる
     const lx=lc.getContext("2d"); let off=0;
     line.gl.forEach((g,i)=>{
       if(!g.ch.trim()) { off+=ex[i]; return; }
@@ -475,7 +483,7 @@ function buildStretchPlan(){
   const steps=[]; let prev=new Set();
   for(let k=0;k<S.sSteps;k++){
     const n=(k%3===1&&lines.length>1)?2:1; // 1文字 → 2文字 → 1文字 …（動画のリズム）
-    const pool=elig.filter(i=>!prev.has(i)); const pick=[];
+    let pool=elig.filter(i=>!prev.has(i)); if(!pool.length) pool=elig.slice(); const pick=[]; // 文字が少ないときは前の文字も使う
     while(pick.length<n&&pool.length){
       let cand=pool;
       if(pick.length===1){ const o=pool.filter(i=>glyphs[i].li!==glyphs[pick[0]].li); if(o.length) cand=o; }
@@ -491,7 +499,7 @@ function stretchAt(t){
   const n=PLAN.count, v=new Array(n).fill(0);
   if(S.src!=="text"||S.sMode==="off"||!n) return v;
   const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, ease=x=>x*x*(3-2*x);
-  if(S.sMode==="wave"){ const w=Math.min(.9,Math.max(.1,S.sTrans*2.2)); for(let i=0;i<n;i++){ const p=((u-i/n)%1+1)%1; if(p<w){ const q=Math.sin(Math.PI*p/w); v[i]=q*q; } } return v; }
+  if(S.sMode==="wave"){ const w=Math.min(.9,Math.max(.1,S.sTrans*2.2)); for(let i=0;i<n;i++){ if(!stretchable(PLAN.glyphs[i].ch)) continue; const p=((u-i/n)%1+1)%1; if(p<w){ const q=Math.sin(Math.PI*p/w); v[i]=q*q; } } return v; }
   const K=Math.max(1,S.sSteps), x=u*K, k=Math.floor(x)%K, f=x-Math.floor(x), tr=S.sTrans;
   const env=f<tr?ease(f/tr):f>1-tr?ease((1-f)/tr):1; // 立ち上がり → 保持 → 戻り
   for(const i of PLAN.steps[k]||[]) v[i]=env;
@@ -536,6 +544,7 @@ function drawPattern(c,W,H,cx,cy,fit){
 function drawImage(c,W,H,cx,cy,fit){
   if(!userImage){ c.fillStyle="#222"; c.font=`600 ${H*.035}px ui-monospace,monospace`; c.textAlign="center"; c.fillText("画像を読み込んでください",cx,cy); return; }
   const img=userImage, iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  if(!iw||!ih){ c.fillStyle="#222"; c.font=`600 ${H*.035}px ui-monospace,monospace`; c.textAlign="center"; c.fillText("この画像はサイズを読み取れません（width/height のないSVGなど）",cx,cy); return; }
   const s=Math.min(W*fit/iw,H*fit/ih); const w=iw*s, h=ih*s;
   const tmp=document.createElement("canvas"); tmp.width=Math.max(1,Math.round(w)); tmp.height=Math.max(1,Math.round(h));
   const t=tmp.getContext("2d"); t.drawImage(img,0,0,tmp.width,tmp.height);
@@ -543,7 +552,7 @@ function drawImage(c,W,H,cx,cy,fit){
   let hasAlpha=false; for(let i=3;i<a.length;i+=16){ if(a[i]<250){hasAlpha=true;break} }
   for(let i=0;i<a.length;i+=4){
     let v = hasAlpha ? a[i+3]/255 : (0.2126*a[i]+0.7152*a[i+1]+0.0722*a[i+2])/255;
-    if(S.invert) v=1-v; if(hasAlpha&&S.invert) v=v*(a[i+3]>0?1:0);
+    if(S.invert) v=1-v;
     const g=Math.round(v*255); a[i]=a[i+1]=a[i+2]=g; a[i+3]=255;
   }
   t.putImageData(d,0,0); c.drawImage(tmp,cx-w/2,cy-h/2);
@@ -552,9 +561,12 @@ function drawImage(c,W,H,cx,cy,fit){
 /* ---------- blur levels ---------- */
 let srcTex=null, mips=[], levels=[], RW=0, RH=0, LVSIG=[];
 const SIG1 = 1.25; // レベル1のσ（1080基準）。以後 2倍ずつ → 1.25…80
+const lvPool={}, tmpPool={}; // サイズごとに使い回す（毎フレーム再構築しても確保し直さない）
+function poolTex(pool,key,w,h){ const k=key+":"+w+"x"+h; return pool[k]||(pool[k]=makeTex(w,h)); }
 function ensureTargets(W,H){
   if(W===RW&&H===RH&&srcTex) return;
-  freeTex(srcTex); mips.forEach(freeTex); levels.forEach(freeTex); levels=[]; mips=[];
+  freeTex(srcTex); mips.forEach(freeTex); levels=[]; mips=[];
+  for(const P of [lvPool,tmpPool]) for(const k in P){ freeTex(P[k]); delete P[k]; }
   RW=W; RH=H;
   srcTex=makeTex(W,H,"rgba8");
   let w=W,h=H; mips.push(null);
@@ -571,23 +583,20 @@ function rebuildLevels(){
   let prev={t:srcTex.t,w:W,h:H};
   for(let j=1;j<mips.length;j++){ gl.bindTexture(gl.TEXTURE_2D,prev.t); gl.uniform2f(P_DOWN.u.u_texel,1/prev.w,1/prev.h); drawTo(mips[j],mips[j].w,mips[j].h); prev=mips[j]; }
   // levels: 0 = source, k>=1 = gaussian σ_k
-  levels.forEach((l,i)=>{ if(i>0) freeTex(l); }); levels=[srcTex];
+  levels=[srcTex];
   const scale=H/1080; LVSIG=[0];
-  const tmpCache={};
   for(let k=1;k<NLV;k++){
     const sig=SIG1*Math.pow(2,k-1); LVSIG.push(sig);
     const sy=sig*scale, sx=sy*S.aniso;
     let j=Math.max(0,Math.min(mips.length-1,Math.floor(Math.log2(Math.max(1,Math.min(sx,sy)/2.5)))));
     const base=j===0?srcTex:mips[j]; const bw=j===0?W:base.w, bh=j===0?H:base.h, d=Math.pow(2,j);
-    const key=bw+"x"+bh; if(!tmpCache[key]) tmpCache[key]=makeTex(bw,bh);
-    const tmp=tmpCache[key]; const out=makeTex(bw,bh);
+    const tmp=poolTex(tmpPool,"t",bw,bh), out=poolTex(lvPool,k,bw,bh);
     gl.useProgram(P_BLUR.p); gl.uniform1i(P_BLUR.u.u_t,0);
     const ex=Math.max(.35,sx/d), ey=Math.max(.35,sy/d);
     gl.bindTexture(gl.TEXTURE_2D,base.t); gl.uniform2f(P_BLUR.u.u_step,1/bw,0); gl.uniform1f(P_BLUR.u.u_s,ex); gl.uniform1i(P_BLUR.u.u_r,Math.min(120,Math.ceil(ex*3))); drawTo(tmp,bw,bh);
     gl.bindTexture(gl.TEXTURE_2D,tmp.t); gl.uniform2f(P_BLUR.u.u_step,0,1/bh); gl.uniform1f(P_BLUR.u.u_s,ey); gl.uniform1i(P_BLUR.u.u_r,Math.min(120,Math.ceil(ey*3))); drawTo(out,bw,bh);
     levels.push(out);
   }
-  Object.values(tmpCache).forEach(freeTex);
 }
 
 /* ---------- palette LUT ---------- */
@@ -655,13 +664,15 @@ function render(t, q){
   gl.clearColor(0,0,0,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H); gl.clear(gl.COLOR_BUFFER_BIT);
   drawTo(null,W,H);
 }
+let loopErr=false;
 function loop(now){
+  requestAnimationFrame(loop); // 描画で例外が出てもループは止めない
   const dt=(now-lastNow)/1000; lastNow=now;
-  if(!recording){
-    if(playing) playhead=(playhead+dt)%S.dur;
-    render(playhead); syncBar();
-  }
-  requestAnimationFrame(loop);
+  if(recording) return;
+  if(playing) playhead=(playhead+dt)%S.dur;
+  try{ render(playhead); loopErr=false; }
+  catch(err){ if(!loopErr){ loopErr=true; console.error(err); toast("描画できませんでした。直前の操作（画像・フォントなど）を見直してください"); } dirtySrc=false; }
+  syncBar();
 }
 
 /* ---------- UI ---------- */
@@ -691,7 +702,7 @@ function bindSeg(id,key,after){
   seg.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; S[key]=b.dataset.v; set(); after&&after(); changed(key); });
   set(); return set;
 }
-const setSrcSeg=bindSeg("srcSeg","src",updateSrcUI);
+const setSrcSeg=bindSeg("srcSeg","src",()=>updateSrcUI(true));
 bindSeg("easeSeg","ease");
 bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
@@ -703,16 +714,17 @@ $("sDice").onclick=()=>{
 };
 const setBg=bindSeg("bgSeg","bg",()=>view.classList.toggle("alpha",S.bg==="alpha"));
 bindSeg("qSeg","q");
-function updateSrcUI(){
+function updateSrcUI(fromUser){
   $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern"); $("srcImage").classList.toggle("hide",S.src!=="image");
-  if(S.src==="image"&&!userImage) $("fileImg").click();
+  if(fromUser&&S.src==="image"&&!userImage) $("fileImg").click();
 }
 // text
 $("text").value=S.text; $("text").addEventListener("input",()=>{ S.text=$("text").value; changed("text"); fontsThen(); });
 // fonts
+function syncWeightUI(){ const f=fontDef(), el=$("weight"); el.disabled=!!f.fixedWeight; el.parentElement.style.opacity=f.fixedWeight?.4:1; el.title=f.fixedWeight?"このフォントはウェイトを変えられません":""; }
 function fillFonts(){ const sel=$("font"); sel.innerHTML=FONTS.map(f=>`<option value="${f.id}">${f.name}</option>`).join("")+(userFontFamily?`<option value="upload">読み込んだフォント</option>`:""); if(S.font==="upload"&&!userFontFamily) S.font="archivo"; sel.value=S.font; }
 fillFonts();
-$("font").addEventListener("change",()=>{ S.font=$("font").value; const f=fontDef(); if(!f.fixedWeight&&f.id!=="upload"){ S.weight=f.weight; $("weight").value=S.weight; $("weight").parentElement.querySelector(".pv").textContent=S.weight; } changed("font"); fontsThen(); });
+$("font").addEventListener("change",()=>{ S.font=$("font").value; const f=fontDef(); if(!f.fixedWeight&&f.id!=="upload"){ S.weight=f.weight; $("weight").value=S.weight; $("weight").parentElement.querySelector(".pv").textContent=S.weight; } syncWeightUI(); changed("font"); fontsThen(); });
 $("fontUp").onclick=()=>$("fileFont").click();
 $("fileFont").addEventListener("change",async e=>{
   const file=e.target.files[0]; if(!file) return;
@@ -720,16 +732,17 @@ $("fileFont").addEventListener("change",async e=>{
   catch(err){ toast("フォントを読み込めませんでした"); }
   e.target.value="";
 });
-function fontsThen(){ const f=fontDef(); if(S.src!=="text") return; document.fonts.load(fontStr(f,80),S.text||"A").then(()=>{ dirtySrc=true; if(!playing) render(playhead); }).catch(()=>{}); }
-document.fonts.addEventListener && document.fonts.addEventListener("loadingdone",()=>{ dirtySrc=true; });
+function fontsThen(){ const f=fontDef(); if(S.src!=="text") return; document.fonts.load(fontStr(f,80),S.text||"A").then(()=>{ fontsChanged(); if(!playing) render(playhead); }).catch(()=>{}); }
+function fontsChanged(){ glyphCache.clear(); layoutCache.key=""; dirtySrc=true; lastSK=""; }
+document.fonts.addEventListener && document.fonts.addEventListener("loadingdone",fontsChanged);
 // pattern / image
 $("pattern").value=S.pattern; $("pattern").addEventListener("change",()=>{ S.pattern=$("pattern").value; changed("pattern"); });
 $("invert").checked=S.invert; $("invert").addEventListener("change",()=>{ S.invert=$("invert").checked; changed("invert"); });
 $("imgUp").onclick=()=>$("fileImg").click();
 $("fileImg").addEventListener("change",e=>{
   const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); const img=new Image();
-  img.onload=()=>{ userImage=img; S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
-  img.onerror=()=>toast("画像を読み込めませんでした"); img.src=url; e.target.value="";
+  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); }; img.src=url; e.target.value="";
 });
 // blur map points
 function buildPts(){
@@ -780,11 +793,12 @@ $("png").onclick=()=>{
 $("rec").onclick=()=>{ recording ? finishRec() : startRec(); };
 const REC_FPS=30;
 async function startRec(){
-  const mimes=["video/mp4;codecs=avc1.640028","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+  const [OW,OH]=outSize(); const big=OW*OH>1920*1088;
+  const mimes=[big?"video/mp4;codecs=avc1.640033":"video/mp4;codecs=avc1.640028","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
   const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
   if(!mime||!view.captureStream){ toast("この環境は動画録画に対応していません"); return; }
   let stream, rec, track; const chunks=[];
-  const session={stop:false, wasPlaying:playing}; recording=session; playing=false;
+  const session={stop:false, wasPlaying:playing, head:playhead}; recording=session; playing=false;
   $("rec").textContent="■ 録画中…"; $("rec").classList.add("rec");
   try{
     forceQ=1; render(0,1);
@@ -796,13 +810,15 @@ async function startRec(){
     // 1フレームずつ描画して録画側に渡す（重い環境でもコマ落ちしない。遅い場合は実時間より長く収録される）
     const N=Math.max(1,Math.round(S.dur*REC_FPS)); const t0=performance.now();
     const raf=()=>new Promise(r=>requestAnimationFrame(r));
-    for(let i=0;i<=N&&!session.stop;i++){
+    for(let i=0;i<N&&!session.stop;i++){
       // 描画は rAF 内で行う（キャンバスの合成タイミングに合わせないと取り込まれない環境がある）
       await raf(); while(performance.now()<t0+i*1000/REC_FPS-4 && !session.stop) await raf();
-      playhead=Math.min(i,N-1)/REC_FPS; render(playhead,1); syncBar();
+      playhead=i/REC_FPS; render(playhead,1); syncBar();
       track.requestFrame&&track.requestFrame();
     }
-    await raf(); await raf();
+    // 最後のコマにも1コマ分の表示時間を持たせてから止める（同じコマは足さない）
+    while(performance.now()<t0+N*1000/REC_FPS && !session.stop) await raf();
+    await raf();
     rec.requestData&&rec.state==="recording"&&rec.requestData();
     rec.state!=="inactive"&&rec.stop(); await stopped;
     stream.getTracks().forEach(t=>t.stop());
@@ -813,13 +829,13 @@ async function startRec(){
       else{ dl(blob,`heatmap-blur-${stamp()}.${mime.startsWith("video/mp4")?"mp4":"webm"}`); toast("録画を保存しました"); }
     }
   }catch(err){ try{rec&&rec.state!=="inactive"&&rec.stop()}catch(e){} if(stream) stream.getTracks().forEach(t=>t.stop()); toast("録画を開始できませんでした"); }
-  recording=null; forceQ=null; playing=session.wasPlaying; playhead=0;
+  recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head;
   $("rec").textContent="● 1ループ録画"; $("rec").classList.remove("rec");
 }
 function finishRec(){ if(recording) recording.stop=true; }
 
 /* ---------- boot ---------- */
-updateSrcUI();
+updateSrcUI(false); syncWeightUI();
 buildKeys(); buildStretchPlan();
 function meta(){ const [w,h]=outSize(); $("meta").textContent=`${w}×${h} · ${HALF?"16bit":"8bit"}`; }
 meta(); $("size").addEventListener("change",meta);
