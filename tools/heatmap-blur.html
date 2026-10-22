@@ -71,18 +71,6 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 #ramp .veil{position:absolute;top:-1px;bottom:-1px;left:-1px;border-radius:4px 0 0 4px;background:repeating-linear-gradient(135deg,rgba(10,10,12,.82) 0 4px,rgba(10,10,12,.62) 4px 8px);display:none;align-items:center;justify-content:center;color:var(--sub);font-size:9.5px;letter-spacing:.08em;white-space:nowrap;overflow:hidden}
 #ramp .veil.right{left:auto;right:-1px;border-radius:0 4px 4px 0}
 #ramp .mark{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--text);box-shadow:0 0 0 1px #000;display:none}
-details summary{cursor:pointer;color:var(--sub);font-size:10.5px;margin-top:8px;list-style:none;display:flex;align-items:center;gap:6px}
-details summary::-webkit-details-marker{display:none}
-details summary::before{content:"▸";color:var(--faint);transition:transform .15s}
-details[open] summary::before{transform:rotate(90deg)}
-details summary:hover{color:var(--text)}
-.stop{display:flex;align-items:center;gap:7px;margin-top:6px}
-.stop input[type=color]{width:24px;height:20px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--panel2);cursor:pointer;flex:0 0 auto}
-.stop input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:#33333c;cursor:pointer}
-.stop input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:var(--text)}
-.stop .pv{flex:0 0 30px;text-align:right;color:var(--faint);font-size:10px}
-.stop .x{flex:0 0 auto;background:none;border:none;color:var(--faint);cursor:pointer;font:12px var(--mono);padding:0 2px}
-.stop .x:hover{color:var(--accent)}
 .pts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
 .pt{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:5px 6px;text-align:center}
 .pt span{display:block;color:var(--faint);font-size:9.5px}
@@ -225,10 +213,6 @@ details summary:hover{color:var(--text)}
         <div class="prow"><span>しきい値</span><input type="range" id="pth" min="0" max="1" step="0.01"><span class="pv"></span></div>
         <div class="prow"><span>境目のぼかし</span><input type="range" id="pfe" min="0" max="0.3" step="0.005"><span class="pv"></span></div>
       </div>
-      <details id="stopBox"><summary>色を個別に編集</summary>
-        <div id="stops"></div>
-        <div class="btnrow"><button class="btn" id="addStop">＋ 色を追加</button><button class="btn" id="revStop">⇄ 反転</button></div>
-      </details>
       <div class="sub">マッピング</div>
       <div class="prow"><span>露出</span><input type="range" id="gain" min="0.4" max="2.5" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>ガンマ</span><input type="range" id="gamma" min="0.3" max="3" step="0.01"><span class="pv"></span></div>
@@ -327,8 +311,21 @@ function load(){
   try{ const s = JSON.parse(localStorage.getItem(LSKEY)||"null"); if(s) Object.assign(d, s); }catch(e){}
   if(d.src==="image"||d.src==="video") d.src="text"; // 画像・動画そのものは保存されないので、開き直したときはテキストに戻す
   d.maxB=Math.min(80,d.maxB); d.minB=Math.min(40,d.minB);
-  if(!Array.isArray(d.stops)||d.stops.length<2) d.stops = clone(PALETTES["HEAT（動画）"]);
+  // 配色はプリセットから選ぶだけ。以前に個別編集した配色は、いちばん近いプリセットへ戻す
+  if(!PALETTES[d.palette]) d.palette=nearestPalette(d.stops);
+  d.stops = clone(PALETTES[d.palette]);
   return d;
+}
+function nearestPalette(st){
+  if(!Array.isArray(st)||st.length<2) return DEFAULTS.palette;
+  try{
+    const a=st.slice().sort((x,y)=>x[0]-y[0]); let best=DEFAULTS.palette, bd=Infinity;
+    for(const [name,ps] of Object.entries(PALETTES)){
+      let d=0; for(let i=0;i<=16;i++){ const t=i/16, c1=sampleStops(a,t), c2=sampleStops(ps,t); d+=Math.hypot(c1[0]-c2[0],c1[1]-c2[1],c1[2]-c2[2]); }
+      if(d<bd){ bd=d; best=name; }
+    }
+    return best;
+  }catch(e){ return DEFAULTS.palette; }
 }
 let saveT=0;
 function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(LSKEY, JSON.stringify(S)); }catch(e){} },250); }
@@ -966,18 +963,9 @@ $("showMap").checked=!!S.showMap; $("showMap").addEventListener("change",()=>{ S
 // palette
 function buildPresets(){
   $("presets").innerHTML=Object.entries(PALETTES).map(([n,st])=>`<button class="chip${S.palette===n?" on":""}" data-n="${n}"><i style="background:linear-gradient(90deg,${st.map(s=>s[1]+" "+s[0]*100+"%").join(",")})"></i>${n}</button>`).join("");
-  $("presets").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ S.palette=b.dataset.n; S.stops=clone(PALETTES[S.palette]); buildPresets(); buildStops(); dirtyLUT=true; changed("stops"); });
+  $("presets").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ S.palette=b.dataset.n; S.stops=clone(PALETTES[S.palette]); buildPresets(); dirtyLUT=true; changed("stops"); });
 }
-function buildStops(){
-  const st=S.stops; $("stops").innerHTML=st.map((s,i)=>`<div class="stop"><input type="color" value="${s[1]}" data-i="${i}"><input type="range" min="0" max="1" step="0.005" value="${s[0]}" data-i="${i}" aria-label="色${i+1}の位置"><span class="pv">${Math.round(s[0]*100)}</span><button class="x" data-i="${i}" title="削除">×</button></div>`).join("");
-  $("stops").querySelectorAll("input[type=color]").forEach(el=>el.addEventListener("input",()=>{ st[+el.dataset.i][1]=el.value; customPal(); }));
-  $("stops").querySelectorAll("input[type=range]").forEach(el=>el.addEventListener("input",()=>{ st[+el.dataset.i][0]=parseFloat(el.value); el.nextElementSibling.textContent=Math.round(el.value*100); customPal(); }));
-  $("stops").querySelectorAll(".x").forEach(el=>el.onclick=()=>{ if(st.length<=2) return toast("色は2つ以上必要です"); st.splice(+el.dataset.i,1); buildStops(); customPal(); });
-}
-function customPal(){ if(S.palette!=="カスタム"){ S.palette="カスタム"; buildPresets(); } dirtyLUT=true; changed("stops"); }
-$("addStop").onclick=()=>{ const st=sortedStops(); let gi=0,g=0; for(let i=1;i<st.length;i++){ const d=st[i][0]-st[i-1][0]; if(d>g){g=d;gi=i;} } const p=st[gi-1][0]+g/2; const c=sampleStops(st,p).map(v=>Math.round(v).toString(16).padStart(2,"0")).join(""); S.stops=st; S.stops.splice(gi,0,[+p.toFixed(3),"#"+c]); buildStops(); customPal(); };
-$("revStop").onclick=()=>{ S.stops=S.stops.map(s=>[+(1-s[0]).toFixed(3),s[1]]).sort((a,b)=>a[0]-b[0]); buildStops(); customPal(); };
-buildPresets(); buildStops();
+buildPresets();
 $("wrap").checked=S.wrap; $("wrap").addEventListener("change",()=>{ S.wrap=$("wrap").checked; changed("wrap"); });
 $("gmove").checked=S.gmove; $("gmove").addEventListener("change",()=>{ S.gmove=$("gmove").checked; changed("gmove"); });
 $("size").value=S.size; $("size").addEventListener("change",()=>{ S.size=$("size").value; changed("size"); });
