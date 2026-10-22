@@ -334,6 +334,7 @@ uniform vec2 uRes;
 uniform float uT, uTime, uSwirl, uArms, uRim, uSeed, uCut;
 uniform vec3 uPal[8]; uniform float uPos[8]; uniform int uN;
 uniform int uMode, uExit, uMat; uniform vec2 uDir;
+uniform float uWarp;   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
 
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
 vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
@@ -442,10 +443,11 @@ void main(){
     else if(uMode==1){ pa=rot(-ce*uSwirl*1.4*exp(-r*1.5))*p*(1.-.28*ce); }     // blown outward
     else if(uMode==2){ pa=p-D*.14*ce+vec2(-D.y,D.x)*.02*ce*snoise(vec3(p*4.,uTime*2.)); } // pushed ahead
     else { pa=p+D*dot(p,D)*.2*ce; }                                             // squeezed to the middle
+    pa=mix(p,pa,uWarp);
     // A heats up just ahead of the flames: heat haze + thermal false colour
     float ahead=exp(min(dist,0.)/.14)*(1.-m);
     vec2 hzA=vec2(snoise(vec3(p*5.,uTime*2.5+uSeed)),snoise(vec3(p*5.+7.,uTime*2.5-uSeed)));
-    pa+=hzA*.016*ahead;
+    pa+=hzA*.016*ahead*uWarp;
     vec3 sa=texture(uA,pa/asp+.5).rgb;
     float lumA=dot(sa,vec3(.299,.587,.114));
     sa=mix(sa,thermal(.12+.8*lumA),ahead*.6);
@@ -485,11 +487,12 @@ void main(){
     else if(uMode==1) pb=rot(-settle*.22*uSwirl)*p*(1.+.08*settle);
     else if(uMode==2) pb=p-D*.07*settle;
     else pb=p/(1.+.06*settle);
+    pb=mix(p,pb,uWarp);
     // footage: heat haze and thermal colour right behind the retreating edge, cooling to the real image
     float behind=exp(min(dist,0.)/.16)*(1.-m);
     float cool=logo?0.:behind*(1.-smoothstep(.55,1.,kk));
     vec2 hzB=vec2(snoise(vec3(p*5.,uTime*2.5+uSeed)),snoise(vec3(p*5.+7.,uTime*2.5-uSeed)));
-    pb+=hzB*.018*(cool+(logo?0.:.3*settle));
+    pb+=hzB*.018*(cool+(logo?0.:.3*settle))*uWarp;
     vec3 sb=texture(uB,pb/asp+.5).rgb;
     vec3 base=sb;
     float lumB=dot(sb,vec3(.299,.587,.114));
@@ -531,7 +534,7 @@ gl.useProgram(prog);
 gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 { const loc=gl.getAttribLocation(prog,'aPos'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0); }
-const U={}; ['uA','uB','uRes','uT','uTime','uSwirl','uArms','uRim','uSeed','uCut','uPal','uPos','uN','uMode','uExit','uMat','uDir'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+const U={}; ['uA','uB','uRes','uT','uTime','uSwirl','uArms','uRim','uSeed','uCut','uPal','uPos','uN','uMode','uExit','uMat','uDir','uWarp'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 function mkTex(unit){ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); return t; }
@@ -543,7 +546,7 @@ function upload(key,unit){ gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl
 
 /* ============ state ============ */
 const BASE=1.25, HOLD_A=.7, HOLD_B=1.1;
-const state={playing:true,loop:true,t:0,clock:0,seed:3.7,swirl:1,arms:3,rim:1,cut:.42,speed:1,
+const state={playing:true,loop:true,t:0,clock:0,seed:3.7,swirl:1,arms:3,rim:1,cut:.42,speed:1,warp:0,
   mode:0,angle:90,exit:0,pal:'thermal',aspect:'16:9'};
 const ASPECTS={'16:9':{scene:[1280,720],out:[1920,1080]},'9:16':{scene:[720,1280],out:[1080,1920]},
   '1:1':{scene:[1080,1080],out:[1080,1080]},'4:5':{scene:[1080,1350],out:[1080,1350]}};
@@ -625,6 +628,7 @@ function applyPalette(id){
 slider($('#gFlame'),'渦の強さ','swirl',0,2,.01,v=>v.toFixed(2));
 slider($('#gFlame'),'炎の腕の本数','arms',1,7,1,v=>String(v));
 slider($('#gFlame'),'縁の太さ','rim',.2,3,.05,v=>v.toFixed(2));
+slider($('#gFlame'),'背景の歪み','warp',0,1,.01,v=>Math.round(v*100)+'%');
 slider($('#gFlame'),'切替タイミング','cut',.25,.7,.01,v=>v.toFixed(2),layoutTrack);
 
 // 05 export
@@ -754,7 +758,7 @@ function frame(now){
   gl.uniform1f(U.uT,state.t); gl.uniform1f(U.uTime,state.t*BASE);
   gl.uniform1f(U.uSwirl,state.swirl); gl.uniform1f(U.uArms,state.arms); gl.uniform1f(U.uRim,state.rim);
   gl.uniform1f(U.uSeed,state.seed); gl.uniform1f(U.uCut,state.cut);
-  gl.uniform1i(U.uMode,state.mode); gl.uniform1i(U.uExit,state.exit); gl.uniform1i(U.uMat,matB);
+  gl.uniform1i(U.uMode,state.mode); gl.uniform1i(U.uExit,state.exit); gl.uniform1i(U.uMat,matB); gl.uniform1f(U.uWarp,state.warp);
   gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad));
   gl.drawArrays(gl.TRIANGLES,0,3);
   requestAnimationFrame(frame);
