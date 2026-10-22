@@ -623,7 +623,8 @@ async function loadAdobeKit(id){
 function layoutFont(it){
   if(it.font==="jp") return {css:px=>`400 ${px}px "Noto Sans JP", "Hiragino Sans", sans-serif`, stretch:"normal"};
   // Obviously（可変）：Wide＝幅150（extra-expanded）、Bold＝700／Semibold＝600。Figma の Wide Bold と同じ字幅になる
-  if(ADOBE.ok) return {css:px=>`${it.font==="bold"?700:600} extra-expanded ${px}px "${ADOBE.fam}", sans-serif`, stretch:"extra-expanded"};
+  // dy：Figma とブラウザで行の置き方の基準が少し違う分の補正（実測：文字サイズ×0.088 だけ下げると Figma と一致）
+  if(ADOBE.ok) return {css:px=>`${it.font==="bold"?700:600} extra-expanded ${px}px "${ADOBE.fam}", sans-serif`, stretch:"extra-expanded", dy:.088};
   const lf=LF[it.font]; if(lf) return {css:px=>`${px}px "${lf.fam}"`, stretch:"normal"};
   return {css:px=>`${it.font==="bold"?800:700} expanded ${px}px "Archivo", sans-serif`, stretch:"expanded"}; // 読み込むまでの代わり
 }
@@ -673,7 +674,7 @@ function drawLayout(c,W,H){
       if(S.goo>0) gooLine(lc,S.goo*px*.09,.5-.16*curTrackEnv); // くっつき：文字の大きさに合わせた強さで溶け合わせる
       gi+=m.gl.length; li++;
       // CSS と同じ行の置き方：行の高さの中で字面（ascent+descent）を上下中央に置き、その中のベースラインに揃える
-      const base=oy+it.y*sc+i*LH+(LH-(m.fA+m.fD))/2+m.fA;
+      const base=oy+it.y*sc+i*LH+(LH-(m.fA+m.fD))/2+m.fA+(f.dy||0)*px;
       // 枠の中央を基準に伸び縮みさせる（Figma の中央揃えの見た目を保つ）
       const left=ox+it.x*sc+(it.w*sc-natW)/2;
       const kx=S.sKeep&&S.sMode!=="track"?natW/Math.max(1,natW+exT):1;
