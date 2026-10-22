@@ -90,7 +90,7 @@ details summary:hover{color:var(--text)}
 #toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%) translateY(10px);background:#1d1d23;border:1px solid var(--line);color:var(--text);padding:8px 14px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:.2s;z-index:50}
 #toast.on{opacity:1;transform:translateX(-50%)}
 .hide{display:none!important}
-#fileImg,#fileFont{display:none}
+#fileImg,#fileFont,#fileVid{display:none}
 @media (max-width:820px){
   #app{flex-direction:column}
   #stageWrap{flex:0 0 56vh}
@@ -124,7 +124,7 @@ details summary:hover{color:var(--text)}
     <section>
       <h2><span><b>01</b>ソース</span></h2>
       <div class="seg" id="srcSeg">
-        <button data-v="text">テキスト</button><button data-v="flame">炎</button><button data-v="pattern">模様</button><button data-v="image">画像</button>
+        <button data-v="text">テキスト</button><button data-v="flame">炎</button><button data-v="pattern">模様</button><button data-v="image">画像</button><button data-v="video">動画</button>
       </div>
 
       <div id="srcText">
@@ -150,8 +150,20 @@ details summary:hover{color:var(--text)}
 
       <div id="srcImage" class="hide">
         <button class="btn wide" id="imgUp">画像を読み込む（PNG / JPG / SVG）</button>
-        <div class="prow"><span>反転</span><input type="checkbox" id="invert"></div>
         <div class="hint">透過PNG・SVGは形（アルファ）を、それ以外は明るさを熱源として使います。</div>
+      </div>
+
+      <div id="srcVideo" class="hide">
+        <button class="btn wide" id="vidUp">動画を読み込む（MP4 / WebM / MOV）</button>
+        <div class="hint" id="vidInfo">動画にはグラデーションマップだけをかけます。明るさを「06 カラー」の配色に置き換えます。</div>
+      </div>
+
+      <div id="srcMedia" class="hide">
+        <div class="prow"><span>画面を埋める</span><input type="checkbox" id="cover"><span style="flex:1;color:var(--faint);font-size:10px">はみ出す分をトリミング</span></div>
+        <div class="prow"><span>反転</span><input type="checkbox" id="invert"></div>
+        <div class="prow"><span>黒レベル</span><input type="range" id="lo" min="0" max="0.95" step="0.01"><span class="pv"></span></div>
+        <div class="prow"><span>白レベル</span><input type="range" id="hi" min="0.05" max="1" step="0.01"><span class="pv"></span></div>
+        <div class="hint">黒レベルを上げると暗い背景が消えて、明るい部分だけが熱を持ちます。</div>
       </div>
 
       <div class="prow"><span>大きさ</span><input type="range" id="fit" min="20" max="100" step="1"><span class="pv"></span></div>
@@ -171,7 +183,7 @@ details summary:hover{color:var(--text)}
       <div class="hint">動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。</div>
     </section>
 
-    <section>
+    <section id="secBlur">
       <h2><span><b>03</b>ブラー</span></h2>
       <div class="prow"><span>最小ブラー</span><input type="range" id="minB" min="0" max="40" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>最大ブラー</span><input type="range" id="maxB" min="0" max="80" step="0.5"><span class="pv"></span></div>
@@ -180,7 +192,7 @@ details summary:hover{color:var(--text)}
       <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて1.8）。</div>
     </section>
 
-    <section>
+    <section id="secMap">
       <h2><span><b>04</b>ブラーマップ（模様の動き）</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="showMap" style="accent-color:var(--accent)">マップ表示</label></h2>
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード"></div>
       <div class="sub">各点の熱さ（白＝ぼける／黒＝シャープ）</div>
@@ -189,7 +201,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>動く範囲</span><input type="range" id="spread" min="0" max="160" step="1"><span class="pv"></span></div>
     </section>
 
-    <section>
+    <section id="secAnim">
       <h2><span><b>05</b>アニメーション</span></h2>
       <div class="prow"><span>ループ</span><input type="range" id="dur" min="1" max="12" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
@@ -213,7 +225,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>周回</span><input type="checkbox" id="wrap"><span style="flex:1;color:var(--faint);font-size:10px">位相を回したとき色を一周させる</span></div>
     </section>
 
-    <section>
+    <section id="secGrain">
       <h2><span><b>07</b>グレイン</span></h2>
       <div class="prow"><span>量</span><input type="range" id="grain" min="0" max="0.8" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>粒の大きさ</span><input type="range" id="gsize" min="1" max="6" step="0.1"><span class="pv"></span></div>
@@ -233,11 +245,12 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
       <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn" id="rec">● 1ループ録画</button></div>
       <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
-      <div class="hint">録画はループ1周ぶんを等倍・30fpsで1コマずつ収録（ブラウザに応じてMP4かWebM）。透過は PNG のみ対応。</div>
+      <div class="hint" id="recHint">録画はループ1周ぶんを等倍・30fpsで1コマずつ収録（ブラウザに応じてMP4かWebM）。透過は PNG のみ対応。</div>
     </section>
   </aside>
 </div>
 <input type="file" id="fileImg" accept="image/*,.svg">
+<input type="file" id="fileVid" accept="video/*,.mov,.mp4,.webm">
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2">
 <div id="toast"></div>
 
@@ -277,7 +290,7 @@ const FONTS = [
 const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
-  fit:82, posy:0,
+  fit:82, posy:0, cover:true, lo:0, hi:1,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
@@ -294,7 +307,7 @@ function clone(o){return JSON.parse(JSON.stringify(o))}
 function load(){
   const d = clone(DEFAULTS); d.stops = clone(PALETTES[d.palette]);
   try{ const s = JSON.parse(localStorage.getItem(LSKEY)||"null"); if(s) Object.assign(d, s); }catch(e){}
-  if(d.src==="image") d.src="text"; // 画像そのものは保存されないので、開き直したときはテキストに戻す
+  if(d.src==="image"||d.src==="video") d.src="text"; // 画像・動画そのものは保存されないので、開き直したときはテキストに戻す
   d.maxB=Math.min(80,d.maxB); d.minB=Math.min(40,d.minB);
   if(!Array.isArray(d.stops)||d.stops.length<2) d.stops = clone(PALETTES["HEAT（動画）"]);
   return d;
@@ -309,6 +322,14 @@ if(!gl){ document.getElementById("meta").textContent="WebGL2 に対応したブ�
 const HALF = !!gl.getExtension("EXT_color_buffer_float");
 const VS = `#version 300 es
 in vec2 p; out vec2 v_uv; void main(){ v_uv=p*.5+.5; gl_Position=vec4(p,0,1); }`;
+const FS_PREP = `#version 300 es
+precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_t; uniform int u_alphaMode, u_invert; uniform float u_lo, u_hi;
+void main(){ // ソース（文字・画像・動画のコマ）を熱源マスクに変換：明るさ or アルファ → 反転 → 黒/白レベル
+  vec4 c=texture(u_t,v_uv);
+  float v=(u_alphaMode==1)?c.a:dot(c.rgb,vec3(.2126,.7152,.0722));
+  if(u_invert==1) v=1.-v;
+  v=clamp((v-u_lo)/max(.001,u_hi-u_lo),0.,1.);
+  o=vec4(v,0,0,1); }`;
 const FS_DOWN = `#version 300 es
 precision highp float; in vec2 v_uv; out vec4 o; uniform sampler2D u_t; uniform vec2 u_texel;
 void main(){ // 4タップのボックス（2×2平均×4 = 4×4範囲）でエイリアスを抑えて半分に
@@ -328,7 +349,7 @@ uniform sampler2D L0,L1,L2,L3,L4,L5,L6,L7; uniform sampler2D u_lut;
 uniform float u_sig[${NLV}];
 uniform vec2 u_pt[4]; uniform float u_val[4]; uniform float u_aspect, u_pow;
 uniform float u_minB,u_maxB,u_curve, u_gain,u_gamma,u_phase; uniform int u_wrap;
-uniform float u_grain,u_gsize,u_gseed; uniform vec2 u_res; uniform int u_mode, u_alpha;
+uniform float u_grain,u_gsize,u_gseed; uniform vec2 u_res; uniform int u_mode, u_alpha, u_direct;
 float lv(int k,vec2 uv){
   if(k==0) return texture(L0,uv).r; if(k==1) return texture(L1,uv).r; if(k==2) return texture(L2,uv).r; if(k==3) return texture(L3,uv).r;
   if(k==4) return texture(L4,uv).r; if(k==5) return texture(L5,uv).r; if(k==6) return texture(L6,uv).r; return texture(L7,uv).r; }
@@ -340,6 +361,12 @@ float blurMap(vec2 uv){
   for(int i=0;i<4;i++){ vec2 q=vec2(u_pt[i].x*u_aspect,u_pt[i].y); float w=1./pow(length(p-q)+.035,u_pow); ws+=w; vs+=w*u_val[i]; }
   return vs/ws; }
 void main(){
+  if(u_direct==1){ // 動画：グラデーションマップだけ（ブラー・グレインなし）
+    float I=pow(clamp(texture(L0,v_uv).r*u_gain,0.,1.),u_gamma);
+    float t=I+u_phase; t=(u_wrap==1)?fract(t):clamp(t,0.,1.);
+    vec3 col=texture(u_lut,vec2(t*255./256.+.5/256.,.5)).rgb;
+    if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(clamp(col/max(a,.0001),0.,1.),a); } else o=vec4(col,1.);
+    return; }
   float m=blurMap(v_uv);
   float s=mix(u_minB,u_maxB,pow(clamp(m,0.,1.),u_curve));
   // σ → レベル番号（0, σ1, 2σ1, 4σ1 …）
@@ -369,7 +396,7 @@ void main(){
 function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
 function prog(fs){const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.bindAttribLocation(p,0,"p");gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
   const u={};const n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);for(let i=0;i<n;i++){const a=gl.getActiveUniform(p,i);const nm=a.name.replace(/\[0\]$/,"");u[nm]=gl.getUniformLocation(p,a.name)}return{p,u}}
-const P_DOWN=prog(FS_DOWN), P_BLUR=prog(FS_BLUR), P_COMP=prog(FS_COMP);
+const P_PREP=prog(FS_PREP), P_DOWN=prog(FS_DOWN), P_BLUR=prog(FS_BLUR), P_COMP=prog(FS_COMP);
 const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vbo); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 
@@ -400,12 +427,16 @@ function fontStr(f,px){
 
 function drawSource(W,H){
   srcCv.width=W; srcCv.height=H;
-  const c=sctx; c.setTransform(1,0,0,1,0,0); c.fillStyle="#000"; c.fillRect(0,0,W,H); c.fillStyle="#fff";
+  const c=sctx; c.setTransform(1,0,0,1,0,0);
+  if(S.src==="image"&&userImage&&userImageAlpha) c.clearRect(0,0,W,H); // 透過画像はアルファを熱源にする
+  else { c.fillStyle="#000"; c.fillRect(0,0,W,H); }
+  c.fillStyle="#fff";
   const cx=W/2, cy=H/2+S.posy/100*H, fit=S.fit/100;
   if(S.src==="text") drawText(c,W,H,cx,cy,fit);
   else if(S.src==="flame") drawFlame(c,W,H,cx,cy,fit);
   else if(S.src==="pattern") drawPattern(c,W,H,cx,cy,fit);
   else if(S.src==="image") drawImage(c,W,H,cx,cy,fit);
+  else if(S.src==="video") drawVideo(c,W,H,cx,cy,fit);
 }
 function textLines(){ return (S.text||" ").split("\n").map(x=>x.trimEnd()).filter((x,i,a)=>x.length||a.length===1); }
 const glyphCache=new Map(), layoutCache={key:""}, lineCanvases=[];
@@ -541,34 +572,35 @@ function drawPattern(c,W,H,cx,cy,fit){
   else if(S.pattern==="waves"){ c.lineWidth=th; c.strokeStyle="#fff"; for(let y=-R;y<R;y+=per){ c.beginPath(); for(let x=-R;x<=R;x+=8){ const yy=y+Math.sin(x/per*1.6)*per*.32; x===-R?c.moveTo(x,yy):c.lineTo(x,yy);} c.stroke(); } }
   c.restore();
 }
+function placeholder(c,W,H,cx,cy,msg){ c.fillStyle="#222"; c.font=`600 ${H*.035}px ui-monospace,monospace`; c.textAlign="center"; c.fillText(msg,cx,cy); }
+function drawMedia(c,W,H,cx,cy,fit,el,iw,ih){
+  const s=S.cover?Math.max(W/iw,H/ih):Math.min(W*fit/iw,H*fit/ih); const w=iw*s, h=ih*s;
+  c.imageSmoothingQuality="high"; c.drawImage(el,cx-w/2,cy-h/2,w,h);
+}
 function drawImage(c,W,H,cx,cy,fit){
-  if(!userImage){ c.fillStyle="#222"; c.font=`600 ${H*.035}px ui-monospace,monospace`; c.textAlign="center"; c.fillText("画像を読み込んでください",cx,cy); return; }
+  if(!userImage) return placeholder(c,W,H,cx,cy,"画像を読み込んでください");
   const img=userImage, iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-  if(!iw||!ih){ c.fillStyle="#222"; c.font=`600 ${H*.035}px ui-monospace,monospace`; c.textAlign="center"; c.fillText("この画像はサイズを読み取れません（width/height のないSVGなど）",cx,cy); return; }
-  const s=Math.min(W*fit/iw,H*fit/ih); const w=iw*s, h=ih*s;
-  const tmp=document.createElement("canvas"); tmp.width=Math.max(1,Math.round(w)); tmp.height=Math.max(1,Math.round(h));
-  const t=tmp.getContext("2d"); t.drawImage(img,0,0,tmp.width,tmp.height);
-  const d=t.getImageData(0,0,tmp.width,tmp.height), a=d.data;
-  let hasAlpha=false; for(let i=3;i<a.length;i+=16){ if(a[i]<250){hasAlpha=true;break} }
-  for(let i=0;i<a.length;i+=4){
-    let v = hasAlpha ? a[i+3]/255 : (0.2126*a[i]+0.7152*a[i+1]+0.0722*a[i+2])/255;
-    if(S.invert) v=1-v;
-    const g=Math.round(v*255); a[i]=a[i+1]=a[i+2]=g; a[i+3]=255;
-  }
-  t.putImageData(d,0,0); c.drawImage(tmp,cx-w/2,cy-h/2);
+  if(!iw||!ih) return placeholder(c,W,H,cx,cy,"この画像はサイズを読み取れません（width/height のないSVGなど）");
+  drawMedia(c,W,H,cx,cy,fit,img,iw,ih);
+}
+function drawVideo(c,W,H,cx,cy,fit){
+  const v=userVideo;
+  if(!v) return placeholder(c,W,H,cx,cy,"動画を読み込んでください");
+  if(v.readyState<2||!v.videoWidth) return placeholder(c,W,H,cx,cy,"動画を準備しています…");
+  drawMedia(c,W,H,cx,cy,fit,v,v.videoWidth,v.videoHeight);
 }
 
 /* ---------- blur levels ---------- */
-let srcTex=null, mips=[], levels=[], RW=0, RH=0, LVSIG=[];
+let srcTex=null, maskTex=null, mips=[], levels=[], RW=0, RH=0, LVSIG=[];
 const SIG1 = 1.25; // レベル1のσ（1080基準）。以後 2倍ずつ → 1.25…80
 const lvPool={}, tmpPool={}; // サイズごとに使い回す（毎フレーム再構築しても確保し直さない）
 function poolTex(pool,key,w,h){ const k=key+":"+w+"x"+h; return pool[k]||(pool[k]=makeTex(w,h)); }
 function ensureTargets(W,H){
   if(W===RW&&H===RH&&srcTex) return;
-  freeTex(srcTex); mips.forEach(freeTex); levels=[]; mips=[];
+  freeTex(srcTex); freeTex(maskTex); mips.forEach(freeTex); levels=[]; mips=[];
   for(const P of [lvPool,tmpPool]) for(const k in P){ freeTex(P[k]); delete P[k]; }
   RW=W; RH=H;
-  srcTex=makeTex(W,H,"rgba8");
+  srcTex=makeTex(W,H,"rgba8"); maskTex=makeTex(W,H);
   let w=W,h=H; mips.push(null);
   for(let j=1;j<8;j++){ w=Math.max(1,Math.ceil(w/2)); h=Math.max(1,Math.ceil(h/2)); mips.push(makeTex(w,h)); }
 }
@@ -578,18 +610,26 @@ function rebuildLevels(){
   gl.bindTexture(gl.TEXTURE_2D,srcTex.t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,W,H,0,gl.RGBA,gl.UNSIGNED_BYTE,srcCv);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  // ソース → 熱源マスク
+  const media=S.src==="image"||S.src==="video";
+  gl.useProgram(P_PREP.p); gl.activeTexture(gl.TEXTURE0); gl.uniform1i(P_PREP.u.u_t,0);
+  gl.uniform1i(P_PREP.u.u_alphaMode,(S.src==="image"&&userImageAlpha)?1:0); gl.uniform1i(P_PREP.u.u_invert,media&&S.invert?1:0);
+  gl.uniform1f(P_PREP.u.u_lo,media?S.lo:0); gl.uniform1f(P_PREP.u.u_hi,media?Math.max(S.lo+.01,S.hi):1);
+  drawTo(maskTex,W,H);
+  if(S.src==="video"){ // 動画はブラーを使わないので、マスクだけ作って終わり
+    levels=new Array(NLV).fill(maskTex); LVSIG=[0]; for(let k=1;k<NLV;k++) LVSIG.push(SIG1*Math.pow(2,k-1)); return; }
   // mip chain
   gl.useProgram(P_DOWN.p); gl.uniform1i(P_DOWN.u.u_t,0); gl.activeTexture(gl.TEXTURE0);
-  let prev={t:srcTex.t,w:W,h:H};
+  let prev={t:maskTex.t,w:W,h:H};
   for(let j=1;j<mips.length;j++){ gl.bindTexture(gl.TEXTURE_2D,prev.t); gl.uniform2f(P_DOWN.u.u_texel,1/prev.w,1/prev.h); drawTo(mips[j],mips[j].w,mips[j].h); prev=mips[j]; }
   // levels: 0 = source, k>=1 = gaussian σ_k
-  levels=[srcTex];
+  levels=[maskTex];
   const scale=H/1080; LVSIG=[0];
   for(let k=1;k<NLV;k++){
     const sig=SIG1*Math.pow(2,k-1); LVSIG.push(sig);
     const sy=sig*scale, sx=sy*S.aniso;
     let j=Math.max(0,Math.min(mips.length-1,Math.floor(Math.log2(Math.max(1,Math.min(sx,sy)/2.5)))));
-    const base=j===0?srcTex:mips[j]; const bw=j===0?W:base.w, bh=j===0?H:base.h, d=Math.pow(2,j);
+    const base=j===0?maskTex:mips[j]; const bw=j===0?W:base.w, bh=j===0?H:base.h, d=Math.pow(2,j);
     const tmp=poolTex(tmpPool,"t",bw,bh), out=poolTex(lvPool,k,bw,bh);
     gl.useProgram(P_BLUR.p); gl.uniform1i(P_BLUR.u.u_t,0);
     const ex=Math.max(.35,sx/d), ey=Math.max(.35,sy/d);
@@ -660,16 +700,29 @@ function render(t, q){
   gl.uniform1f(P.u.u_gain,S.gain); gl.uniform1f(P.u.u_gamma,S.gamma); gl.uniform1f(P.u.u_phase,S.phase); gl.uniform1i(P.u.u_wrap,S.wrap?1:0);
   const fps=30; const frame=Math.floor(t*fps);
   gl.uniform1f(P.u.u_grain,S.grain); gl.uniform1f(P.u.u_gsize,S.gsize*(H/1080)); gl.uniform1f(P.u.u_gseed,S.gmove?(frame%997):0);
+  gl.uniform1i(P.u.u_direct,S.src==="video"?1:0);
   gl.uniform2f(P.u.u_res,W,H); gl.uniform1i(P.u.u_mode,(S.showMap&&!recording)?1:0); gl.uniform1i(P.u.u_alpha,S.bg==="alpha"&&!recording?1:0);
   gl.clearColor(0,0,0,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H); gl.clear(gl.COLOR_BUFFER_BIT);
   drawTo(null,W,H);
 }
 let loopErr=false;
+let userVideo=null, userVideoURL=null, videoDirty=false;
+function videoMode(){ return S.src==="video"&&userVideo&&userVideo.readyState>=2; }
+function totalDur(){ return videoMode()&&isFinite(userVideo.duration)?userVideo.duration:S.dur; }
 function loop(now){
   requestAnimationFrame(loop); // 描画で例外が出てもループは止めない
   const dt=(now-lastNow)/1000; lastNow=now;
   if(recording) return;
-  if(playing) playhead=(playhead+dt)%S.dur;
+  if(videoMode()){
+    // 動画が時計の基準。再生状態を合わせ、新しいコマが来たときだけ作り直す
+    const v=userVideo;
+    if(playing&&v.paused&&!v.ended) v.play().catch(()=>{ playing=false; });
+    if(!playing&&!v.paused) v.pause();
+    playhead=v.currentTime;
+    if(videoDirty||playhead!==loop.lastVT){ videoDirty=false; dirtySrc=true; } // 再生位置が進んだ＝新しいコマ
+    loop.lastVT=playhead;
+  }
+  else if(playing) playhead=(playhead+dt)%S.dur;
   try{ render(playhead); loopErr=false; }
   catch(err){ if(!loopErr){ loopErr=true; console.error(err); toast("描画できませんでした。直前の操作（画像・フォントなど）を見直してください"); } dirtySrc=false; }
   syncBar();
@@ -678,10 +731,10 @@ function loop(now){
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
-const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v,
+const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
   dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+const SRC_KEYS=new Set(["cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -715,8 +768,25 @@ $("sDice").onclick=()=>{
 const setBg=bindSeg("bgSeg","bg",()=>view.classList.toggle("alpha",S.bg==="alpha"));
 bindSeg("qSeg","q");
 function updateSrcUI(fromUser){
-  $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern"); $("srcImage").classList.toggle("hide",S.src!=="image");
+  const media=S.src==="image"||S.src==="video";
+  $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern");
+  $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
+  $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
+  for(const id of ["secBlur","secMap","secAnim","secGrain"]) $(id).classList.toggle("hide",S.src==="video");
   if(fromUser&&S.src==="image"&&!userImage) $("fileImg").click();
+  if(fromUser&&S.src==="video"&&!userVideo) $("fileVid").click();
+  if(S.src!=="video"&&userVideo&&!userVideo.paused) userVideo.pause();
+  if(S.src==="video") playhead=userVideo?userVideo.currentTime:0;
+  else playhead=Math.min(playhead,S.dur-1e-4);
+  recLabel();
+}
+function recLabel(){
+  const vid=S.src==="video";
+  $("rec").disabled=vid; $("rec").style.opacity=vid?.4:1;
+  if(!recording) $("rec").textContent="● 1ループ録画";
+  $("recHint").textContent=vid
+    ? "動画ソースではプレビューでグラデーションマップを確認できます。PNG保存で今のコマを書き出せます（動画の録画は対象外）。"
+    : "録画はループ1周ぶんを等倍・30fpsで1コマずつ収録（ブラウザに応じてMP4かWebM）。透過は PNG のみ対応。";
 }
 // text
 $("text").value=S.text; $("text").addEventListener("input",()=>{ S.text=$("text").value; changed("text"); fontsThen(); });
@@ -738,11 +808,41 @@ document.fonts.addEventListener && document.fonts.addEventListener("loadingdone"
 // pattern / image
 $("pattern").value=S.pattern; $("pattern").addEventListener("change",()=>{ S.pattern=$("pattern").value; changed("pattern"); });
 $("invert").checked=S.invert; $("invert").addEventListener("change",()=>{ S.invert=$("invert").checked; changed("invert"); });
+$("cover").checked=S.cover; $("cover").addEventListener("change",()=>{ S.cover=$("cover").checked; updateSrcUI(); changed("cover"); });
 $("imgUp").onclick=()=>$("fileImg").click();
 $("fileImg").addEventListener("change",e=>{
   const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); const img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
+  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
   img.onerror=()=>{ URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); }; img.src=url; e.target.value="";
+});
+let userImageAlpha=false;
+function detectAlpha(img){
+  try{ const t=document.createElement("canvas"); t.width=t.height=64; const x=t.getContext("2d"); x.drawImage(img,0,0,64,64);
+    const a=x.getImageData(0,0,64,64).data; for(let i=3;i<a.length;i+=4) if(a[i]<250) return true; }catch(e){}
+  return false;
+}
+// video
+$("vidUp").onclick=()=>$("fileVid").click();
+$("fileVid").addEventListener("change",e=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  const url=URL.createObjectURL(file); const v=document.createElement("video");
+  v.muted=true; v.playsInline=true; v.loop=true; v.preload="auto";
+  v.onloadeddata=()=>{
+    if(userVideo){ userVideo.pause(); userVideo.removeAttribute("src"); userVideo.load(); }
+    if(userVideoURL) URL.revokeObjectURL(userVideoURL);
+    userVideo=v; userVideoURL=url;
+    v.addEventListener("seeked",()=>{ videoDirty=true; });
+    // 出力サイズを動画の縦横比に一番近いものへ
+    const ar=v.videoWidth/v.videoHeight, opts=[["1920x1080",16/9],["1080x1080",1],["1080x1350",4/5],["1080x1920",9/16]];
+    const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
+    let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
+    $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒）`;
+    S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
+    v.play().catch(()=>{});
+    toast("動画を読み込みました"+note);
+  };
+  v.onerror=()=>{ URL.revokeObjectURL(url); toast("この動画は再生できません（ブラウザが対応していない形式です）"); };
+  v.src=url;
 });
 // blur map points
 function buildPts(){
@@ -776,11 +876,14 @@ $("reset").onclick=()=>{ try{localStorage.removeItem(LSKEY)}catch(e){} location.
 
 // transport
 function syncBar(){
-  $("scrub").value=Math.round(playhead/S.dur*1000); $("tlabel").textContent=`${playhead.toFixed(2)} / ${S.dur.toFixed(2)}s`;
+  const T=totalDur(); $("scrub").value=Math.round(playhead/T*1000); $("tlabel").textContent=`${playhead.toFixed(2)} / ${T.toFixed(2)}s`;
   $("play").textContent=playing?"❚❚":"▶";
 }
 $("play").onclick=()=>{ playing=!playing; };
-$("scrub").addEventListener("input",()=>{ playing=false; playhead=$("scrub").value/1000*S.dur*.9999; render(playhead); });
+$("scrub").addEventListener("input",()=>{
+  playing=false;
+  if(videoMode()){ userVideo.pause(); userVideo.currentTime=$("scrub").value/1000*userVideo.duration; playhead=userVideo.currentTime; return; } // コマが届いたら seeked で描き直す
+  playhead=$("scrub").value/1000*S.dur*.9999; render(playhead); });
 addEventListener("keydown",e=>{ if(e.code==="Space"&&!/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)){ e.preventDefault(); playing=!playing; } });
 
 /* ---------- export ---------- */
@@ -793,9 +896,8 @@ $("png").onclick=()=>{
 $("rec").onclick=()=>{ recording ? finishRec() : startRec(); };
 const REC_FPS=30;
 async function startRec(){
-  const [OW,OH]=outSize(); const big=OW*OH>1920*1088;
-  const mimes=[big?"video/mp4;codecs=avc1.640033":"video/mp4;codecs=avc1.640028","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
-  const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
+  if(S.src==="video") return;
+  const mime=pickMime();
   if(!mime||!view.captureStream){ toast("この環境は動画録画に対応していません"); return; }
   let stream, rec, track; const chunks=[];
   const session={stop:false, wasPlaying:playing, head:playhead}; recording=session; playing=false;
@@ -830,10 +932,14 @@ async function startRec(){
     }
   }catch(err){ try{rec&&rec.state!=="inactive"&&rec.stop()}catch(e){} if(stream) stream.getTracks().forEach(t=>t.stop()); toast("録画を開始できませんでした"); }
   recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head;
-  $("rec").textContent="● 1ループ録画"; $("rec").classList.remove("rec");
+  $("rec").classList.remove("rec"); recLabel();
 }
 function finishRec(){ if(recording) recording.stop=true; }
-
+function pickMime(){
+  const [OW,OH]=outSize(); const big=OW*OH>1920*1088;
+  const mimes=[big?"video/mp4;codecs=avc1.640033":"video/mp4;codecs=avc1.640028","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+  return window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
+}
 /* ---------- boot ---------- */
 updateSrcUI(false); syncWeightUI();
 buildKeys(); buildStretchPlan();
