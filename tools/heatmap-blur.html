@@ -210,8 +210,9 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>ループ</span><input type="range" id="dur" min="1" max="12" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="sub">補間</div>
-      <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button><button data-v="fire">炎（ランダム）</button></div>
-      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「炎」はノイズで揺らぎながら下から上へ立ちのぼる動きで、点の位置は使いません。各点の熱さ（4点まとめて）は全体の熱さになり、高いほどぼける部分が増えます。</div>
+      <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button><button data-v="fire">ランダム</button></div>
+      <div id="rtypeRow" class="hide"><div class="sub">ランダムの種類</div><div class="chips" id="rtypes"></div></div>
+      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「ランダム」は点の位置を使わず、ノイズで不規則にぼける場所が変わります（炎・煙・陽炎・水面・チラつき・放射）。各点の熱さ（4点まとめて）は全体の熱さになり、高いほどぼける部分が増えます。</div>
     </section>
 
     <section>
@@ -277,6 +278,7 @@ details summary:hover{color:var(--text)}
 ================================================================== */
 
 /* ---------- presets ---------- */
+const RTYPES=[["fire","炎（上へ）"],["smoke","煙"],["haze","陽炎"],["water","水面"],["flicker","チラつき"],["radial","放射"]];
 const PALETTES = {
   "HEAT（動画）": [
     [0.00,"#000000"],[0.05,"#0d0317"],[0.11,"#1e0839"],[0.17,"#330e5e"],[0.23,"#4b1468"],[0.29,"#71205a"],
@@ -308,7 +310,7 @@ const DEFAULTS = {
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
-  dur:3, keys:3, ease:"ease",
+  dur:3, keys:3, ease:"ease", rtype:"fire",
   palette:"HEAT（動画）", stops:null, gain:1, gamma:1, phase:0, wrap:false,
   grain:0.16, gsize:1.2, gmove:true,
   size:"1920x1080", bg:"black", q:"0.5",
@@ -371,19 +373,47 @@ float lv(int k,vec2 uv){
 float hash(vec2 p){ p=fract(p*vec2(443.897,441.423)); p+=dot(p,p.yx+19.19); return fract((p.x+p.y)*p.x); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-uniform int u_flame; uniform float u_ft, u_T, u_vavg;
+uniform int u_flame, u_rtype; uniform float u_ft, u_T, u_vavg;
 // 炎モード：立ちのぼる・ねじれるノイズ。ループの継ぎ目は「1周前」とクロスフェードして消す
 float h3(vec3 p){ p=fract(p*vec3(.1031,.1030,.0973)); p+=dot(p,p.yxz+33.33); return fract((p.x+p.y)*p.z); }
 float vn3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
              mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
 float fbm3(vec3 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ s+=a*vn3(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s/.9375; }
+float ridge(float n){ return 1.-abs(2.*n-1.); }
+// ランダムの種類：0 炎 / 1 煙 / 2 陽炎 / 3 水面 / 4 チラつき / 5 放射
 float flameAt(vec2 uv,float t){
-  vec2 p=vec2(uv.x*u_aspect*1.9,uv.y*.95); p.y-=t*.85;               // 縦長の舌が上へ流れる
+  vec2 q=vec2(uv.x*u_aspect,uv.y);
+  if(u_rtype==1){ // 煙：大きくゆっくり渦を巻いて昇る
+    vec2 p=q*1.3; p.y-=t*.32;
+    vec2 w=vec2(fbm3(vec3(p*.9,t*.35)),fbm3(vec3(p*.9+vec2(3.1,7.7),t*.35)));
+    p+=(w-.5)*2.6;
+    return fbm3(vec3(p*1.1,t*.45)); }
+  if(u_rtype==2){ // 陽炎：横向きの揺らぎが細かく波打つ
+    vec2 p=q*vec2(1.2,2.6); p.y-=t*.25;
+    p.x+=sin(p.y*5.+t*5.)*.18+sin(p.y*11.-t*7.)*.07;
+    return fbm3(vec3(p.x*.9,p.y*2.2,t*1.6)); }
+  if(u_rtype==3){ // 水面：細い光の筋（コースティクス）がゆらめく
+    vec2 p=q*2.2+vec2(t*.18,t*.12);
+    vec2 w=vec2(fbm3(vec3(p*.8,t*.5)),fbm3(vec3(p*.8+5.,t*.5)));
+    float f=fbm3(vec3(p+(w-.5)*1.4,t*.7));
+    float r=clamp(1.-abs(f-.5)*5.,0.,1.);                              // ノイズが中間値をまたぐ所だけ＝細い筋
+    return pow(r,2.)*1.1; }
+  if(u_rtype==4){ // チラつき：横長のブロックが不規則に明滅
+    float fr=floor(t*12.+.5);                                         // ループの継ぎ目でコマ番号がずれないよう四捨五入
+    vec2 cell=floor(q*vec2(5.,16.)+vec2(h3(vec3(floor(q.y*16.),fr,7.))*3.,0.));
+    float n=h3(vec3(cell,fr)); float big=vn3(vec3(q*1.5,t*2.));
+    return mix(n,big,.45); }
+  if(u_rtype==5){ // 放射：中心から外へ波が広がる
+    vec2 d=q-vec2(.5*u_aspect,.5); float r=length(d), a=atan(d.y,d.x);
+    vec3 c=vec3(vec2(cos(a),sin(a))*1.6*smoothstep(0.,.32,r),r*4.2-t*1.5); // 中心では角度の影響を消してトゲを防ぐ
+    return fbm3(c+vec3(0,0,fbm3(vec3(d*2.,t*.4))*1.2)); }
+  // 炎：縦長の舌が揺らぎながら上へ流れる
+  vec2 p=vec2(q.x*1.9,q.y*.95); p.y-=t*.85;
   vec2 w=vec2(fbm3(vec3(p*1.1,t*.55)),fbm3(vec3(p*1.1+vec2(5.2,1.3),t*.55)));
-  p+=(w-.5)*vec2(1.1,1.8);                                            // ねじれ（ドメインワープ）
+  p+=(w-.5)*vec2(1.1,1.8);
   float n=fbm3(vec3(p*1.25,t*1.05));
-  n+=.22*(vn3(vec3(p*4.5,t*3.2))-.5);                                 // 細かいちらつき
+  n+=.22*(vn3(vec3(p*4.5,t*3.2))-.5);
   return n; }
 float flameMap(vec2 uv){
   float T=max(u_T,.1), t=mod(u_ft,T), w=t/T;
@@ -746,7 +776,7 @@ function render(t, q){
   gl.activeTexture(gl.TEXTURE0);
   gl.uniform1fv(P.u.u_sig,new Float32Array(LVSIG));
   const pts=pointsAt(t); gl.uniform2fv(P.u.u_pt,new Float32Array(pts.flat())); gl.uniform1fv(P.u.u_val,new Float32Array(S.vals));
-  gl.uniform1i(P.u.u_flame,S.ease==="fire"?1:0); gl.uniform1f(P.u.u_ft,t); gl.uniform1f(P.u.u_T,S.dur);
+  gl.uniform1i(P.u.u_flame,S.ease==="fire"?1:0); gl.uniform1i(P.u.u_rtype,RTYPES.findIndex(r=>r[0]===S.rtype)>=0?RTYPES.findIndex(r=>r[0]===S.rtype):0); gl.uniform1f(P.u.u_ft,t); gl.uniform1f(P.u.u_T,S.dur);
   gl.uniform1f(P.u.u_vavg,S.vals.reduce((a,b)=>a+b,0)/S.vals.length);
   gl.uniform1f(P.u.u_aspect,W/H); gl.uniform1f(P.u.u_pow,S.blend);
   gl.uniform1f(P.u.u_minB,S.minB); gl.uniform1f(P.u.u_maxB,Math.max(S.minB,S.maxB)); gl.uniform1f(P.u.u_curve,S.curve);
@@ -811,7 +841,13 @@ function bindSeg(id,key,after){
   set(); return set;
 }
 const setSrcSeg=bindSeg("srcSeg","src",()=>updateSrcUI(true));
-bindSeg("easeSeg","ease"); bindSeg("pdirSeg","pdir");
+bindSeg("easeSeg","ease",()=>$("rtypeRow").classList.toggle("hide",S.ease!=="fire")); bindSeg("pdirSeg","pdir");
+$("rtypeRow").classList.toggle("hide",S.ease!=="fire");
+function buildRtypes(){
+  $("rtypes").innerHTML=RTYPES.map(([k,n])=>`<button class="chip${S.rtype===k?" on":""}" data-k="${k}" style="padding:4px 11px">${n}</button>`).join("");
+  $("rtypes").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ S.rtype=b.dataset.k; buildRtypes(); changed("rtype"); });
+}
+buildRtypes();
 $("partial").checked=S.partial; $("partial").addEventListener("change",()=>{ S.partial=$("partial").checked; changed("partial"); });
 bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
