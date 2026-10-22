@@ -200,6 +200,7 @@ details summary:hover{color:var(--text)}
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード"></div>
       <div class="sub">各点の熱さ（白＝ぼける／黒＝シャープ）</div>
       <div class="pts" id="pts"></div>
+      <div class="prow"><span>4点まとめて</span><input type="range" id="valAll" min="0" max="1" step="0.01" aria-label="4点の熱さをまとめて"><span class="pv" id="valAllPv"></span></div>
       <div class="prow"><span>ブレンド</span><input type="range" id="blend" min="0.6" max="4" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>動く範囲</span><input type="range" id="spread" min="0" max="160" step="1"><span class="pv"></span></div>
     </section>
@@ -209,8 +210,9 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>ループ</span><input type="range" id="dur" min="1" max="12" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="sub">補間</div>
-      <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button></div>
-      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。</div>
+      <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button><button data-v="fire">ランダム</button></div>
+      <div id="rtypeRow" class="hide"><div class="sub">ランダムの種類</div><div class="chips" id="rtypes"></div></div>
+      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「ランダム」は点の位置を使わず、ノイズで不規則にぼける場所が変わります（炎・煙・陽炎・水面・チラつき・放射）。各点の熱さ（4点まとめて）は全体の熱さになり、高いほどぼける部分が増えます。</div>
     </section>
 
     <section>
@@ -276,11 +278,16 @@ details summary:hover{color:var(--text)}
 ================================================================== */
 
 /* ---------- presets ---------- */
+const RTYPES=[["fire","炎（上へ）"],["smoke","煙"],["haze","陽炎"],["water","水面"],["flicker","チラつき"],["radial","放射"]];
 const PALETTES = {
   "HEAT（動画）": [
     [0.00,"#000000"],[0.05,"#0d0317"],[0.11,"#1e0839"],[0.17,"#330e5e"],[0.23,"#4b1468"],[0.29,"#71205a"],
     [0.35,"#a4263a"],[0.41,"#d33412"],[0.48,"#ef6800"],[0.55,"#f9a50b"],[0.62,"#ffcf24"],[0.69,"#f5e42c"],
     [0.76,"#e6f34c"],[0.83,"#e0fb7c"],[0.90,"#ecfcb6"],[0.96,"#f6fbe4"],[1.00,"#fbfbf6"]],
+  // Thermal Flow のプリセット（空色・クリーム・オレンジ）を黒背景向けに組み直したもの
+  "U19": [[0,"#000000"],[0.06,"#04121c"],[0.14,"#0c3a57"],[0.23,"#2c86b4"],[0.32,"#54B6DF"],[0.42,"#a9d9de"],[0.52,"#F2EFC9"],[0.62,"#E6A06D"],[0.72,"#FF5A2A"],[0.86,"#FFA64A"],[1,"#FFD873"]],
+  "U19 ミラー": [[0,"#000000"],[0.05,"#061722"],[0.12,"#1a6a92"],[0.19,"#54B6DF"],[0.29,"#F2EFC9"],[0.41,"#E6A06D"],[0.48,"#FF5A2A"],[0.53,"#FFD873"],[0.58,"#FF5A2A"],[0.66,"#E6A06D"],[0.79,"#F2EFC9"],[0.91,"#54B6DF"],[1,"#89C9D3"]],
+  "U19 アイス": [[0,"#000000"],[0.07,"#160a05"],[0.16,"#5a1a0c"],[0.26,"#FF5A2A"],[0.36,"#E6A06D"],[0.47,"#F2EFC9"],[0.58,"#89C9D3"],[0.7,"#54B6DF"],[0.84,"#a9dcef"],[1,"#f4fbfd"]],
   "IRONBOW": [[0,"#000000"],[0.15,"#140a4a"],[0.32,"#5a0f8a"],[0.5,"#c4204d"],[0.66,"#f26a16"],[0.82,"#ffc83a"],[1,"#fffbe8"]],
   "THERMO": [[0,"#000000"],[0.12,"#0a0f5c"],[0.28,"#0060ff"],[0.44,"#00e0ff"],[0.58,"#30ff60"],[0.72,"#ffe600"],[0.86,"#ff3a00"],[1,"#ffffff"]],
   "ACID": [[0,"#000000"],[0.2,"#0b2410"],[0.42,"#1f7a2a"],[0.64,"#7bdc23"],[0.82,"#d9ff4a"],[1,"#f6ffe4"]],
@@ -303,7 +310,7 @@ const DEFAULTS = {
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
-  dur:3, keys:3, ease:"ease",
+  dur:3, keys:3, ease:"ease", rtype:"fire",
   palette:"HEAT（動画）", stops:null, gain:1, gamma:1, phase:0, wrap:false,
   grain:0.16, gsize:1.2, gmove:true,
   size:"1920x1080", bg:"black", q:"0.5",
@@ -366,10 +373,60 @@ float lv(int k,vec2 uv){
 float hash(vec2 p){ p=fract(p*vec2(443.897,441.423)); p+=dot(p,p.yx+19.19); return fract((p.x+p.y)*p.x); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-float blurMap(vec2 uv){
+uniform int u_flame, u_rtype; uniform float u_ft, u_T, u_vavg;
+// 炎モード：立ちのぼる・ねじれるノイズ。ループの継ぎ目は「1周前」とクロスフェードして消す
+float h3(vec3 p){ p=fract(p*vec3(.1031,.1030,.0973)); p+=dot(p,p.yxz+33.33); return fract((p.x+p.y)*p.z); }
+float vn3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
+float fbm3(vec3 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ s+=a*vn3(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s/.9375; }
+float ridge(float n){ return 1.-abs(2.*n-1.); }
+// ランダムの種類：0 炎 / 1 煙 / 2 陽炎 / 3 水面 / 4 チラつき / 5 放射
+float flameAt(vec2 uv,float t){
+  vec2 q=vec2(uv.x*u_aspect,uv.y);
+  if(u_rtype==1){ // 煙：大きくゆっくり渦を巻いて昇る
+    vec2 p=q*1.3; p.y-=t*.32;
+    vec2 w=vec2(fbm3(vec3(p*.9,t*.35)),fbm3(vec3(p*.9+vec2(3.1,7.7),t*.35)));
+    p+=(w-.5)*2.6;
+    return fbm3(vec3(p*1.1,t*.45)); }
+  if(u_rtype==2){ // 陽炎：横向きの揺らぎが細かく波打つ
+    vec2 p=q*vec2(1.2,2.6); p.y-=t*.25;
+    p.x+=sin(p.y*5.+t*5.)*.18+sin(p.y*11.-t*7.)*.07;
+    return fbm3(vec3(p.x*.9,p.y*2.2,t*1.6)); }
+  if(u_rtype==3){ // 水面：細い光の筋（コースティクス）がゆらめく
+    vec2 p=q*2.2+vec2(t*.18,t*.12);
+    vec2 w=vec2(fbm3(vec3(p*.8,t*.5)),fbm3(vec3(p*.8+5.,t*.5)));
+    float f=fbm3(vec3(p+(w-.5)*1.4,t*.7));
+    float r=clamp(1.-abs(f-.5)*5.,0.,1.);                              // ノイズが中間値をまたぐ所だけ＝細い筋
+    return pow(r,2.)*1.1; }
+  if(u_rtype==4){ // チラつき：横長のブロックが不規則に明滅
+    float fr=floor(t*12.+.5);                                         // ループの継ぎ目でコマ番号がずれないよう四捨五入
+    vec2 cell=floor(q*vec2(5.,16.)+vec2(h3(vec3(floor(q.y*16.),fr,7.))*3.,0.));
+    float n=h3(vec3(cell,fr)); float big=vn3(vec3(q*1.5,t*2.));
+    return mix(n,big,.45); }
+  if(u_rtype==5){ // 放射：中心から外へ波が広がる
+    vec2 d=q-vec2(.5*u_aspect,.5); float r=length(d), a=atan(d.y,d.x);
+    vec3 c=vec3(vec2(cos(a),sin(a))*1.6*smoothstep(0.,.32,r),r*4.2-t*1.5); // 中心では角度の影響を消してトゲを防ぐ
+    return fbm3(c+vec3(0,0,fbm3(vec3(d*2.,t*.4))*1.2)); }
+  // 炎：縦長の舌が揺らぎながら上へ流れる
+  vec2 p=vec2(q.x*1.9,q.y*.95); p.y-=t*.85;
+  vec2 w=vec2(fbm3(vec3(p*1.1,t*.55)),fbm3(vec3(p*1.1+vec2(5.2,1.3),t*.55)));
+  p+=(w-.5)*vec2(1.1,1.8);
+  float n=fbm3(vec3(p*1.25,t*1.05));
+  n+=.22*(vn3(vec3(p*4.5,t*3.2))-.5);
+  return n; }
+float flameMap(vec2 uv){
+  float T=max(u_T,.1), t=mod(u_ft,T), w=t/T;
+  float n=mix(flameAt(uv,t),flameAt(uv,t-T),w);
+  n=(n-.5)/sqrt(w*w+(1.-w)*(1.-w))+.5;                               // クロスフェードで薄まる分を戻す
+  n=smoothstep(.28,.72,n);
+  // 4点の熱さの平均＝全体の熱さ。値がそろっていても、そこを中心に必ず揺らぐ
+  return clamp(n+(u_vavg-.5)*1.1,0.,1.); }
+float pointMap(vec2 uv){
   vec2 p=vec2(uv.x*u_aspect,uv.y); float ws=0., vs=0.;
   for(int i=0;i<4;i++){ vec2 q=vec2(u_pt[i].x*u_aspect,u_pt[i].y); float w=1./pow(length(p-q)+.035,u_pow); ws+=w; vs+=w*u_val[i]; }
   return vs/ws; }
+float blurMap(vec2 uv){ return u_flame==1?flameMap(uv):pointMap(uv); }
 void main(){
   if(u_direct==1){ // 動画：グラデーションマップだけ（ブラー・グレインなし）
     float I=pow(clamp(texture(L0,v_uv).r*u_gain,0.,1.),u_gamma);
@@ -392,7 +449,7 @@ void main(){
   if(u_mode==1){ // ブラーマップ表示
     vec3 c=vec3(m*.82)+vec3(1.,.36,.12)*src*.55;
     vec2 p=vec2(v_uv.x*u_aspect,v_uv.y);
-    for(int i=0;i<4;i++){ float d=length(p-vec2(u_pt[i].x*u_aspect,u_pt[i].y))*u_res.y;
+    if(u_flame==0) for(int i=0;i<4;i++){ float d=length(p-vec2(u_pt[i].x*u_aspect,u_pt[i].y))*u_res.y;
       float ring=smoothstep(2.2,0.,abs(d-10.)); float dot_=smoothstep(4.5,3.,d);
       c=mix(c,vec3(1.,.36,.12),ring); c=mix(c,vec3(u_val[i]),dot_); }
     o=vec4(c,1.); return; }
@@ -691,7 +748,7 @@ function pointsAt(t){
       const p0=ks[(k-1+K)%K], p3=ks[(k+2)%K], f2=f*f, f3=f2*f;
       out.push([0,1].map(j=>.5*((2*a[j])+(-p0[j]+b[j])*f+(2*p0[j]-5*a[j]+4*b[j]-p3[j])*f2+(-p0[j]+3*a[j]-3*b[j]+p3[j])*f3)));
     } else {
-      const e=S.ease==="ease"? f*f*(3-2*f) : f; // AEのイージーイーズ(33%) = smoothstep
+      const e=S.ease==="linear"? f : f*f*(3-2*f); // AEのイージーイーズ(33%) = smoothstep
       out.push([a[0]+(b[0]-a[0])*e, a[1]+(b[1]-a[1])*e]);
     }
   }
@@ -719,6 +776,8 @@ function render(t, q){
   gl.activeTexture(gl.TEXTURE0);
   gl.uniform1fv(P.u.u_sig,new Float32Array(LVSIG));
   const pts=pointsAt(t); gl.uniform2fv(P.u.u_pt,new Float32Array(pts.flat())); gl.uniform1fv(P.u.u_val,new Float32Array(S.vals));
+  gl.uniform1i(P.u.u_flame,S.ease==="fire"?1:0); gl.uniform1i(P.u.u_rtype,RTYPES.findIndex(r=>r[0]===S.rtype)>=0?RTYPES.findIndex(r=>r[0]===S.rtype):0); gl.uniform1f(P.u.u_ft,t); gl.uniform1f(P.u.u_T,S.dur);
+  gl.uniform1f(P.u.u_vavg,S.vals.reduce((a,b)=>a+b,0)/S.vals.length);
   gl.uniform1f(P.u.u_aspect,W/H); gl.uniform1f(P.u.u_pow,S.blend);
   gl.uniform1f(P.u.u_minB,S.minB); gl.uniform1f(P.u.u_maxB,Math.max(S.minB,S.maxB)); gl.uniform1f(P.u.u_curve,S.curve);
   gl.uniform1f(P.u.u_gain,S.gain); gl.uniform1f(P.u.u_gamma,S.gamma); gl.uniform1f(P.u.u_phase,S.phase); gl.uniform1i(P.u.u_wrap,S.wrap?1:0);
@@ -766,6 +825,7 @@ function bindRange(id){
   el.addEventListener("input",()=>{ S[id]=parseFloat(el.value); if(pv) pv.textContent=fmt[id](S[id]); changed(id); });
 }
 function changed(id){
+  if(id==="fit"&&(S.src==="image"||S.src==="video")&&S.cover){ S.cover=false; $("cover").checked=false; updateSrcUI(); } // 「大きさ」を触ったら全面表示を解除
   if(SRC_KEYS.has(id)) dirtySrc=true;
   if(KEY_KEYS.has(id)) buildKeys();
   if(id==="text"||id==="sSteps"||id==="sSeed") buildStretchPlan();
@@ -781,7 +841,13 @@ function bindSeg(id,key,after){
   set(); return set;
 }
 const setSrcSeg=bindSeg("srcSeg","src",()=>updateSrcUI(true));
-bindSeg("easeSeg","ease"); bindSeg("pdirSeg","pdir");
+bindSeg("easeSeg","ease",()=>$("rtypeRow").classList.toggle("hide",S.ease!=="fire")); bindSeg("pdirSeg","pdir");
+$("rtypeRow").classList.toggle("hide",S.ease!=="fire");
+function buildRtypes(){
+  $("rtypes").innerHTML=RTYPES.map(([k,n])=>`<button class="chip${S.rtype===k?" on":""}" data-k="${k}" style="padding:4px 11px">${n}</button>`).join("");
+  $("rtypes").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ S.rtype=b.dataset.k; buildRtypes(); changed("rtype"); });
+}
+buildRtypes();
 $("partial").checked=S.partial; $("partial").addEventListener("change",()=>{ S.partial=$("partial").checked; changed("partial"); });
 bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
@@ -839,7 +905,7 @@ $("cover").checked=S.cover; $("cover").addEventListener("change",()=>{ S.cover=$
 $("imgUp").onclick=()=>$("fileImg").click();
 $("fileImg").addEventListener("change",e=>{
   const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); const img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
+  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.cover=false; $("cover").checked=false; /* 画像（ロゴ・SVGなど）は大きさを変えられる表示で始める */ S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
   img.onerror=()=>{ URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); }; img.src=url; e.target.value="";
 });
 let userImageAlpha=false;
@@ -864,7 +930,7 @@ $("fileVid").addEventListener("change",e=>{
     const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
     let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
     $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒）`;
-    S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
+    S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
     v.play().catch(()=>{});
     toast("動画を読み込みました"+note);
   };
@@ -874,8 +940,16 @@ $("fileVid").addEventListener("change",e=>{
 // blur map points
 function buildPts(){
   $("pts").innerHTML=S.vals.map((v,i)=>`<div class="pt"><span>点${i+1}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}" aria-label="点${i+1}の熱さ"><b>${Math.round(v*100)}</b></div>`).join("");
-  $("pts").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ S.vals[+el.dataset.i]=parseFloat(el.value); el.nextElementSibling.textContent=Math.round(el.value*100); changed("vals"); }));
+  $("pts").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ S.vals[+el.dataset.i]=parseFloat(el.value); el.nextElementSibling.textContent=Math.round(el.value*100); syncValAll(); changed("vals"); }));
+  syncValAll();
 }
+// 4点を同じ値にそろえて一度に動かす（その後も個別に調整できる）
+function syncValAll(){ const avg=S.vals.reduce((a,b)=>a+b,0)/S.vals.length; $("valAll").value=avg; $("valAllPv").textContent=Math.round(avg*100); }
+$("valAll").addEventListener("input",()=>{
+  const v=parseFloat($("valAll").value); S.vals=S.vals.map(()=>v);
+  $("pts").querySelectorAll("input").forEach(el=>{ el.value=v; el.nextElementSibling.textContent=Math.round(v*100); });
+  $("valAllPv").textContent=Math.round(v*100); changed("vals");
+});
 buildPts();
 $("seed").value=S.seed; $("seed").addEventListener("input",()=>{ S.seed=$("seed").value||"0"; changed("seed"); });
 $("dice").onclick=()=>{ S.seed=String(Math.floor(Math.random()*9000+1000)); $("seed").value=S.seed; changed("seed"); };
