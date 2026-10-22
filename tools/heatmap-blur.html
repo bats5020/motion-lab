@@ -67,7 +67,10 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 .chip i{width:26px;height:10px;border-radius:5px;display:block}
 .chip:hover{border-color:var(--line-hover);color:var(--text)}
 .chip.on{border-color:var(--accent);color:var(--text)}
-#ramp{height:16px;border-radius:4px;margin-top:10px;border:1px solid var(--line)}
+#ramp{position:relative;height:16px;border-radius:4px;margin-top:10px;border:1px solid var(--line)}
+#ramp .veil{position:absolute;top:-1px;bottom:-1px;left:-1px;border-radius:4px 0 0 4px;background:repeating-linear-gradient(135deg,rgba(10,10,12,.82) 0 4px,rgba(10,10,12,.62) 4px 8px);display:none;align-items:center;justify-content:center;color:var(--sub);font-size:9.5px;letter-spacing:.08em;white-space:nowrap;overflow:hidden}
+#ramp .veil.right{left:auto;right:-1px;border-radius:0 4px 4px 0}
+#ramp .mark{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--text);box-shadow:0 0 0 1px #000;display:none}
 details summary{cursor:pointer;color:var(--sub);font-size:10.5px;margin-top:8px;list-style:none;display:flex;align-items:center;gap:6px}
 details summary::-webkit-details-marker{display:none}
 details summary::before{content:"▸";color:var(--faint);transition:transform .15s}
@@ -213,7 +216,13 @@ details summary:hover{color:var(--text)}
     <section>
       <h2><span><b>06</b>カラー（Colorama）</span></h2>
       <div class="chips" id="presets"></div>
-      <div id="ramp"></div>
+      <div id="ramp"><i class="veil">元の色</i><b class="mark"></b></div>
+      <div id="partialBox" class="hide">
+        <div class="prow"><span>一部だけ</span><input type="checkbox" id="partial"><span style="flex:1;color:var(--faint);font-size:10px">しきい値の片側だけ色を置き換え、残りは元の動画の色</span></div>
+        <div class="prow"><span>かける側</span><div class="seg" id="pdirSeg" style="flex:1;margin:0"><button data-v="up">しきい値より上</button><button data-v="down">しきい値より下</button></div></div>
+        <div class="prow"><span>しきい値</span><input type="range" id="pth" min="0" max="1" step="0.01"><span class="pv"></span></div>
+        <div class="prow"><span>境目のぼかし</span><input type="range" id="pfe" min="0" max="0.3" step="0.005"><span class="pv"></span></div>
+      </div>
       <details id="stopBox"><summary>色を個別に編集</summary>
         <div id="stops"></div>
         <div class="btnrow"><button class="btn" id="addStop">＋ 色を追加</button><button class="btn" id="revStop">⇄ 反転</button></div>
@@ -290,7 +299,7 @@ const FONTS = [
 const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
-  fit:82, posy:0, cover:true, lo:0, hi:1,
+  fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
@@ -345,7 +354,8 @@ void main(){
 const NLV = 8;
 const FS_COMP = `#version 300 es
 precision highp float; in vec2 v_uv; out vec4 o;
-uniform sampler2D L0,L1,L2,L3,L4,L5,L6,L7; uniform sampler2D u_lut;
+uniform sampler2D L0,L1,L2,L3,L4,L5,L6,L7; uniform sampler2D u_lut, u_src;
+uniform int u_partial; uniform float u_pth, u_pfe, u_pdir;
 uniform float u_sig[${NLV}];
 uniform vec2 u_pt[4]; uniform float u_val[4]; uniform float u_aspect, u_pow;
 uniform float u_minB,u_maxB,u_curve, u_gain,u_gamma,u_phase; uniform int u_wrap;
@@ -365,6 +375,10 @@ void main(){
     float I=pow(clamp(texture(L0,v_uv).r*u_gain,0.,1.),u_gamma);
     float t=I+u_phase; t=(u_wrap==1)?fract(t):clamp(t,0.,1.);
     vec3 col=texture(u_lut,vec2(t*255./256.+.5/256.,.5)).rgb;
+    if(u_partial==1){ // しきい値の片側だけ配色、反対側は元の動画の色
+      float tc=clamp(I+u_phase,0.,1.); float k=smoothstep(u_pth-u_pfe-1e-4,u_pth+u_pfe+1e-4,tc); if(u_pdir<0.) k=1.-k;
+      col=mix(texture(u_src,v_uv).rgb,col,k);
+      if(u_alpha==1){ o=vec4(col,max(k*clamp(I*7.,0.,1.),1.-k)); return; } }
     if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(clamp(col/max(a,.0001),0.,1.),a); } else o=vec4(col,1.);
     return; }
   float m=blurMap(v_uv);
@@ -651,8 +665,16 @@ function buildLUT(){
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   const css=st.map(s=>`${s[1]} ${(s[0]*100).toFixed(1)}%`).join(","); document.getElementById("ramp").style.background=`linear-gradient(90deg,${css})`;
+  updateRampMark();
 }
 
+function updateRampMark(){
+  const r=document.getElementById("ramp"); if(!r) return; const on=S.src==="video"&&S.partial;
+  const veil=r.querySelector(".veil"), mark=r.querySelector(".mark"); const p=Math.round(S.pth*1000)/10;
+  veil.style.display=on?"flex":"none"; mark.style.display=on?"block":"none";
+  veil.classList.toggle("right",S.pdir==="down");
+  veil.style.width=(S.pdir==="down"?100-p:p)+"%"; mark.style.left=p+"%";
+}
 /* ---------- blur map animation (4-Color Gradient) ---------- */
 function rng(seed){ let h=2166136261>>>0; for(const ch of String(seed)) h=Math.imul(h^ch.charCodeAt(0),16777619); return ()=>{ h+=0x6D2B79F5; let t=h; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return((t^t>>>14)>>>0)/4294967296; }; }
 let KEYS=[];
@@ -692,6 +714,8 @@ function render(t, q){
   const names=["L0","L1","L2","L3","L4","L5","L6","L7"];
   for(let i=0;i<NLV;i++){ gl.activeTexture(gl.TEXTURE0+i); gl.bindTexture(gl.TEXTURE_2D,levels[i].t); gl.uniform1i(P.u[names[i]],i); }
   gl.activeTexture(gl.TEXTURE0+NLV); gl.bindTexture(gl.TEXTURE_2D,lutTex); gl.uniform1i(P.u.u_lut,NLV);
+  gl.activeTexture(gl.TEXTURE0+NLV+1); gl.bindTexture(gl.TEXTURE_2D,srcTex.t); gl.uniform1i(P.u.u_src,NLV+1);
+  gl.uniform1i(P.u.u_partial,S.src==="video"&&S.partial?1:0); gl.uniform1f(P.u.u_pth,S.pth); gl.uniform1f(P.u.u_pfe,S.pfe); gl.uniform1f(P.u.u_pdir,S.pdir==="down"?-1:1);
   gl.activeTexture(gl.TEXTURE0);
   gl.uniform1fv(P.u.u_sig,new Float32Array(LVSIG));
   const pts=pointsAt(t); gl.uniform2fv(P.u.u_pt,new Float32Array(pts.flat())); gl.uniform1fv(P.u.u_val,new Float32Array(S.vals));
@@ -731,7 +755,7 @@ function loop(now){
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
-const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2),
+const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
   dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
 const SRC_KEYS=new Set(["cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
@@ -747,6 +771,7 @@ function changed(id){
   if(id==="text"||id==="sSteps"||id==="sSeed") buildStretchPlan();
   if(SRC_KEYS.has(id)) lastSK="";
   if(id==="dur") playhead=Math.min(playhead,S.dur-1e-4);
+  if(id==="pth"||id==="pdir"||id==="partial") updateRampMark();
   save(); if(!playing) render(playhead);
 }
 Object.keys(fmt).forEach(bindRange);
@@ -756,7 +781,8 @@ function bindSeg(id,key,after){
   set(); return set;
 }
 const setSrcSeg=bindSeg("srcSeg","src",()=>updateSrcUI(true));
-bindSeg("easeSeg","ease");
+bindSeg("easeSeg","ease"); bindSeg("pdirSeg","pdir");
+$("partial").checked=S.partial; $("partial").addEventListener("change",()=>{ S.partial=$("partial").checked; changed("partial"); });
 bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
 $("sDice").onclick=()=>{
@@ -773,6 +799,7 @@ function updateSrcUI(fromUser){
   $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
   $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
   for(const id of ["secBlur","secMap","secAnim","secGrain"]) $(id).classList.toggle("hide",S.src==="video");
+  $("partialBox").classList.toggle("hide",S.src!=="video"); updateRampMark();
   if(fromUser&&S.src==="image"&&!userImage) $("fileImg").click();
   if(fromUser&&S.src==="video"&&!userVideo) $("fileVid").click();
   if(S.src!=="video"&&userVideo&&!userVideo.paused) userVideo.pause();
