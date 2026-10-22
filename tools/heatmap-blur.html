@@ -233,6 +233,9 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>露出</span><input type="range" id="gain" min="0.4" max="2.5" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>ガンマ</span><input type="range" id="gamma" min="0.3" max="3" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>位相</span><input type="range" id="phase" min="-1" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="sub">背景</div>
+      <div class="prow"><div class="seg" id="bgSeg" style="flex:1;margin:0"><button data-v="black">黒</button><button data-v="color">色</button><button data-v="alpha">透過</button></div><input type="color" id="bgColor" style="width:30px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--panel2);cursor:pointer" aria-label="背景色"></div>
+      <div class="hint" id="bgHint">「色」は配色の光を背景色の上に重ねます。透過は PNG 保存のみで、録画では黒になります。</div>
       <div class="prow"><span>周回</span><input type="checkbox" id="wrap"><span style="flex:1;color:var(--faint);font-size:10px">位相を回したとき色を一周させる</span></div>
     </section>
 
@@ -252,7 +255,6 @@ details summary:hover{color:var(--text)}
         <option value="1080x1350">1080 × 1350（4:5）</option>
         <option value="1080x1920">1080 × 1920（9:16）</option>
       </select></div>
-      <div class="prow"><span>背景</span><div class="seg" id="bgSeg" style="flex:1;margin:0"><button data-v="black">黒</button><button data-v="alpha">透過</button></div></div>
       <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
       <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn" id="rec">● 1ループ録画</button></div>
       <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
@@ -313,7 +315,7 @@ const DEFAULTS = {
   dur:3, keys:3, ease:"ease", rtype:"fire",
   palette:"HEAT（動画）", stops:null, gain:1, gamma:1, phase:0, wrap:false,
   grain:0.16, gsize:1.2, gmove:true,
-  size:"1920x1080", bg:"black", q:"0.5",
+  size:"1920x1080", bg:"black", bgColor:"#14183a", q:"0.5",
 };
 
 /* ---------- state ---------- */
@@ -366,7 +368,9 @@ uniform int u_partial; uniform float u_pth, u_pfe, u_pdir;
 uniform float u_sig[${NLV}];
 uniform vec2 u_pt[4]; uniform float u_val[4]; uniform float u_aspect, u_pow;
 uniform float u_minB,u_maxB,u_curve, u_gain,u_gamma,u_phase; uniform int u_wrap;
-uniform float u_grain,u_gsize,u_gseed; uniform vec2 u_res; uniform int u_mode, u_alpha, u_direct;
+uniform float u_grain,u_gsize,u_gseed; uniform vec2 u_res; uniform int u_mode, u_alpha, u_direct, u_bgon; uniform vec3 u_bgcol;
+// 背景色：配色は黒から立ち上がる＝光そのもの、として背景色の上に足す（縁のにじみが背景に溶ける）
+vec3 onBg(vec3 col,float I){ return u_bgon==1 ? col+u_bgcol*(1.-clamp(I*7.,0.,1.)) : col; }
 float lv(int k,vec2 uv){
   if(k==0) return texture(L0,uv).r; if(k==1) return texture(L1,uv).r; if(k==2) return texture(L2,uv).r; if(k==3) return texture(L3,uv).r;
   if(k==4) return texture(L4,uv).r; if(k==5) return texture(L5,uv).r; if(k==6) return texture(L6,uv).r; return texture(L7,uv).r; }
@@ -432,6 +436,7 @@ void main(){
     float I=pow(clamp(texture(L0,v_uv).r*u_gain,0.,1.),u_gamma);
     float t=I+u_phase; t=(u_wrap==1)?fract(t):clamp(t,0.,1.);
     vec3 col=texture(u_lut,vec2(t*255./256.+.5/256.,.5)).rgb;
+    if(u_alpha==0) col=onBg(col,I);
     if(u_partial==1){ // しきい値の片側だけ配色、反対側は元の動画の色
       float tc=clamp(I+u_phase,0.,1.); float k=smoothstep(u_pth-u_pfe-1e-4,u_pth+u_pfe+1e-4,tc); if(u_pdir<0.) k=1.-k;
       col=mix(texture(u_src,v_uv).rgb,col,k);
@@ -462,7 +467,7 @@ void main(){
   float t=I+u_phase; t=(u_wrap==1)?fract(t):clamp(t,0.,1.);
   vec3 col=texture(u_lut,vec2(t*255./256.+.5/256.,.5)).rgb;
   if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(col/max(a,.0001),a); o.rgb=clamp(o.rgb,0.,1.); }
-  else o=vec4(col,1.);
+  else o=vec4(clamp(onBg(col,I),0.,1.),1.);
 }`;
 function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
 function prog(fs){const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.bindAttribLocation(p,0,"p");gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
@@ -785,6 +790,7 @@ function render(t, q){
   gl.uniform1f(P.u.u_grain,S.grain); gl.uniform1f(P.u.u_gsize,S.gsize*(H/1080)); gl.uniform1f(P.u.u_gseed,S.gmove?(frame%997):0);
   gl.uniform1i(P.u.u_direct,S.src==="video"?1:0);
   gl.uniform2f(P.u.u_res,W,H); gl.uniform1i(P.u.u_mode,(S.showMap&&!recording)?1:0); gl.uniform1i(P.u.u_alpha,S.bg==="alpha"&&!recording?1:0);
+  gl.uniform1i(P.u.u_bgon,S.bg==="color"?1:0); gl.uniform3fv(P.u.u_bgcol,new Float32Array(hex2rgb(S.bgColor).map(v=>v/255)));
   gl.clearColor(0,0,0,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H); gl.clear(gl.COLOR_BUFFER_BIT);
   drawTo(null,W,H);
 }
@@ -857,7 +863,10 @@ $("sDice").onclick=()=>{
   for(let n=0;n<30;n++){ S.sSeed=String(Math.floor(Math.random()*9000+1000)); buildStretchPlan(); if(JSON.stringify(PLAN.steps)!==before) break; }
   changed("sSeed"); toast("伸ばす文字："+planLabel());
 };
-const setBg=bindSeg("bgSeg","bg",()=>view.classList.toggle("alpha",S.bg==="alpha"));
+const setBg=bindSeg("bgSeg","bg",()=>{ view.classList.toggle("alpha",S.bg==="alpha"); syncBgUI(); });
+function syncBgUI(){ $("bgColor").style.opacity=S.bg==="color"?1:.35; }
+$("bgColor").value=S.bgColor; syncBgUI();
+$("bgColor").addEventListener("input",()=>{ S.bgColor=$("bgColor").value; if(S.bg!=="color"){ S.bg="color"; setBg(); view.classList.remove("alpha"); syncBgUI(); } changed("bgColor"); });
 bindSeg("qSeg","q");
 function updateSrcUI(fromUser){
   const media=S.src==="image"||S.src==="video";
