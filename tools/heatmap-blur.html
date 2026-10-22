@@ -211,7 +211,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="sub">補間</div>
       <div class="seg" id="easeSeg"><button data-v="ease">イージーイーズ</button><button data-v="linear">リニア</button><button data-v="flow">なめらか</button><button data-v="fire">炎（ランダム）</button></div>
-      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「炎」はノイズで揺らぎながら下から上へ立ちのぼる動きで、点の位置は使わず、各点の熱さの最小〜最大の範囲でぼけ方が変わります。</div>
+      <div class="hint">動画の設定は 3秒・3キー・イージーイーズ（各キーで一瞬止まる）。「炎」はノイズで揺らぎながら下から上へ立ちのぼる動きで、点の位置は使いません。各点の熱さ（4点まとめて）は全体の熱さになり、高いほどぼける部分が増えます。</div>
     </section>
 
     <section>
@@ -371,7 +371,7 @@ float lv(int k,vec2 uv){
 float hash(vec2 p){ p=fract(p*vec2(443.897,441.423)); p+=dot(p,p.yx+19.19); return fract((p.x+p.y)*p.x); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-uniform int u_flame; uniform float u_ft, u_T, u_vmin, u_vmax;
+uniform int u_flame; uniform float u_ft, u_T, u_vavg;
 // 炎モード：立ちのぼる・ねじれるノイズ。ループの継ぎ目は「1周前」とクロスフェードして消す
 float h3(vec3 p){ p=fract(p*vec3(.1031,.1030,.0973)); p+=dot(p,p.yxz+33.33); return fract((p.x+p.y)*p.z); }
 float vn3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
@@ -390,7 +390,8 @@ float flameMap(vec2 uv){
   float n=mix(flameAt(uv,t),flameAt(uv,t-T),w);
   n=(n-.5)/sqrt(w*w+(1.-w)*(1.-w))+.5;                               // クロスフェードで薄まる分を戻す
   n=smoothstep(.28,.72,n);
-  return mix(u_vmin,u_vmax,n); }
+  // 4点の熱さの平均＝全体の熱さ。値がそろっていても、そこを中心に必ず揺らぐ
+  return clamp(n+(u_vavg-.5)*1.1,0.,1.); }
 float pointMap(vec2 uv){
   vec2 p=vec2(uv.x*u_aspect,uv.y); float ws=0., vs=0.;
   for(int i=0;i<4;i++){ vec2 q=vec2(u_pt[i].x*u_aspect,u_pt[i].y); float w=1./pow(length(p-q)+.035,u_pow); ws+=w; vs+=w*u_val[i]; }
@@ -746,7 +747,7 @@ function render(t, q){
   gl.uniform1fv(P.u.u_sig,new Float32Array(LVSIG));
   const pts=pointsAt(t); gl.uniform2fv(P.u.u_pt,new Float32Array(pts.flat())); gl.uniform1fv(P.u.u_val,new Float32Array(S.vals));
   gl.uniform1i(P.u.u_flame,S.ease==="fire"?1:0); gl.uniform1f(P.u.u_ft,t); gl.uniform1f(P.u.u_T,S.dur);
-  gl.uniform1f(P.u.u_vmin,Math.min(...S.vals)); gl.uniform1f(P.u.u_vmax,Math.max(...S.vals));
+  gl.uniform1f(P.u.u_vavg,S.vals.reduce((a,b)=>a+b,0)/S.vals.length);
   gl.uniform1f(P.u.u_aspect,W/H); gl.uniform1f(P.u.u_pow,S.blend);
   gl.uniform1f(P.u.u_minB,S.minB); gl.uniform1f(P.u.u_maxB,Math.max(S.minB,S.maxB)); gl.uniform1f(P.u.u_curve,S.curve);
   gl.uniform1f(P.u.u_gain,S.gain); gl.uniform1f(P.u.u_gamma,S.gamma); gl.uniform1f(P.u.u_phase,S.phase); gl.uniform1i(P.u.u_wrap,S.wrap?1:0);
