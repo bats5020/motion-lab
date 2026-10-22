@@ -168,6 +168,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>変化の長さ</span><input type="range" id="sTrans" min="0.05" max="0.5" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、ほかの文字を詰める</span></div>
       <div class="btnrow"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
+      <div class="prow"><span>伸びる順番</span><span id="sPlan" style="flex:1;color:var(--text);font-size:12px;letter-spacing:.06em"></span></div>
       <div class="hint">動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。</div>
     </section>
 
@@ -482,8 +483,10 @@ function buildStretchPlan(){
     }
     steps.push(pick); prev=new Set(pick);
   }
-  PLAN={count:glyphs.length,steps}; lastSK="";
+  PLAN={count:glyphs.length,steps,glyphs}; lastSK="";
+  const el=document.getElementById("sPlan"); if(el) el.textContent=planLabel();
 }
+function planLabel(){ return PLAN.steps.map(st=>st.map(i=>PLAN.glyphs[i].ch).join("・")||"—").join(" → "); }
 function stretchAt(t){
   const n=PLAN.count, v=new Array(n).fill(0);
   if(S.src!=="text"||S.sMode==="off"||!n) return v;
@@ -692,7 +695,12 @@ const setSrcSeg=bindSeg("srcSeg","src",updateSrcUI);
 bindSeg("easeSeg","ease");
 bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
 $("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
-$("sDice").onclick=()=>{ S.sSeed=String(Math.floor(Math.random()*9000+1000)); changed("sSeed"); };
+$("sDice").onclick=()=>{
+  // 前と違う組み合わせになるまで引き直す
+  const before=JSON.stringify(PLAN.steps);
+  for(let n=0;n<30;n++){ S.sSeed=String(Math.floor(Math.random()*9000+1000)); buildStretchPlan(); if(JSON.stringify(PLAN.steps)!==before) break; }
+  changed("sSeed"); toast("伸ばす文字："+planLabel());
+};
 const setBg=bindSeg("bgSeg","bg",()=>view.classList.toggle("alpha",S.bg==="alpha"));
 bindSeg("qSeg","q");
 function updateSrcUI(){
