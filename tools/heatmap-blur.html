@@ -771,6 +771,7 @@ function bindRange(id){
   el.addEventListener("input",()=>{ S[id]=parseFloat(el.value); if(pv) pv.textContent=fmt[id](S[id]); changed(id); });
 }
 function changed(id){
+  if(id==="fit"&&(S.src==="image"||S.src==="video")&&S.cover){ S.cover=false; $("cover").checked=false; updateSrcUI(); } // 「大きさ」を触ったら全面表示を解除
   if(SRC_KEYS.has(id)) dirtySrc=true;
   if(KEY_KEYS.has(id)) buildKeys();
   if(id==="text"||id==="sSteps"||id==="sSeed") buildStretchPlan();
@@ -844,7 +845,7 @@ $("cover").checked=S.cover; $("cover").addEventListener("change",()=>{ S.cover=$
 $("imgUp").onclick=()=>$("fileImg").click();
 $("fileImg").addEventListener("change",e=>{
   const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); const img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
+  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.cover=false; $("cover").checked=false; /* 画像（ロゴ・SVGなど）は大きさを変えられる表示で始める */ S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
   img.onerror=()=>{ URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); }; img.src=url; e.target.value="";
 });
 let userImageAlpha=false;
@@ -869,7 +870,7 @@ $("fileVid").addEventListener("change",e=>{
     const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
     let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
     $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒）`;
-    S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
+    S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
     v.play().catch(()=>{});
     toast("動画を読み込みました"+note);
   };
