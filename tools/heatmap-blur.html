@@ -1116,10 +1116,12 @@ $("scrub").addEventListener("input",()=>{
 $("kToggle").onclick=toggleKey; $("kPrev").onclick=()=>jumpKey(-1); $("kNext").onclick=()=>jumpKey(1);
 $("kEase").addEventListener("change",()=>{ const k=keyAt(playhead); if(!k) return; k.ease=$("kEase").value; lastKctl=""; save(); });
 $("kClear").onclick=()=>{ if(!S.kf.length) return toast("キーはありません"); S.kf=[]; drawMarks(); save(); toast("キーを全部消しました（今の値で固定されます）"); };
-addEventListener("keydown",e=>{ if(e.code==="KeyK"&&!e.metaKey&&!e.ctrlKey&&!/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)){ e.preventDefault(); toggleKey(); } });
+addEventListener("keydown",e=>{ if(e.code==="KeyK"&&!e.metaKey&&!e.ctrlKey&&!typing()){ e.preventDefault(); toggleKey(); } });
 document.addEventListener("pointerdown",e=>{ if(e.target.matches&&e.target.matches('#panel input[type=range]')) dragEl=e.target; },true);
 document.addEventListener("pointerup",()=>{ dragEl=null; },true);
-addEventListener("keydown",e=>{ if(e.code==="Space"&&!/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)){ e.preventDefault(); playing=!playing; } });
+// 文字入力中だけショートカットを止める（スライダー・シークバー・チェック直後は効く）
+const typing=()=>{ const el=document.activeElement; if(!el) return false; if(/TEXTAREA|SELECT/.test(el.tagName)) return true; return el.tagName==="INPUT"&&!["range","checkbox","button","color"].includes(el.type); };
+addEventListener("keydown",e=>{ if(e.code==="Space"&&!typing()){ e.preventDefault(); playing=!playing; } });
 
 /* ---------- export ---------- */
 function stamp(){ const d=new Date(); return d.toISOString().slice(0,19).replace(/[-:T]/g,""); }
