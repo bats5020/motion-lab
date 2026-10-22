@@ -292,6 +292,25 @@ const TOOLS = [
     }
   },
   {
+    cat:"motion", name:"Flame Transition",
+    desc:"サーモカラーの炎が画面を覆った瞬間に次のシーンへ切り替わるトランジション。渦・一方向・両側から、映像同士／ロゴ出し、MP4・WebM書き出し",
+    href:"tools/flame-transition.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ft-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9e6bff"/><stop offset=".3" stop-color="#c9f7b5"/><stop offset=".5" stop-color="#ffed4d"/><stop offset=".72" stop-color="#ff8c1a"/><stop offset="1" stop-color="#ff3312"/></linearGradient></defs><rect width="120" height="66" fill="#1a2430"/><g id="d"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"),NS="http://www.w3.org/2000/svg";
+      const cx=60,cy=33,arm=(o,col,wid)=>{
+        const out=[],inn=[];
+        for(let r=7;r<=95;r+=2){const t=o+1.5*Math.log(r)-0.02*r,w=wid*(0.25+r/95);
+          out.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);inn.push([cx+r*Math.cos(t+w),cy+r*Math.sin(t+w)]);}
+        const pts=out.concat(inn.reverse()).map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" ");
+        const pl=document.createElementNS(NS,"polygon");pl.setAttribute("points",pts);pl.setAttribute("fill",col);
+        pl.setAttribute("stroke","#7b3cf0");pl.setAttribute("stroke-width","1.2");pl.setAttribute("stroke-linejoin","round");g.appendChild(pl);
+      };
+      for(let k=0;k<3;k++)arm(k*2.094,"url(#ft-g)",1.25);
+      for(let k=0;k<3;k++)arm(k*2.094+0.55,"#ff3312",0.28);
+    }
+  },
+  {
     cat:"raster", name:"Effect Stack",
     desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応、ランダマイズ＋スタック刻印＋WebM録画",
     href:"tools/effect-stack.html",
