@@ -165,7 +165,7 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>最大ブラー</span><input type="range" id="maxB" min="0" max="160" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>カーブ</span><input type="range" id="curve" min="0.3" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>横流れ</span><input type="range" id="aniso" min="1" max="4" step="0.05"><span class="pv"></span></div>
-      <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて2.6）。</div>
+      <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて1.8）。</div>
     </section>
 
     <section>
@@ -266,7 +266,7 @@ const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
   fit:82, posy:0,
-  minB:3, maxB:40, curve:1.4, aniso:2.6,
+  minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
   dur:3, keys:3, ease:"ease",
   palette:"HEAT（動画）", stops:null, gain:1, gamma:1, phase:0, wrap:false,
@@ -342,9 +342,10 @@ void main(){
     o=vec4(c,1.); return; }
   I=clamp(I*u_gain,0.,1.); I=pow(I,u_gamma);
   // Add Grain：明部〜中間に乗る粒子（背景の黒は黒のまま）
-  vec2 gp=gl_FragCoord.xy/u_gsize;
-  float n=vnoise(gp+u_gseed*37.13)*.62+hash(gl_FragCoord.xy+u_gseed*91.7)*.38-.5;
-  I=clamp(I+n*u_grain*smoothstep(.12,.85,I),0.,1.);
+  // 粒は格子が出ないよう、セル内ランダム＋ピクセルノイズの混合。暗部〜中間はほぼ滑らかなまま
+  vec2 gp=gl_FragCoord.xy/u_gsize+u_gseed*vec2(37.13,11.71);
+  float n=mix(hash(floor(gp)),hash(gl_FragCoord.xy+u_gseed*91.7),.45)-.5;
+  I=clamp(I+n*u_grain*1.4*smoothstep(.5,.95,I),0.,1.);
   float t=I+u_phase; t=(u_wrap==1)?fract(t):clamp(t,0.,1.);
   vec3 col=texture(u_lut,vec2(t*255./256.+.5/256.,.5)).rgb;
   if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(col/max(a,.0001),a); o.rgb=clamp(o.rgb,0.,1.); }
