@@ -188,7 +188,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       </div>
 
       <div id="srcVideo" class="hide">
-        <button class="btn wide" id="vidUp">動画を読み込む（MP4 / WebM / MOV）</button>
+        <button class="btn wide" id="vidUp">動画を読み込む（MP4 / WebM / MOV・ロスレスMOV）</button>
         <div class="hint" id="vidInfo">動画にはグラデーションマップだけをかけます。明るさを「06 カラー」の配色に置き換えます。</div>
       </div>
 
@@ -812,6 +812,7 @@ function drawVideo(c,W,H,cx,cy,fit){
   const v=userVideo;
   if(!v) return placeholder(c,W,H,cx,cy,"動画を読み込んでください");
   if(v.readyState<2||!v.videoWidth) return placeholder(c,W,H,cx,cy,"動画を準備しています…");
+  if(v.isPngMov){ if(v.frame) drawMedia(c,W,H,cx,cy,fit,v.frame,v.videoWidth,v.videoHeight); return; }
   drawMedia(c,W,H,cx,cy,fit,v,v.videoWidth,v.videoHeight);
 }
 
@@ -1292,25 +1293,100 @@ function detectAlpha(img){
 }
 // video
 $("vidUp").onclick=()=>$("fileVid").click();
-$("fileVid").addEventListener("change",e=>{
+/* ---------- PNG の MOV（ロスレスMOV・AE の PNG 書き出し）を自前で再生 ----------
+   ブラウザの動画プレーヤーは PNG コーデックを再生できないので、MOV の目次（moov）を読み、
+   必要なコマの PNG だけをファイルから切り出して表示する（ファイル全体はメモリに読み込まない）。 */
+async function readBytes(file,off,len){ return new DataView(await file.slice(off,off+len).arrayBuffer()); }
+async function parsePngMov(file){
+  // 最上位の箱をたどって moov を探す（mdat の後ろにあることが多い）
+  let off=0, moov=null;
+  while(off+8<=file.size){
+    const h=await readBytes(file,off,16); let size=h.getUint32(0); const type=String.fromCharCode(h.getUint8(4),h.getUint8(5),h.getUint8(6),h.getUint8(7));
+    let hdr=8; if(size===1){ size=Number(h.getBigUint64(8)); hdr=16; } else if(size===0) size=file.size-off;
+    if(size<8) break;
+    if(type==="moov"){ moov=await readBytes(file,off+hdr,size-hdr); break; }
+    off+=size;
+  }
+  if(!moov) return null;
+  const kids=(dv,start,end)=>{ const out=[]; let p=start; while(p+8<=end){ let sz=dv.getUint32(p); const t=String.fromCharCode(dv.getUint8(p+4),dv.getUint8(p+5),dv.getUint8(p+6),dv.getUint8(p+7)); let hd=8; if(sz===1){ sz=Number(dv.getBigUint64(p+8)); hd=16; } if(sz<8||p+sz>end) break; out.push({t,s:p+hd,e:p+sz}); p+=sz; } return out; };
+  const find=(dv,box,path)=>{ let cur=[box]; for(const name of path){ const n=cur.flatMap(b=>kids(dv,b.s,b.e)).filter(k=>k.t===name); if(!n.length) return null; cur=n; } return cur; };
+  const root={s:0,e:moov.byteLength};
+  for(const trak of find(moov,root,["trak"])||[]){
+    const hd=find(moov,trak,["mdia","hdlr"]); if(!hd) continue;
+    const h0=hd[0].s; if(String.fromCharCode(...[8,9,10,11].map(i=>moov.getUint8(h0+i)))!=="vide") continue;
+    const md=find(moov,trak,["mdia","mdhd"])[0], mv=moov.getUint8(md.s);
+    const timescale=mv===1?moov.getUint32(md.s+20):moov.getUint32(md.s+12);
+    const stbl=find(moov,trak,["mdia","minf","stbl"])[0], box=n=>kids(moov,stbl.s,stbl.e).find(k=>k.t===n);
+    const stsd=box("stsd"); if(!stsd) continue;
+    const ent=stsd.s+8, codec=String.fromCharCode(...[4,5,6,7].map(i=>moov.getUint8(ent+i)));
+    if(codec!=="png ") return {codec};
+    const width=moov.getUint16(ent+32), height=moov.getUint16(ent+34);
+    const stsz=box("stsz"), fixed=moov.getUint32(stsz.s+4), count=moov.getUint32(stsz.s+8);
+    const sizes=new Array(count); for(let i=0;i<count;i++) sizes[i]=fixed||moov.getUint32(stsz.s+12+i*4);
+    const co=box("stco")||box("co64"), is64=co.t==="co64", nch=moov.getUint32(co.s+4), chunks=new Array(nch);
+    for(let i=0;i<nch;i++) chunks[i]=is64?Number(moov.getBigUint64(co.s+8+i*8)):moov.getUint32(co.s+8+i*4);
+    const stsc=box("stsc"), nsc=moov.getUint32(stsc.s+4), map=[]; for(let i=0;i<nsc;i++){ const o=stsc.s+8+i*12; map.push([moov.getUint32(o),moov.getUint32(o+4)]); }
+    const offsets=new Array(count); let si=0;
+    for(let c=0;c<nch&&si<count;c++){ let per=1; for(const [first,n] of map) if(c+1>=first) per=n; let o=chunks[c]; for(let k=0;k<per&&si<count;k++){ offsets[si]=o; o+=sizes[si]; si++; } }
+    const stts=box("stts"), nts=moov.getUint32(stts.s+4), times=new Array(count); let t=0, ti=0;
+    for(let i=0;i<nts;i++){ const n=moov.getUint32(stts.s+8+i*8), d=moov.getUint32(stts.s+12+i*8); for(let k=0;k<n&&ti<count;k++){ times[ti++]=t/timescale; t+=d; } }
+    return {codec, width, height, count, offsets, sizes, times, duration:t/timescale, fps:count/(t/timescale||1)};
+  }
+  return null;
+}
+// <video> と同じように扱えるプレーヤー（再生・停止・シーク・ループ）
+function makePngMovPlayer(file,info){
+  const P={isPngMov:true, readyState:4, videoWidth:info.width, videoHeight:info.height, duration:info.duration, loop:true, paused:true, ended:false, frame:null,
+    _t:0, _start:0, _idx:-1, _want:-1, _busy:false, _ls:{}};
+  const idxAt=t=>{ const T=info.times; let lo=0, hi=T.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(T[m]<=t+1e-6) lo=m; else hi=m-1; } return lo; };
+  const emit=n=>(P._ls[n]||[]).forEach(f=>f());
+  const pump=async()=>{
+    if(P._busy||P._want===P._idx||P._want<0) return; P._busy=true; const i=P._want;
+    try{ const bmp=await createImageBitmap(file.slice(info.offsets[i],info.offsets[i]+info.sizes[i],"image/png")); if(P.frame&&P.frame.close) P.frame.close(); P.frame=bmp; P._idx=i; videoDirty=true; }catch(e){ P._idx=i; }
+    P._busy=false; if(P._want!==P._idx) pump();
+  };
+  const clock=()=>{ if(P.paused) return P._t; let t=P._t+(performance.now()-P._start)/1000;
+    if(t>=P.duration){ if(P.loop){ t%=P.duration; } else { t=P.duration; P.paused=true; P.ended=true; P._t=t; emit("ended"); } } return t; };
+  Object.defineProperty(P,"currentTime",{ get(){ const t=clock(); P._want=idxAt(t); pump(); return info.times[P._want]; },
+    set(v){ P._t=Math.min(Math.max(0,v),P.duration); P._start=performance.now(); P.ended=false; P._want=idxAt(P._t); pump(); setTimeout(()=>emit("seeked"),0); } });
+  P.play=()=>{ if(P.paused){ if(P.ended){ P._t=0; P.ended=false; } P._start=performance.now(); P.paused=false; } return Promise.resolve(); };
+  P.pause=()=>{ if(!P.paused){ P._t=clock(); P.paused=true; } };
+  P.addEventListener=(n,f,o)=>{ (P._ls[n]||(P._ls[n]=[])).push(o&&o.once?function g(){ P._ls[n]=P._ls[n].filter(x=>x!==g); f(); }:f); };
+  P.removeAttribute=()=>{}; P.load=()=>{ if(P.frame&&P.frame.close) P.frame.close(); P.frame=null; };
+  P._want=0; pump();
+  return P;
+}
+function adoptVideo(v,file,url){
+  if(userVideo){ userVideo.pause(); userVideo.removeAttribute("src"); userVideo.load(); }
+  if(userVideoURL) URL.revokeObjectURL(userVideoURL);
+  userVideo=v; userVideoURL=url;
+  v.addEventListener("seeked",()=>{ videoDirty=true; });
+  // 出力サイズを動画の縦横比に一番近いものへ
+  const ar=v.videoWidth/v.videoHeight, opts=[["1920x1080",16/9],["1080x1080",1],["1080x1350",4/5],["1080x1920",9/16]];
+  const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
+  let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
+  $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒${v.isPngMov?"・ロスレスMOV":""}）`;
+  S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
+  v.play().catch(()=>{});
+  toast("動画を読み込みました"+note);
+}
+$("fileVid").addEventListener("change",async e=>{
   const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  $("vidInfo").textContent=`${file.name} を読み込んでいます…`;
+  // MOV なら中身を確認し、PNG（ロスレスMOV）なら自前のプレーヤーで開く
+  if(/\.mov$/i.test(file.name)||file.type==="video/quicktime"){
+    try{
+      const info=await parsePngMov(file);
+      if(info&&info.codec==="png "&&info.count){ adoptVideo(makePngMovPlayer(file,info),file,null); return; }
+    }catch(err){ console.warn(err); }
+  }
   const url=URL.createObjectURL(file); const v=document.createElement("video");
   v.muted=true; v.playsInline=true; v.loop=true; v.preload="auto";
-  v.onloadeddata=()=>{
-    if(userVideo){ userVideo.pause(); userVideo.removeAttribute("src"); userVideo.load(); }
-    if(userVideoURL) URL.revokeObjectURL(userVideoURL);
-    userVideo=v; userVideoURL=url;
-    v.addEventListener("seeked",()=>{ videoDirty=true; });
-    // 出力サイズを動画の縦横比に一番近いものへ
-    const ar=v.videoWidth/v.videoHeight, opts=[["1920x1080",16/9],["1080x1080",1],["1080x1350",4/5],["1080x1920",9/16]];
-    const best=opts.reduce((a,b)=>Math.abs(Math.log(b[1]/ar))<Math.abs(Math.log(a[1]/ar))?b:a)[0];
-    let note=""; if(S.size!==best&&S.size!=="3840x2160"){ S.size=best; $("size").value=best; meta(); note="・出力サイズを "+best.replace("x","×")+" に合わせました"; }
-    $("vidInfo").textContent=`${file.name}（${v.videoWidth}×${v.videoHeight}・${v.duration.toFixed(1)}秒）`;
-    S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); videoDirty=true;
-    v.play().catch(()=>{});
-    toast("動画を読み込みました"+note);
-  };
-  v.onerror=()=>{ URL.revokeObjectURL(url); toast("この動画は再生できません（ブラウザが対応していない形式です）"); };
+  let done=false;
+  const fail=msg=>{ if(done) return; done=true; URL.revokeObjectURL(url); $("vidInfo").textContent="動画にはグラデーションマップだけをかけます。"; toast(msg); };
+  const guard=setTimeout(()=>fail("この動画はブラウザで再生できない形式です（MP4・WebM、またはこのツールのロスレスMOVを使ってください）"),12000);
+  v.onloadeddata=()=>{ if(done) return; done=true; clearTimeout(guard); adoptVideo(v,file,url); };
+  v.onerror=()=>{ clearTimeout(guard); fail("この動画はブラウザで再生できない形式です（MP4・WebM、またはこのツールのロスレスMOVを使ってください）"); };
   v.src=url;
 });
 // layout
