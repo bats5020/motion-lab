@@ -159,8 +159,20 @@ details summary:hover{color:var(--text)}
       <div class="prow"><span>位置 Y</span><input type="range" id="posy" min="-50" max="50" step="1"><span class="pv"></span></div>
     </section>
 
+    <section id="secStretch">
+      <h2><span><b>02</b>文字ストレッチ</span></h2>
+      <div class="seg" id="sModeSeg"><button data-v="seq">動画風（順番に）</button><button data-v="wave">ウェーブ</button><button data-v="off">オフ</button></div>
+      <div class="prow"><span>伸ばし方</span><div class="seg" id="sMethodSeg" style="flex:1;margin:0"><button data-v="split">中央を伸ばす</button><button data-v="scale">横に拡大</button></div></div>
+      <div class="prow"><span>伸び量</span><input type="range" id="sAmount" min="0" max="3" step="0.05"><span class="pv"></span></div>
+      <div class="prow"><span>切り替え回数</span><input type="range" id="sSteps" min="1" max="8" step="1"><span class="pv"></span></div>
+      <div class="prow"><span>変化の長さ</span><input type="range" id="sTrans" min="0.05" max="0.5" step="0.01"><span class="pv"></span></div>
+      <div class="prow"><span>行幅を保つ</span><input type="checkbox" id="sKeep"><span style="flex:1;color:var(--faint);font-size:10px">伸びた分、ほかの文字を詰める</span></div>
+      <div class="btnrow"><button class="btn" id="sDice">⚄ 伸ばす文字を選び直す</button></div>
+      <div class="hint">動画と同じく、1ループの中で 1文字 → 2文字（上下の行から1つずつ）→ 1文字… と順に伸びます。中央を伸ばすと、カーブはそのままで横線だけが長くなります。</div>
+    </section>
+
     <section>
-      <h2><span><b>02</b>ブラー</span></h2>
+      <h2><span><b>03</b>ブラー</span></h2>
       <div class="prow"><span>最小ブラー</span><input type="range" id="minB" min="0" max="60" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>最大ブラー</span><input type="range" id="maxB" min="0" max="160" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>カーブ</span><input type="range" id="curve" min="0.3" max="3" step="0.05"><span class="pv"></span></div>
@@ -169,7 +181,7 @@ details summary:hover{color:var(--text)}
     </section>
 
     <section>
-      <h2><span><b>03</b>ブラーマップ（模様の動き）</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="showMap" style="accent-color:var(--accent)">マップ表示</label></h2>
+      <h2><span><b>04</b>ブラーマップ（模様の動き）</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="showMap" style="accent-color:var(--accent)">マップ表示</label></h2>
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード"></div>
       <div class="sub">各点の熱さ（白＝ぼける／黒＝シャープ）</div>
       <div class="pts" id="pts"></div>
@@ -178,7 +190,7 @@ details summary:hover{color:var(--text)}
     </section>
 
     <section>
-      <h2><span><b>04</b>アニメーション</span></h2>
+      <h2><span><b>05</b>アニメーション</span></h2>
       <div class="prow"><span>ループ</span><input type="range" id="dur" min="1" max="12" step="0.5"><span class="pv"></span></div>
       <div class="prow"><span>キー数</span><input type="range" id="keys" min="1" max="8" step="1"><span class="pv"></span></div>
       <div class="sub">補間</div>
@@ -187,7 +199,7 @@ details summary:hover{color:var(--text)}
     </section>
 
     <section>
-      <h2><span><b>05</b>カラー（Colorama）</span></h2>
+      <h2><span><b>06</b>カラー（Colorama）</span></h2>
       <div class="chips" id="presets"></div>
       <div id="ramp"></div>
       <details id="stopBox"><summary>色を個別に編集</summary>
@@ -202,14 +214,14 @@ details summary:hover{color:var(--text)}
     </section>
 
     <section>
-      <h2><span><b>06</b>グレイン</span></h2>
+      <h2><span><b>07</b>グレイン</span></h2>
       <div class="prow"><span>量</span><input type="range" id="grain" min="0" max="0.8" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>粒の大きさ</span><input type="range" id="gsize" min="1" max="6" step="0.1"><span class="pv"></span></div>
       <div class="prow"><span>動かす</span><input type="checkbox" id="gmove"></div>
     </section>
 
     <section>
-      <h2><span><b>07</b>書き出し</span></h2>
+      <h2><span><b>08</b>書き出し</span></h2>
       <div class="prow"><span>サイズ</span><select id="size">
         <option value="1920x1080">1920 × 1080（16:9）</option>
         <option value="3840x2160">3840 × 2160（4K）</option>
@@ -266,6 +278,7 @@ const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
   fit:82, posy:0,
+  sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11",
   minB:3, maxB:32, curve:1.8, aniso:1.8,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
   dur:3, keys:3, ease:"ease",
@@ -392,21 +405,94 @@ function drawSource(W,H){
   else if(S.src==="pattern") drawPattern(c,W,H,cx,cy,fit);
   else if(S.src==="image") drawImage(c,W,H,cx,cy,fit);
 }
+function textLines(){ return (S.text||" ").split("\n").map(x=>x.trimEnd()).filter((x,i,a)=>x.length||a.length===1); }
+const glyphCache=new Map();
+function glyphRaster(ch,fs,stretchKw,sx,scale,inkL,inkR,gH,baseY,pad){
+  const key=[ch,fs,sx.toFixed(4),scale.toFixed(5),gH].join("|");
+  let g=glyphCache.get(key); if(g) return g;
+  if(glyphCache.size>400) glyphCache.clear();
+  const ox0=pad-inkL*sx*scale; const w=Math.max(1,Math.ceil((inkR-inkL)*sx*scale)+pad*2);
+  const cv=document.createElement("canvas"); cv.width=w; cv.height=gH;
+  const x=cv.getContext("2d"); x.font=fs; try{x.fontStretch=stretchKw}catch(e){} x.letterSpacing="0px"; x.textAlign="left"; x.textBaseline="alphabetic"; x.fillStyle="#fff";
+  x.translate(ox0,baseY); x.scale(sx,1); x.fillText(ch,0,0);
+  g={cv,ox0,split:Math.round(ox0+(inkL+inkR)/2*sx*scale),inkLpx:pad}; glyphCache.set(key,g); return g;
+}
 function drawText(c,W,H,cx,cy,fit){
-  const f=fontDef(); const lines=(S.text||" ").split("\n").map(s=>s.trimEnd()).filter((s,i,a)=>s.length||a.length===1);
+  const f=fontDef(); const lines=textLines();
   const base=200; c.font=fontStr(f,base); try{c.fontStretch=f.stretch||"normal"}catch(e){} c.letterSpacing=(S.track/100*base)+"px";
-  c.textAlign="center"; c.textBaseline="alphabetic"; c.fontKerning="normal";
+  c.textAlign="left"; c.textBaseline="alphabetic"; c.fontKerning="normal";
   const sx=S.stretch/100*(f.wide||1);
-  let maxW=1; let asc=base*.72, desc=0;
-  for(const l of lines){ const m=c.measureText(l); maxW=Math.max(maxW,(m.actualBoundingBoxRight+m.actualBoundingBoxLeft)*sx); asc=Math.max(asc,m.actualBoundingBoxAscent); desc=Math.max(desc,m.actualBoundingBoxDescent); }
+  // 行ごとにグリフの位置（カーニング・字間込み）と字面を測る
+  let maxW=1, asc=base*.72, desc=0; const L=[];
+  for(const l of lines){
+    const gl=[]; let acc="";
+    for(const ch of [...l]){ const x=c.measureText(acc).width; acc+=ch; const m=c.measureText(ch); gl.push({ch,x,inkL:-m.actualBoundingBoxLeft,inkR:m.actualBoundingBoxRight}); }
+    const m=c.measureText(l); const left=-m.actualBoundingBoxLeft, right=m.actualBoundingBoxRight;
+    L.push({gl,left,right}); maxW=Math.max(maxW,(right-left)*sx); asc=Math.max(asc,m.actualBoundingBoxAscent); desc=Math.max(desc,m.actualBoundingBoxDescent);
+  }
   const capH=asc; const lead=capH*S.lead/100*1.18;
   const blockH=capH+(lines.length-1)*lead;
   const scale=Math.min(W*fit/maxW, H*fit*.92/blockH);
-  c.save(); c.translate(cx,cy); c.scale(scale,scale);
-  c.transform(1,0,-Math.tan(S.skew*Math.PI/180),1,0,0);
-  let y=-blockH/2+capH;
-  for(const l of lines){ c.save(); c.translate(0,y); c.scale(sx,1); c.fillText(l,0,0); c.restore(); y+=lead; }
+  const fsPx=fontStr(f,base*scale), stretchKw=f.stretch||"normal";
+  const pad=Math.ceil(base*scale*.3), gH=Math.ceil((asc+desc)*scale)+pad*2, baseY=pad+Math.ceil(asc*scale);
+  const amt=S.sAmount*capH*scale;
+  c.save(); c.translate(cx,cy); c.transform(1,0,-Math.tan(S.skew*Math.PI/180),1,0,0);
+  let y=-blockH/2+capH, gi=0;
+  for(const line of L){
+    const natW=Math.max(1,(line.right-line.left)*sx*scale);
+    const ex=line.gl.map((g,i)=>(curStretch[gi+i]||0)*amt); const exT=ex.reduce((a,b)=>a+b,0);
+    const lc=document.createElement("canvas"); lc.width=Math.ceil(natW+exT)+pad*2; lc.height=gH;
+    const lx=lc.getContext("2d"); let off=0;
+    line.gl.forEach((g,i)=>{
+      if(!g.ch.trim()) { off+=ex[i]; return; }
+      const r=glyphRaster(g.ch,fsPx,stretchKw,sx,scale,g.inkL,g.inkR,gH,baseY,pad);
+      const gx=pad+(g.x-line.left)*sx*scale+off-r.ox0; const e=ex[i];
+      if(e<.05) lx.drawImage(r.cv,gx,0);
+      else if(S.sMethod==="scale"){ const iw=Math.max(1,(g.inkR-g.inkL)*sx*scale); lx.save(); lx.translate(gx+r.inkLpx,0); lx.scale((iw+e)/iw,1); lx.drawImage(r.cv,-r.inkLpx,0); lx.restore(); }
+      else { // 中央の1列を引き伸ばして左右を離す（カーブは保ったまま横線が伸びる）
+        const k=r.split, w=r.cv.width;
+        lx.drawImage(r.cv,0,0,k,gH,gx,0,k,gH);
+        lx.drawImage(r.cv,k,0,w-k,gH,gx+k+e,0,w-k,gH);
+        lx.drawImage(r.cv,k-1,0,2,gH,gx+k-1.5,0,e+3,gH); // 継ぎ目が出ないよう左右に重ねる
+      }
+      off+=e;
+    });
+    gi+=line.gl.length;
+    const kx=S.sKeep?natW/(natW+exT):1;
+    c.save(); c.translate(0,y*scale); c.scale(kx,1); c.drawImage(lc,-(natW+exT)/2-pad,-baseY); c.restore();
+    y+=lead;
+  }
   c.restore();
+}
+
+/* ---------- 文字ストレッチの段取り ---------- */
+let curStretch=[], lastSK="", PLAN={count:0,steps:[]};
+function stretchable(ch){ return ch.trim() && !/[Iil1|.,:;'"!?\-ー・、。「」]/.test(ch); }
+function buildStretchPlan(){
+  const lines=textLines(); const glyphs=[]; lines.forEach((l,li)=>[...l].forEach(ch=>glyphs.push({li,ch})));
+  const r=rng(S.sSeed+"/stretch"); const elig=glyphs.map((g,i)=>stretchable(g.ch)?i:-1).filter(i=>i>=0);
+  const steps=[]; let prev=new Set();
+  for(let k=0;k<S.sSteps;k++){
+    const n=(k%3===1&&lines.length>1)?2:1; // 1文字 → 2文字 → 1文字 …（動画のリズム）
+    const pool=elig.filter(i=>!prev.has(i)); const pick=[];
+    while(pick.length<n&&pool.length){
+      let cand=pool;
+      if(pick.length===1){ const o=pool.filter(i=>glyphs[i].li!==glyphs[pick[0]].li); if(o.length) cand=o; }
+      const g=cand[Math.floor(r()*cand.length)]; pick.push(g); pool.splice(pool.indexOf(g),1);
+    }
+    steps.push(pick); prev=new Set(pick);
+  }
+  PLAN={count:glyphs.length,steps}; lastSK="";
+}
+function stretchAt(t){
+  const n=PLAN.count, v=new Array(n).fill(0);
+  if(S.src!=="text"||S.sMode==="off"||!n) return v;
+  const u=(((t%S.dur)+S.dur)%S.dur)/S.dur, ease=x=>x*x*(3-2*x);
+  if(S.sMode==="wave"){ const w=Math.min(.9,Math.max(.1,S.sTrans*2.2)); for(let i=0;i<n;i++){ const p=((u-i/n)%1+1)%1; if(p<w){ const q=Math.sin(Math.PI*p/w); v[i]=q*q; } } return v; }
+  const K=Math.max(1,S.sSteps), x=u*K, k=Math.floor(x)%K, f=x-Math.floor(x), tr=S.sTrans;
+  const env=f<tr?ease(f/tr):f>1-tr?ease((1-f)/tr):1; // 立ち上がり → 保持 → 戻り
+  for(const i of PLAN.steps[k]||[]) v[i]=env;
+  return v;
 }
 function drawFlame(c,W,H,cx,cy,fit){
   // オリジナルの炎シンボル（外炎＋内側の抜き）
@@ -546,6 +632,8 @@ function render(t, q){
   const W=Math.round(OW*qq), H=Math.round(OH*qq);
   if(view.width!==W||view.height!==H){ view.width=W; view.height=H; }
   if(W!==RW||H!==RH){ ensureTargets(W,H); dirtySrc=true; }
+  const sv=stretchAt(t), sk=sv.map(x=>x.toFixed(3)).join(",");
+  if(sk!==lastSK){ lastSK=sk; curStretch=sv; dirtySrc=true; }
   if(dirtySrc){ rebuildLevels(); dirtySrc=false; }
   if(dirtyLUT){ buildLUT(); dirtyLUT=false; }
   const P=P_COMP; gl.useProgram(P.p);
@@ -578,8 +666,8 @@ const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v,
   minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
-  dur:v=>(+v).toFixed(1)+"s", keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+  dur:v=>(+v).toFixed(1)+"s", sAmount:v=>"×"+(+v).toFixed(2), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
+const SRC_KEYS=new Set(["sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -589,6 +677,8 @@ function bindRange(id){
 function changed(id){
   if(SRC_KEYS.has(id)) dirtySrc=true;
   if(KEY_KEYS.has(id)) buildKeys();
+  if(id==="text"||id==="sSteps"||id==="sSeed") buildStretchPlan();
+  if(SRC_KEYS.has(id)) lastSK="";
   if(id==="dur") playhead=Math.min(playhead,S.dur-1e-4);
   save(); if(!playing) render(playhead);
 }
@@ -600,10 +690,13 @@ function bindSeg(id,key,after){
 }
 const setSrcSeg=bindSeg("srcSeg","src",updateSrcUI);
 bindSeg("easeSeg","ease");
+bindSeg("sModeSeg","sMode"); bindSeg("sMethodSeg","sMethod");
+$("sKeep").checked=S.sKeep; $("sKeep").addEventListener("change",()=>{ S.sKeep=$("sKeep").checked; changed("sKeep"); });
+$("sDice").onclick=()=>{ S.sSeed=String(Math.floor(Math.random()*9000+1000)); changed("sSeed"); };
 const setBg=bindSeg("bgSeg","bg",()=>view.classList.toggle("alpha",S.bg==="alpha"));
 bindSeg("qSeg","q");
 function updateSrcUI(){
-  $("srcText").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern"); $("srcImage").classList.toggle("hide",S.src!=="image");
+  $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",S.src!=="text"); $("srcPattern").classList.toggle("hide",S.src!=="pattern"); $("srcImage").classList.toggle("hide",S.src!=="image");
   if(S.src==="image"&&!userImage) $("fileImg").click();
 }
 // text
@@ -719,7 +812,7 @@ function finishRec(){ if(recording) recording.stop=true; }
 
 /* ---------- boot ---------- */
 updateSrcUI();
-buildKeys();
+buildKeys(); buildStretchPlan();
 function meta(){ const [w,h]=outSize(); $("meta").textContent=`${w}×${h} · ${HALF?"16bit":"8bit"}`; }
 meta(); $("size").addEventListener("change",meta);
 document.fonts.ready.then(()=>{ fontsThen(); });
