@@ -200,6 +200,7 @@ details summary:hover{color:var(--text)}
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード"></div>
       <div class="sub">各点の熱さ（白＝ぼける／黒＝シャープ）</div>
       <div class="pts" id="pts"></div>
+      <div class="prow"><span>4点まとめて</span><input type="range" id="valAll" min="0" max="1" step="0.01" aria-label="4点の熱さをまとめて"><span class="pv" id="valAllPv"></span></div>
       <div class="prow"><span>ブレンド</span><input type="range" id="blend" min="0.6" max="4" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>動く範囲</span><input type="range" id="spread" min="0" max="160" step="1"><span class="pv"></span></div>
     </section>
@@ -874,8 +875,16 @@ $("fileVid").addEventListener("change",e=>{
 // blur map points
 function buildPts(){
   $("pts").innerHTML=S.vals.map((v,i)=>`<div class="pt"><span>点${i+1}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}" aria-label="点${i+1}の熱さ"><b>${Math.round(v*100)}</b></div>`).join("");
-  $("pts").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ S.vals[+el.dataset.i]=parseFloat(el.value); el.nextElementSibling.textContent=Math.round(el.value*100); changed("vals"); }));
+  $("pts").querySelectorAll("input").forEach(el=>el.addEventListener("input",()=>{ S.vals[+el.dataset.i]=parseFloat(el.value); el.nextElementSibling.textContent=Math.round(el.value*100); syncValAll(); changed("vals"); }));
+  syncValAll();
 }
+// 4点を同じ値にそろえて一度に動かす（その後も個別に調整できる）
+function syncValAll(){ const avg=S.vals.reduce((a,b)=>a+b,0)/S.vals.length; $("valAll").value=avg; $("valAllPv").textContent=Math.round(avg*100); }
+$("valAll").addEventListener("input",()=>{
+  const v=parseFloat($("valAll").value); S.vals=S.vals.map(()=>v);
+  $("pts").querySelectorAll("input").forEach(el=>{ el.value=v; el.nextElementSibling.textContent=Math.round(v*100); });
+  $("valAllPv").textContent=Math.round(v*100); changed("vals");
+});
 buildPts();
 $("seed").value=S.seed; $("seed").addEventListener("input",()=>{ S.seed=$("seed").value||"0"; changed("seed"); });
 $("dice").onclick=()=>{ S.seed=String(Math.floor(Math.random()*9000+1000)); $("seed").value=S.seed; changed("seed"); };
