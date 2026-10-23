@@ -35,7 +35,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [Warp Type](tools/warp-type.html) | motion | テキストをノイズで歪ませるジェネレーター。プリセット・PNG／WebM書き出し |
 | [U19 Aberration](tools/u19-aberration.html) | motion | ロゴ・テキスト輪郭のサーモグロー。背景合成・ループWebM書き出し |
 | [U19 Tile Scroll](tools/u19-tile-scroll.html) | motion | FigmaのHUDの組みで流れるU19ロゴタイルの帯でシーンA→Bをつなぐトランジション。ワイプの向き（初期値は右下→左上）・境目（サーモ色の液体＝MSI 2024の入り方／ブロック／列ごと／直線）、タイルの流れの緩急（スピードカーブ）、流れの位置と色の反転をAEと同じ感覚で打てるキーフレーム（自動で打ってから消す・動かすことも可）、サーモの配色（Heatmap Blurと同じ13種）、配色・角度・モーションブラー。AE風タイムライン、タイルだけの透過レイヤー、連番PNG（ZIP）／ロスレスMOV／MP4書き出し（[設計メモ](docs/u19-tile-scroll.md)） |
-| [U19 HUD Sequence](tools/u19-hud-sequence.html) | motion | U19 ECSのHUDが立ち上がり、中央の線から角丸の映像ウィンドウが開くオープニング。中の映像だけ差し替え（選択／プレビューにドロップ、16:9以外は窓に合わせてトリミング）、1920×1080・30fps のMP4（H.264・WebCodecs）をコマ送りで書き出し。尺は HUD 3.4秒＋映像＋0.5秒 |
+| [U19 HUD Sequence](tools/u19-hud-sequence.html) | motion | U19 ECSのHUDが立ち上がり、中央の線から角丸の映像ウィンドウが開くオープニング。中の映像だけ差し替え（選択／プレビューにドロップ、16:9以外は窓に合わせてトリミング）、1920×1080・30fps のMP4（H.264・WebCodecs）をコマ送りで書き出し。始まり方は「オープニングあり」（尺＝HUD 3.4秒＋映像＋0.5秒）／「HUDのみ」（最初から窓が開いた状態、尺＝映像の長さ） |
 | [Flame Transition](tools/flame-transition.html) | motion | サーモカラーの炎で画面を覆ってシーンA→Bへ切り替えるトランジション（WebGL）。渦・一方向・両側から、映像同士／ロゴ出し、U19系の配色、タイムライン、炎だけの透過レイヤー、ロスレスMOV／MP4（[設計メモ](docs/flame-transition.md)） |
 | [Wireframe](tools/wireframe.html) | motion | ジオメトリックなワイヤーフレーム系モーショングラフィック |
 
