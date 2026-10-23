@@ -198,7 +198,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
       <div class="prow"><span>炎の腕の本数</span><input type="range" id="arms" min="1" max="7" step="1"><span class="pv"></span></div>
       <div class="prow"><span>縁の太さ</span><input type="range" id="rim" min="0.2" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>背景の歪み</span><input type="range" id="warp" min="0" max="1" step="0.01"><span class="pv"></span></div>
-      <div class="hint">シャッフルで炎の形（ノイズ）だけが変わります。背景の歪みは0%で後ろのシーンを歪ませず、上げると渦でねじれ・押し出し・熱のゆらぎが乗ります。</div>
+      <div class="sub">切り替え後</div>
+      <div class="prow"><span>炎が引く時間</span><input type="range" id="exitDur" min="0.3" max="2" step="0.05"><span class="pv"></span></div>
+      <div class="prow"><span>残り火・煙</span><input type="range" id="ember" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="prow"><span>残る長さ</span><input type="range" id="linger" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="hint">炎が引く時間を下げると切り替え後すぐに炎が消えます。残り火・煙はロゴのときの煙と残り火、映像のときは炎の跡のサーモ色の濃さ。0%でなし。<br>シャッフルで炎の形（ノイズ）だけが変わります。背景の歪みは0%で後ろのシーンを歪ませず、上げると渦でねじれ・押し出し・熱のゆらぎが乗ります。</div>
     </section>
 
     <section>
@@ -265,6 +269,7 @@ const DEFAULTS={
   holdA:.7, trans:1.25, holdB:1.1, cut:.42,
   mode:0, angle:90, exit:0,
   seed:"370", swirl:1, arms:3, rim:1, warp:0,
+  exitDur:1, ember:.5, linger:.5,
   palette:"Thermal", gain:1, gamma:1, phase:0, wrap:false,
   grain:0, gsize:1.2, gmove:true,
   out:"scene", size:"1920x1080", q:"0.5", loop:true,
@@ -394,7 +399,7 @@ const isVideo=sc=>sc.media&&sc.media.tagName==="VIDEO";
 let thumbTick=0;
 function drawScene(key){
   const sc=scenes[key], c=sc.cv.getContext("2d"), w=sc.cv.width, h=sc.cv.height;
-  if(!sc.media){ c.drawImage(sampleCv[key],0,0,w,h); }
+  if(!sc.media){ c.fillStyle="#000"; c.fillRect(0,0,w,h); c.drawImage(sampleCv[key],0,0,w,h); }
   else{
     const el=sc.media, iw=el.videoWidth||el.naturalWidth, ih=el.videoHeight||el.naturalHeight;
     c.fillStyle="#000"; c.fillRect(0,0,w,h);
@@ -489,7 +494,8 @@ uniform float uT, uTime, uSwirl, uArms, uRim, uSeed, uCut;
 uniform vec3 uPal[16]; uniform float uPos[16]; uniform int uN; uniform float uLo;
 uniform int uMode, uExit, uMat; uniform vec2 uDir;
 uniform float uWarp;
-uniform float uGain,uGamma,uPhase,uGrain,uGsize,uGseed; uniform int uWrap,uAlpha;   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
+uniform float uGain,uGamma,uPhase,uGrain,uGsize,uGseed; uniform int uWrap,uAlpha;
+uniform float uEmber,uLinger,uExitDur;   // 切り替え後：残り火・煙の量／残る長さ／炎が引く時間   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
 
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
 vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
@@ -618,18 +624,19 @@ void main(){
     float kk=(uT-uCut)/(1.-uCut);
     float settle=pow(1.-kk,3.);
     bool logo=uMat==1;
+    float fadeEnd=mix(.3,1.,uLinger), fadeStart=fadeEnd*.55;   // 残り火・煙・熱の跡が消える区間
     float spin=-3.0*uSwirl-kk*.8*uSwirl;
     Fld f=field(p,spin,-1.2-uTime*.3);
     float range=max(f.gmax-f.gmin,.5);
     float e, h;
     if(uExit==0){
       // burn away in place (opens where the flames arrived last)
-      e=clamp(kk/(logo?.2:.5),0.,1.); e=1.-pow(1.-e,2.);
+      e=clamp(kk/((logo?.2:.5)*uExitDur),0.,1.); e=1.-pow(1.-e,2.);
       float d0=f.reach*f.arm+.14*f.n+.6*(f.gmax-f.g)/range;
       h=d0-mix(-.2,1.6,e);
     } else {
       // keep travelling and leave the frame
-      e=clamp(kk/.5,0.,1.); e=1.-pow(1.-e,2.);
+      e=clamp(kk/(.5*uExitDur),0.,1.); e=1.-pow(1.-e,2.);
       float tail=mix(f.gmin-.25,f.gmax+f.reach+.15,e);
       h=f.g-tail+f.reach*(1.-f.arm)+.14*f.n;
     }
@@ -649,7 +656,7 @@ void main(){
     pb=mix(p,pb,uWarp);
     // footage: heat haze and thermal colour right behind the retreating edge, cooling to the real image
     float behind=exp(min(dist,0.)/.16)*(1.-m);
-    float cool=logo?0.:behind*(1.-smoothstep(.55,1.,kk));
+    float cool=logo?0.:behind*min(1.,uEmber*1.67)*(1.-smoothstep(fadeStart,fadeEnd,kk));
     vec2 hzB=vec2(snoise(vec3(p*5.,uTime*2.5+uSeed)),snoise(vec3(p*5.+7.,uTime*2.5-uSeed)));
     pb+=hzB*.018*(cool+(logo?0.:.3*settle))*uWarp;
     vec3 sb=texture(uB,pb/asp+.5).rgb;
@@ -671,11 +678,11 @@ void main(){
       float w2=1.-abs(snoise(vec3(qs*3.6+3.,uTime*.5+uSeed*1.7)));
       w=max(w,pow(w2,12.)*.55);
       w*=smoothstep(-.25,.3,fbm(vec3(qs*.9,uSeed+uTime*.15)));
-      float amt=smoothstep(0.,.22,kk)*(1.-smoothstep(.62,1.,kk));
+      float amt=smoothstep(0.,.22*fadeEnd,kk)*(1.-smoothstep(fadeStart,fadeEnd,kk))*uEmber;
       vec3 smoke=mix(violet*.9,thermal(.33),smoothstep(.55,1.,w));
       base=mix(base,smoke,clamp(w*1.1,0.,1.)*amt*(1.-pres)*.85);
       float pv=.5+.5*fbm(vec3(qs*2.3,uSeed*1.3+uTime*.45));
-      float thrP=mix(.42,.95,smoothstep(0.,.95,kk));
+      float thrP=mix(mix(.95,.42,uEmber),1.02,smoothstep(0.,fadeEnd,kk));
       float pm=smoothstep(thrP,thrP+.015,pv)*pres;
       base=mix(base,thermal(.08+.62*smoothstep(thrP+.01,thrP+.16,pv)),pm);
       base=mix(base,thermal(.2+.42*w),clamp(w*1.6,0.,1.)*amt*pres);
@@ -702,7 +709,7 @@ gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 { const loc=gl.getAttribLocation(prog,"aPos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0); }
 const U={}; ["uA","uB","uRes","uT","uTime","uSwirl","uArms","uRim","uSeed","uCut","uPal","uPos","uN","uLo","uMode","uExit","uMat","uDir","uWarp",
-  "uGain","uGamma","uPhase","uWrap","uGrain","uGsize","uGseed","uAlpha"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+  "uGain","uGamma","uPhase","uWrap","uGrain","uGsize","uGseed","uAlpha","uEmber","uLinger","uExitDur"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 function mkTex(unit){ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); return t; }
@@ -736,6 +743,7 @@ function render(clock,q,alphaMode){
   gl.uniform2f(U.uRes,w,h); gl.uniform1f(U.uT,t); gl.uniform1f(U.uTime,t*FLAME_T);
   gl.uniform1f(U.uSwirl,S.swirl); gl.uniform1f(U.uArms,S.arms); gl.uniform1f(U.uRim,S.rim); gl.uniform1f(U.uSeed,seedNum(S.seed)); gl.uniform1f(U.uCut,S.cut);
   gl.uniform1i(U.uMode,S.mode); gl.uniform1i(U.uExit,S.exit); gl.uniform1i(U.uMat,S.matB==="logo"?1:0); gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad)); gl.uniform1f(U.uWarp,S.warp);
+  gl.uniform1f(U.uEmber,S.ember); gl.uniform1f(U.uLinger,S.linger); gl.uniform1f(U.uExitDur,S.exitDur);
   gl.uniform1f(U.uGain,S.gain); gl.uniform1f(U.uGamma,S.gamma); gl.uniform1f(U.uPhase,S.phase); gl.uniform1i(U.uWrap,S.wrap?1:0);
   gl.uniform1f(U.uGrain,S.grain); gl.uniform1f(U.uGsize,S.gsize*(h/1080)); gl.uniform1f(U.uGseed,S.gmove?Math.floor(clock*FPS)%997:0);
   gl.uniform1i(U.uAlpha,alphaMode!=null?alphaMode:(S.out==="alpha"?1:0));
@@ -809,6 +817,7 @@ function loop(now){
 const fmt={
   holdA:v=>(+v).toFixed(2)+"s", trans:v=>(+v).toFixed(2)+"s", holdB:v=>(+v).toFixed(2)+"s", cut:v=>Math.round(v*100)+"%",
   angle:v=>v+"°", swirl:v=>(+v).toFixed(2), arms:v=>String(v), rim:v=>(+v).toFixed(2), warp:v=>Math.round(v*100)+"%",
+  exitDur:v=>Math.round(v*100)+"%", ember:v=>Math.round(v*100)+"%", linger:v=>Math.round(v*100)+"%",
   gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1),
 };
 const TIMING=new Set(["holdA","trans","holdB","cut"]);
