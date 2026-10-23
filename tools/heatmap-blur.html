@@ -198,12 +198,12 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div id="srcVideo" class="hide">
         <button class="btn wide" id="vidUp">動画を読み込む（MP4 / WebM / MOV・ロスレスMOV）</button>
         <div class="hint" id="vidInfo">動画の明るさを「06 カラー」の配色に置き換えます。</div>
-        <div class="sub">動画にかける効果</div>
-        <div class="seg" id="vfxSeg"><button data-v="map">グラデーションマップだけ</button><button data-v="heat">ブラー＋グレインも</button></div>
-        <div class="hint" id="vfxHint"></div>
       </div>
 
       <div id="srcMedia" class="hide">
+        <div class="sub">かける効果</div>
+        <div class="seg" id="vfxSeg"><button data-v="map">グラデーションマップだけ</button><button data-v="heat">ブラー＋グレインも</button></div>
+        <div class="hint" id="vfxHint"></div>
         <div class="prow"><span>画面を埋める</span><input type="checkbox" id="cover"><span style="flex:1;color:var(--faint);font-size:10px">はみ出す分をトリミング</span></div>
         <div class="prow"><span>反転</span><input type="checkbox" id="invert"></div>
         <div class="prow"><span>黒レベル</span><input type="range" id="lo" min="0" max="0.95" step="0.01"><span class="pv"></span></div>
@@ -271,7 +271,7 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="chips" id="presets"></div>
       <div id="ramp"><i class="veil">元の色</i><b class="mark"></b></div>
       <div id="partialBox" class="hide">
-        <div class="prow"><span>一部だけ</span><input type="checkbox" id="partial"><span style="flex:1;color:var(--faint);font-size:10px">しきい値の片側だけ色を置き換え、残りは元の動画の色</span></div>
+        <div class="prow"><span>一部だけ</span><input type="checkbox" id="partial"><span style="flex:1;color:var(--faint);font-size:10px">しきい値の片側だけ色を置き換え、残りは元の画像・動画の色</span></div>
         <div class="prow"><span>かける側</span><div class="seg" id="pdirSeg" style="flex:1;margin:0"><button data-v="up">しきい値より上</button><button data-v="down">しきい値より下</button></div></div>
         <div class="prow"><span>しきい値</span><input type="range" id="pth" min="0" max="1" step="0.01"><span class="pv"></span></div>
         <div class="prow"><span>境目のぼかし</span><input type="range" id="pfe" min="0" max="0.3" step="0.005"><span class="pv"></span></div>
@@ -379,7 +379,7 @@ const FONTS = [
 const DEFAULTS = {
   src:"text", text:"AFTER\nGLOW", font:"archivo", weight:800, stretch:128, track:0, lead:84, skew:0,
   pattern:"stripes", pdens:12, pthick:42, pangle:0, invert:false,
-  vfx:"map", layoutPreset:"u19-qualifier", layout:null, adobeKit:"yhz3hqi",
+  vfx:"map", ivfx:"heat", layoutPreset:"u19-qualifier", layout:null, adobeKit:"yhz3hqi",
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
   minB:3, maxB:32, curve:1.8, aniso:1.8, szAdapt:1,
@@ -535,8 +535,8 @@ void main(){
     if(u_alpha==0) col=onBg(col,I);
     if(u_partial==1){ // しきい値の片側だけ配色、反対側は元の動画の色
       float tc=clamp(I+u_phase,0.,1.); float k=smoothstep(u_pth-u_pfe-1e-4,u_pth+u_pfe+1e-4,tc); if(u_pdir<0.) k=1.-k;
-      col=mix(texture(u_src,v_uv).rgb,col,k);
-      if(u_alpha==1){ o=vec4(col,max(k*clamp(I*7.,0.,1.),1.-k)); return; } }
+      vec4 sc=texture(u_src,v_uv); col=mix(sc.rgb,col,k);
+      if(u_alpha==1){ o=vec4(col,max(k*clamp(I*7.,0.,1.),(1.-k)*sc.a)); return; } }
     if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(clamp(col/max(a,.0001),0.,1.),a); } else o=vec4(col,1.);
     return; }
   float m=blurMap(v_uv);
@@ -566,8 +566,8 @@ void main(){
   if(u_partial==1){ // 動画＋ブラー：ぼけた明るさで「熱い側」を決め、反対側はくっきりした元の動画の色
     if(u_alpha==0) col=onBg(col,I);
     float tc=clamp(I+u_phase,0.,1.); float kk=smoothstep(u_pth-u_pfe-1e-4,u_pth+u_pfe+1e-4,tc); if(u_pdir<0.) kk=1.-kk;
-    col=mix(texture(u_src,v_uv).rgb,col,kk);
-    if(u_alpha==1){ float a=max(kk*clamp(I*7.,0.,1.),1.-kk); o=vec4(clamp(col,0.,1.),a); } else o=vec4(clamp(col,0.,1.),1.);
+    vec4 sc=texture(u_src,v_uv); col=mix(sc.rgb,col,kk);
+    if(u_alpha==1){ float a=max(kk*clamp(I*7.,0.,1.),(1.-kk)*sc.a); o=vec4(clamp(col,0.,1.),a); } else o=vec4(clamp(col,0.,1.),1.);
     return; }
   if(u_alpha==1){ float a=clamp(I*7.,0.,1.); o=vec4(col/max(a,.0001),a); o.rgb=clamp(o.rgb,0.,1.); }
   else o=vec4(clamp(onBg(col,I),0.,1.),1.);
@@ -904,7 +904,7 @@ function rebuildLevels(){
     gl.bindTexture(gl.TEXTURE_2D,g1.t); gl.uniform2f(P_BLUR.u.u_step,0,1/H); drawTo(g2,W,H);
     gl.useProgram(P_THRESH.p); gl.uniform1i(P_THRESH.u.u_t,0); gl.uniform1f(P_THRESH.u.u_c,.5-.16*curTrackEnv); gl.bindTexture(gl.TEXTURE_2D,g2.t); drawTo(maskTex,W,H);
   }
-  if(S.src==="video"&&S.vfx!=="heat"){ // グラデーションマップだけのときはブラーを使わないので、マスクだけ作って終わり
+  if(mapOnly()){ // グラデーションマップだけのときはブラーを使わないので、マスクだけ作って終わり
     levels=new Array(NLV).fill(maskTex); LVSIG=[0]; for(let k=1;k<NLV;k++) LVSIG.push(SIG1*Math.pow(2,k-1)); return; }
   // mip chain
   gl.useProgram(P_DOWN.p); gl.uniform1i(P_DOWN.u.u_t,0); gl.activeTexture(gl.TEXTURE0);
@@ -942,8 +942,12 @@ function buildLUT(){
   updateRampMark();
 }
 
+// 画像・動画：「グラデーションマップだけ」か「ブラー＋グレインも」か（画像と動画で別々に覚える。画像の既定はブラーあり）
+const isMedia=()=>S.src==="image"||S.src==="video";
+const vfxKey=()=>S.src==="image"?"ivfx":"vfx";
+const mapOnly=()=>isMedia()&&S[vfxKey()]!=="heat";
 function updateRampMark(){
-  const r=document.getElementById("ramp"); if(!r) return; const on=S.src==="video"&&S.partial;
+  const r=document.getElementById("ramp"); if(!r) return; const on=isMedia()&&S.partial;
   const veil=r.querySelector(".veil"), mark=r.querySelector(".mark"); const p=Math.round(S.pth*1000)/10;
   veil.style.display=on?"flex":"none"; mark.style.display=on?"block":"none";
   veil.classList.toggle("right",S.pdir==="down");
@@ -992,7 +996,7 @@ function render(t, q){
   gl.activeTexture(gl.TEXTURE0+NLV); gl.bindTexture(gl.TEXTURE_2D,lutTex); gl.uniform1i(P.u.u_lut,NLV);
   gl.activeTexture(gl.TEXTURE0+NLV+1); gl.bindTexture(gl.TEXTURE_2D,srcTex.t); gl.uniform1i(P.u.u_src,NLV+1);
   gl.activeTexture(gl.TEXTURE0+NLV+2); gl.bindTexture(gl.TEXTURE_2D,szmTex); gl.uniform1i(P.u.u_szm,NLV+2);
-  gl.uniform1i(P.u.u_partial,S.src==="video"&&S.partial?1:0); gl.uniform1f(P.u.u_pth,S.pth); gl.uniform1f(P.u.u_pfe,S.pfe); gl.uniform1f(P.u.u_pdir,S.pdir==="down"?-1:1);
+  gl.uniform1i(P.u.u_partial,isMedia()&&S.partial?1:0); gl.uniform1f(P.u.u_pth,S.pth); gl.uniform1f(P.u.u_pfe,S.pfe); gl.uniform1f(P.u.u_pdir,S.pdir==="down"?-1:1);
   gl.activeTexture(gl.TEXTURE0);
   gl.uniform1fv(P.u.u_sig,new Float32Array(LVSIG));
   const pts=pointsAt(t); gl.uniform2fv(P.u.u_pt,new Float32Array(pts.flat())); gl.uniform1fv(P.u.u_val,new Float32Array(S.vals));
@@ -1003,7 +1007,7 @@ function render(t, q){
   gl.uniform1f(P.u.u_gain,S.gain); gl.uniform1f(P.u.u_gamma,S.gamma); gl.uniform1f(P.u.u_phase,S.phase); gl.uniform1i(P.u.u_wrap,S.wrap?1:0);
   const fps=30; const frame=Math.floor(t*fps);
   gl.uniform1f(P.u.u_grain,S.grain); gl.uniform1f(P.u.u_gsize,S.gsize*(H/1080)); gl.uniform1f(P.u.u_gseed,S.gmove?(frame%997):0);
-  gl.uniform1i(P.u.u_direct,S.src==="video"&&S.vfx!=="heat"?1:0);
+  gl.uniform1i(P.u.u_direct,mapOnly()?1:0);
   gl.uniform2f(P.u.u_res,W,H); gl.uniform1i(P.u.u_mode,(S.showMap&&!recording)?1:0); gl.uniform1i(P.u.u_alpha,S.bg==="alpha"&&(!recording||recording.alpha)?1:0);
   gl.uniform1i(P.u.u_bgon,S.bg==="color"?1:0); gl.uniform3fv(P.u.u_bgcol,new Float32Array(hex2rgb(S.bgColor).map(v=>v/255)));
   gl.clearColor(0,0,0,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -1229,7 +1233,7 @@ async function importPresets(file){
 function syncAllUI(){
   for(const id of Object.keys(fmt)){ const el=$(id); if(!el) continue; el.value=S[id]; const pv=el.parentElement.querySelector(".pv"); if(pv) pv.textContent=fmt[id](S[id]); }
   $("text").value=S.text; fillFonts(); buildLayoutUI(); $("pattern").value=S.pattern; $("size").value=S.size; $("seed").value=S.seed; $("bgColor").value=S.bgColor;
-  for(const [id,key] of [["srcSeg","src"],["easeSeg","ease"],["sModeSeg","sMode"],["sMethodSeg","sMethod"],["bgSeg","bg"],["qSeg","q"],["pdirSeg","pdir"],["vfxSeg","vfx"]])
+  for(const [id,key] of [["srcSeg","src"],["easeSeg","ease"],["sModeSeg","sMode"],["sMethodSeg","sMethod"],["bgSeg","bg"],["qSeg","q"],["pdirSeg","pdir"]])
     $(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===String(S[key])));
   for(const id of ["invert","cover","partial","wrap","gmove","sKeep","showMap"]) $(id).checked=!!S[id];
   S.stops=clone(PALETTES[S.palette]||PALETTES[DEFAULTS.palette]); buildPresets(); buildRtypes(); buildPts();
@@ -1291,7 +1295,8 @@ function bindSeg(id,key,after){
   set(); return set;
 }
 const setSrcSeg=bindSeg("srcSeg","src",()=>updateSrcUI(true));
-bindSeg("vfxSeg","vfx",()=>{ dirtySrc=true; updateSrcUI(false); });
+function setVfxSeg(){ $("vfxSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===(S[vfxKey()]==="heat"?"heat":"map"))); }
+$("vfxSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; const k=vfxKey(); S[k]=b.dataset.v; dirtySrc=true; updateSrcUI(false); changed(k); });
 bindSeg("easeSeg","ease",()=>$("rtypeRow").classList.toggle("hide",S.ease!=="fire")); bindSeg("pdirSeg","pdir");
 $("rtypeRow").classList.toggle("hide",S.ease!=="fire");
 function buildRtypes(){
@@ -1329,12 +1334,13 @@ function updateSrcUI(fromUser){
   if(S.src==="layout"){ buildStretchPlan(); document.fonts.load('400 18px "Noto Sans JP"',"予選").then(()=>{ fontsChanged(); }).catch(()=>{}); } $("srcPattern").classList.toggle("hide",S.src!=="pattern");
   $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
   $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
-  const vmap=S.src==="video"&&S.vfx!=="heat";
+  const vmap=mapOnly(); setVfxSeg();
   for(const id of ["secBlur","secMap","secGrain","animLoop"]) $(id).classList.toggle("hide",vmap); // グラデーションマップだけのときはタイムライン・キーフレームだけ使う
-  $("vfxHint").textContent=S.vfx==="heat"
-    ? "動画の明るさをソースにして、テキストと同じように場所ごとにブラーの強さを変え（03・04）、グレイン（07）も乗せます。「一部だけ」をオンにすると、熱い側だけ配色＋ブラー、反対側はくっきりした元の動画になります。"
-    : "動画の明るさをそのまま配色に置き換えます（ブラー・グレインなし）。";
-  $("partialBox").classList.toggle("hide",S.src!=="video"); updateRampMark();
+  const what=S.src==="image"?"画像":"動画";
+  $("vfxHint").textContent=!vmap
+    ? `${what}の明るさ（透過PNG・SVGは形）をソースにして、テキストと同じように場所ごとにブラーの強さを変え（03・04）、グレイン（07）も乗せます。「一部だけ」をオンにすると、熱い側だけ配色＋ブラー、反対側はくっきりした元の${what}になります。`
+    : `${what}の明るさをそのまま配色に置き換えます（ブラー・グレインなし）。`;
+  $("partialBox").classList.toggle("hide",!isMedia()); updateRampMark();
   if(fromUser&&S.src==="image"&&!userImage) $("fileImg").click();
   if(fromUser&&S.src==="video"&&!userVideo) $("fileVid").click();
   if(S.src!=="video"&&userVideo&&!userVideo.paused) userVideo.pause();
