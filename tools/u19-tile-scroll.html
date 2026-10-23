@@ -176,7 +176,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
     <section>
       <h2><span><b>03</b>つなぎ方（ワイプ）</span></h2>
       <div class="sub">境目</div>
-      <div class="seg" id="edgeSeg"><button data-v="block">ブロック</button><button data-v="column">列ごと</button><button data-v="line">直線</button></div>
+      <div class="seg" id="edgeSeg"><button data-v="thermal">サーモ（液体）</button><button data-v="block">ブロック</button><button data-v="column">列ごと</button><button data-v="line">直線</button></div>
       <div class="sub">進む向き</div>
       <div class="seg arrows" id="wdirSeg">
         <button data-v="90" title="上へ">↑</button><button data-v="45" title="右上へ">↗</button><button data-v="0" title="右へ">→</button><button data-v="315" title="右下へ">↘</button><button data-v="270" title="下へ">↓</button><button data-v="225" title="左下へ">↙</button><button data-v="180" title="左へ">←</button><button data-v="135" title="左上へ">↖</button>
@@ -260,8 +260,9 @@ const $ = id => document.getElementById(id);
 
 /* ============ settings ============ */
 const DEFAULTS = {
-  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.7, wOut:0.7,
-  edge:"block", wdir:135, soft:6, jitter:25, wease:"io",
+  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.6, wOut:0.6,
+  edge:"thermal", wdir:135, soft:6, jitter:25, wease:"out",
+  twarp:16, trim:17, tsmear:65, tlead:14,
   cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.55, ease:5,
   bg:"#ff2b12", fg:"#000000",
   inv:"each", invPhase:50, invStart:false,
@@ -278,7 +279,7 @@ const SPEED_PRESETS = {
 const COLOR_PRESETS = [
   ["#ff2b12","#000000"],["#000000","#ff2b12"],["#ff0000","#000000"],["#ff5a2a","#000000"],["#ffffff","#000000"],["#000000","#ffffff"],
 ];
-const STORE = "u19-tile-scroll-v2";
+const STORE = "u19-tile-scroll-v3";
 let S = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
 let saveT = 0;
@@ -294,7 +295,7 @@ const tileClock = t => t - S.holdA;
 const cutTime = () => S.holdA + (wInD() + (S.trans - wOutD())) / 2;   // the moment the band covers most
 const EASES = {
   io:  u => u<.5 ? 4*u*u*u : 1 - Math.pow(-2*u+2, 3)/2,
-  out: u => 1 - Math.pow(1-u, 3),
+  out: u => 1 - Math.pow(1-u, 2.2),
   in:  u => u*u*u,
   lin: u => u,
 };
@@ -435,9 +436,45 @@ uniform int uTaps;
 uniform vec3 uBg, uFg;
 uniform vec2 uDir, uProj;                 // wipe direction (screen, y down), projection min & 1/extent
 uniform float uFrontIn, uFrontOut, uSoft, uJitter, uUnderB;
-uniform int uEdge, uOut;                  // edge: 0 line, 1 block, 2 column · out: 0 composite, 1 tiles only
+uniform int uEdge, uOut;                  // edge: 0 line, 1 block, 2 column, 3 thermal · out: 0 composite, 1 tiles only
+uniform float uTWarp, uTRim, uTSmear, uTLead, uTime, uPre;
 out vec4 o;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1./6.,1./3.); const vec4 D=vec4(0.,.5,1.,2.);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+  float n_=.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.+1.; vec4 s1=floor(b1)*2.+1.; vec4 sh=-step(h,vec4(0.));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.); m=m*m;
+  return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+float fbm(vec3 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ s+=a*snoise(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s; }
+// thermal ramp: 0 = tile ground colour … .8 = violet rim … 1 = black
+vec3 heat(float h){
+  vec3 c=uBg;
+  c=mix(c,vec3(1.,.40,0.),  smoothstep(.00,.22,h));
+  c=mix(c,vec3(1.,.80,.16), smoothstep(.22,.40,h));
+  c=mix(c,vec3(1.,1.,.80),  smoothstep(.40,.52,h));
+  c=mix(c,vec3(.80,.74,1.), smoothstep(.52,.64,h));
+  c=mix(c,vec3(.44,.12,.96),smoothstep(.64,.80,h));
+  c=mix(c,vec3(.03,0.,.08), smoothstep(.80,1.,h));
+  return c;
+}
 vec2 toScreen(vec2 R){                    // inverse of the tile mapping
   vec2 q = R - uBase - vec2(0., uScroll);
   vec2 f = vec2(q.x*uRot.x + q.y*uRot.y, -q.x*uRot.y + q.y*uRot.x);
@@ -450,24 +487,18 @@ void main(){
   vec2 R = vec2(f.x*uRot.x - f.y*uRot.y, f.x*uRot.y + f.y*uRot.x) + uBase + vec2(0., uScroll);
   const vec2 period = vec2(951., 424.);
 
-  /* tiles */
-  float m = 0.;
-  if (uTaps <= 1) m = texture(uTex, R / period).r;
-  else {
-    for (int i = 0; i < 48; i++){
-      if (i >= uTaps) break;
-      float k = float(i) / float(uTaps - 1) - .5;
-      m += texture(uTex, (R + vec2(0., k*uBlur)) / period).r;
-    }
-    m /= float(uTaps);
-  }
-  vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
-  vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
-  float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
-
-  /* wipe position: per pixel, per block, or per column */
+  /* wipe position: thermal (warped), per pixel, per block, or per column */
   float s;
-  if (uEdge == 0) s = sOf(p);
+  vec2 q = p / uRes.y;
+  vec2 flow = vec2(0.);
+  float bd = 1., n = 0.;
+  if (uEdge == 3){
+    n = fbm(vec3(q*2.0, uTime*.55)) + .35*fbm(vec3(q*5.2 + 3.1, uTime*.9));
+    vec2 uvp = p / uRes; bd = min(min(uvp.x, uvp.y), min(1.-uvp.x, 1.-uvp.y)) * uRes.y / min(uRes.x, uRes.y);
+    s = sOf(p) + n*uTWarp - uTLead*(1. - smoothstep(0., .2, bd));
+    flow = vec2(fbm(vec3(q*1.6, uTime*.4 + 7.)), fbm(vec3(q*1.6 + 4.7, uTime*.4 + 7.)));
+  }
+  else if (uEdge == 0) s = sOf(p);
   else {
     float c = floor(R.x / 475.5);
     float off = mod(c, 2.) > .5 ? -94. : 0.;
@@ -480,11 +511,64 @@ void main(){
   float cOut = 1. - smoothstep(uFrontOut - uSoft, uFrontOut, s);   // 1 = band has left (B)
   float wT = max(cIn - cOut, 0.), wA = 1. - cIn, wB = min(cOut, cIn);
 
-  if (uOut == 1){ o = vec4(tcol * ta * wT, ta * wT); return; }
+  /* thermal: distance into the band from either front (wipe units) */
+  float dIn = uFrontIn - s, dOut = s - uFrontOut;                  // >0 inside the band
+  float near = 0.;
+  if (uEdge == 3) near = max(1. - smoothstep(0., uTRim*2.6, dIn), 1. - smoothstep(0., uTRim*2.6, dOut));
+  float smear = uTSmear * near;
+  vec2 Rs = R + flow * 70. * smear;                                // liquid wobble right behind the front
+  float bias = smear * 4.5;
+
+  /* tiles */
+  float m = 0.;
+  if (uTaps <= 1) m = texture(uTex, Rs / period, bias).r;
+  else {
+    for (int i = 0; i < 48; i++){
+      if (i >= uTaps) break;
+      float k = float(i) / float(uTaps - 1) - .5;
+      m += texture(uTex, (Rs + vec2(0., k*uBlur)) / period, bias).r;
+    }
+    m /= float(uTaps);
+  }
+  vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
+  vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
+  float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
+
+  /* thermal rim: heat inside the band near the front, a dark violet fringe just outside it */
+  float hA = 0., fringe = 0.;
+  if (uEdge == 3){
+    float d = min(dIn, dOut);                                     // nearest front, signed
+    float fr = uTRim * .45;
+    if (d > 0.) hA = .8 * (1. - clamp(d / uTRim, 0., 1.));
+    else { hA = .8 + .2 * clamp(-d / fr, 0., 1.); fringe = 1. - smoothstep(0., fr, -d); }
+    float wobble = .08 * snoise(vec3(q*9., uTime*1.3));
+    hA = clamp(hA + wobble*step(.001, hA), 0., 1.);
+    float lum = max(tcol.r, max(tcol.g, tcol.b)) * ta;
+    vec3 hc = heat(hA);
+    float hw = smoothstep(0., .1, hA);
+    tcol = mix(tcol, hc * (.12 + .88*lum), hw * step(0., d)); ta = mix(ta, 1., hw * step(0., d));
+  }
+
+  /* frame-edge heat on scene A as the wipe starts (black at the very edge → violet → white → orange) */
+  float pre = 0., ph = 0.;
+  if (uEdge == 3 && uPre > 0.){
+    float bw = uTLead * .9 * uPre;
+    float bh = clamp(1. - (bd + n*.025) / max(bw, 1e-4), 0., 1.);
+    ph = .18 + .82*bh; pre = smoothstep(0., .3, bh) * wA * (1. - wT);
+  }
+  if (uOut == 1){
+    float fa = fringe * .9;
+    vec3 rgb = tcol * ta * wT + heat(hA) * fa * (1. - wT);
+    float a = ta * wT + fa * (1. - wT);
+    rgb = rgb * (1. - pre) + heat(ph) * pre; a = a * (1. - pre) + pre;
+    o = vec4(rgb, a); return;
+  }
   vec2 uv = p / uRes;
   vec3 sa = texture(uA, uv).rgb, sb = texture(uB, uv).rgb;
   vec3 under = mix(sa, sb, uUnderB);
   vec3 col = (tcol * ta + under * (1. - ta)) * wT + sa * wA + sb * wB;
+  col = mix(col, heat(hA), fringe * .9 * (1. - wT));
+  col = mix(col, heat(ph), pre);
   o = vec4(col, 1.);
 }`;
 let U = {}, texA, texB;
@@ -497,7 +581,7 @@ function compile(){
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  ['uTex','uA','uB','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  ['uTex','uA','uB','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
 }
 function makeTex(unit, mip){
   const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -542,12 +626,16 @@ function render(t, q){
   const wa = S.wdir*Math.PI/180, dir = [Math.cos(wa), -Math.sin(wa)];
   const pr = [[0,0],[W,0],[0,H],[W,H]].map(([x,y]) => x*dir[0] + y*dir[1]);
   const pmin = Math.min(...pr), ext = Math.max(...pr) - pmin;
-  const soft = S.edge === 'line' ? Math.max(0.002, S.soft/100) : 0.004;
-  const jit = S.edge === 'line' ? 0 : S.jitter/100;
-  const cellR = S.edge === 'line' ? 0 : 260*k/ext;                // half a block, in wipe units
-  const margin = soft + jit/2 + cellR;
+  const th = S.edge === 'thermal';
+  const soft = S.edge === 'line' ? Math.max(0.002, S.soft/100) : th ? 0.003 : 0.004;
+  const jit = (S.edge === 'line' || th) ? 0 : S.jitter/100;
+  const cellR = (S.edge === 'line' || th) ? 0 : 260*k/ext;        // half a block, in wipe units
+  // start just before the earliest point can be reached (edges lead, warp pulls it forward) and end once the rim has cleared
+  const base0 = soft + jit/2 + cellR;
+  const mStart = base0 + (th ? S.twarp/100*0.75 + S.tlead/100 + S.trim/100*0.45 : 0);
+  const mEnd   = base0 + (th ? S.twarp/100*0.75 + S.trim/100*1.1 : 0);
   const [pa, pb] = wipeProgress(t);
-  const front = u => -margin + u*(1 + 2*margin);
+  const front = u => -mStart + u*(1 + mStart + mEnd);
   gl.uniform2f(U.uRes, W, H); gl.uniform2f(U.uCenterPx, W/2, H/2);
   gl.uniform2f(U.uBase, base[0], base[1]); gl.uniform2f(U.uRot, Math.cos(a), Math.sin(a));
   gl.uniform1f(U.uPxPerFig, k); gl.uniform1f(U.uScroll, S.dir * (posAt(tc) + S.start*BLOCK));
@@ -558,7 +646,9 @@ function render(t, q){
   gl.uniform1f(U.uFrontIn, front(pa)); gl.uniform1f(U.uFrontOut, front(pb));
   gl.uniform1f(U.uSoft, soft); gl.uniform1f(U.uJitter, jit);
   gl.uniform1f(U.uUnderB, t >= cutTime() ? 1 : 0);
-  gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : 2);
+  gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : S.edge === 'column' ? 2 : 3);
+  gl.uniform1f(U.uTWarp, S.twarp/100); gl.uniform1f(U.uTRim, S.trim/100); gl.uniform1f(U.uTSmear, S.tsmear/100); gl.uniform1f(U.uTLead, S.tlead/100); gl.uniform1f(U.uTime, tc);
+  gl.uniform1f(U.uPre, th ? Math.min(1, Math.max(0, tc / Math.max(0.05, wInD()*0.35))) * (1 - pb) : 0);
   gl.uniform1i(U.uOut, S.out === 'tiles' ? 1 : 0);
   if (S.out !== 'tiles'){
     const hasVid = scenes.A.kind === 'video' || scenes.B.kind === 'video';
@@ -582,6 +672,10 @@ const ROWS = {
     ["wdir","角度",0,359,1, v=>`${v}°`],
     ["jitter","ばらつき",0,100,1, v=>`${v}%`],
     ["soft","ぼかし",0,40,0.5, v=>`${v}%`],
+    ["twarp","うねり",0,40,0.5, v=>`${v}%`],
+    ["trim","熱の縁の幅",1,30,0.5, v=>`${v}%`],
+    ["tsmear","にじみ",0,100,1, v=>`${v}%`],
+    ["tlead","フチから先に",0,50,0.5, v=>`${v}%`],
   ],
   speedRows: [
     ["cruise","巡航スピード",0,400,5, v=>`${v}px/s`],
@@ -628,6 +722,7 @@ function segBind(id, key, parse){
 }
 function syncSeg(id, val){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(val))); }
 const WIPE_HINT = {
+  thermal:'参考動画の入り方。赤い液体がうねりながら流れ込み、縁にサーモの熱（黒→紫→白→オレンジ）。現れた直後のタイルはにじんで揺れ、だんだんくっきりします。「フチから先に」で画面の縁から熱がにじみ始めます。',
   block:'タイルの区切りごとに、帯の進む順で切り替わります。ばらつきで順番を少し崩せます。',
   column:'傾いた列ごとに切り替わります。ばらつきで列ごとのタイミングをずらせます。',
   line:'まっすぐなワイプ。ぼかしで境目を柔らかくできます。',
@@ -642,7 +737,8 @@ function syncUI(){
   $('invStart').checked = S.invStart; $('blurOn').checked = S.blur; $('alpha').checked = S.alpha; $('size').value = S.size;
   sliders.invPhase.r.disabled = S.inv === 'off';
   sliders.soft.row.classList.toggle('hide', S.edge !== 'line');
-  sliders.jitter.row.classList.toggle('hide', S.edge === 'line');
+  sliders.jitter.row.classList.toggle('hide', S.edge === 'line' || S.edge === 'thermal');
+  for (const k of ['twarp','trim','tsmear','tlead']) sliders[k].row.classList.toggle('hide', S.edge !== 'thermal');
   $('wipeHint').textContent = WIPE_HINT[S.edge];
   view.classList.toggle('alpha', S.out === 'tiles');
   $('tcEnd').textContent = '/ ' + tc(total());

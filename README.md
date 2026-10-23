@@ -34,7 +34,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [Word Switcher](tools/word-switcher.html) | motion | 単語／SVGを切り替えるモーショングラフィック |
 | [Warp Type](tools/warp-type.html) | motion | テキストをノイズで歪ませるジェネレーター。プリセット・PNG／WebM書き出し |
 | [U19 Aberration](tools/u19-aberration.html) | motion | ロゴ・テキスト輪郭のサーモグロー。背景合成・ループWebM書き出し |
-| [U19 Tile Scroll](tools/u19-tile-scroll.html) | motion | FigmaのHUDの組みで流れるU19ロゴタイルの帯でシーンA→Bをつなぐトランジション。ワイプの向き（初期値は右下→左上）・境目（ブロック／列ごと／直線）・ばらつき、タイルの流れの緩急（スピードカーブ）、加速に合わせた色の反転、配色・角度・モーションブラー。AE風タイムライン、タイルだけの透過レイヤー、連番PNG（ZIP）／ロスレスMOV／MP4書き出し |
+| [U19 Tile Scroll](tools/u19-tile-scroll.html) | motion | FigmaのHUDの組みで流れるU19ロゴタイルの帯でシーンA→Bをつなぐトランジション。ワイプの向き（初期値は右下→左上）・境目（サーモ色の液体＝MSI 2024の入り方／ブロック／列ごと／直線）、タイルの流れの緩急（スピードカーブ）、加速に合わせた色の反転、配色・角度・モーションブラー。AE風タイムライン、タイルだけの透過レイヤー、連番PNG（ZIP）／ロスレスMOV／MP4書き出し |
 | [Flame Transition](tools/flame-transition.html) | motion | サーモカラーの炎で画面を覆ってシーンA→Bへ切り替えるトランジション（WebGL）。渦・一方向・両側から、映像同士／ロゴ出し、U19系の配色、タイムライン、炎だけの透過レイヤー、ロスレスMOV／MP4（[設計メモ](docs/flame-transition.md)） |
 | [Wireframe](tools/wireframe.html) | motion | ジオメトリックなワイヤーフレーム系モーショングラフィック |
 
