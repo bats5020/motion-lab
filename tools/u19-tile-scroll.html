@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>U19 Tile Scroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700&display=swap">
+<style>
+/* MOTION LAB dark UI (shared/tokens.css) — stage left, panel right, timeline bottom */
+:root{
+  --barLeft:150px;
+  --bg:#0a0a0b;--panel:#141417;--panel2:#1c1c21;--line:#2a2a31;--line-hover:#3d3d46;
+  --text:#e6e6ef;--sub:#9a9aa6;--faint:#6a6a74;--accent:#ff5a1f;--rec:#b3122a;
+  --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-font-smoothing:antialiased;overflow:hidden}
+#app{display:flex;width:100vw;height:100vh}
+#stageWrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;background:radial-gradient(1200px 800px at 30% 20%,#101014,var(--bg))}
+#stage{flex:1 1 auto;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;padding:28px}
+#view{max-width:100%;max-height:100%;display:block;background:#000;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329}
+#view.alpha{background:repeating-conic-gradient(#26262c 0% 25%,#1a1a1f 0% 50%) 0 0/18px 18px}
+#meta{position:absolute;top:10px;right:14px;color:var(--faint);font-size:10px;letter-spacing:.06em;pointer-events:none}
+#dropOv{position:absolute;inset:12px;border:2px dashed var(--accent);border-radius:10px;display:none;align-items:center;justify-content:center;color:var(--accent);font-size:13px;letter-spacing:.18em;background:rgba(255,90,31,.06);pointer-events:none;z-index:5}
+#dropOv.on{display:flex}
+#dropOv span{flex:1;text-align:center}
+#dropOv span+span{border-left:1px dashed var(--accent)}
+#bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:10px 18px 14px var(--barLeft,18px);border-top:1px solid var(--line);background:rgba(12,12,14,.7)}
+#play{width:34px;height:28px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:13px var(--mono)}
+#play:hover{border-color:var(--accent)}
+#tcode{flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2;font-variant-numeric:tabular-nums;min-width:86px}
+#tcode b{color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.02em}
+#tcode span{color:var(--faint);font-size:9.5px}
+#tl{flex:1;position:relative;min-width:0;height:74px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:ew-resize}
+#ruler{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
+#ptrack{position:absolute;left:0;right:0;top:20px;height:16px;border:1px solid var(--line);border-radius:4px 4px 0 0;overflow:hidden;background:#121216}
+#ptrack canvas,#ktrack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ktrack{position:absolute;left:0;right:0;top:35px;height:39px;background:#121216;border:1px solid var(--line);border-top:none;border-radius:0 0 4px 4px;overflow:hidden}
+#cti{position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:2}
+#cti::before{content:"";position:absolute;left:-.5px;top:9px;bottom:0;width:1px;background:var(--accent)}
+#cti i{position:absolute;left:-6px;top:0;width:12px;height:13px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 58%,50% 100%,0 58%)}
+#kctl{display:flex;gap:6px;align-items:center}
+#kmarks{position:absolute;inset:0}
+.kmark{position:absolute;width:13px;height:13px;margin-left:-6.5px;cursor:grab;touch-action:none}
+.kmark.f{bottom:3px}
+.kmark.iv{top:3px;width:11px;height:11px;margin-left:-5.5px}
+.kmark svg{display:block;width:100%;height:100%;overflow:visible}
+.kmark path,.kmark rect{fill:#c9c9d4;stroke:#0a0a0b;stroke-width:1.2}
+.kmark.iv rect{fill:#0a0a0b;stroke:#c9c9d4}
+.kmark.iv rect.half{fill:#c9c9d4;stroke:none}
+.kmark:hover path,.kmark:hover rect{fill:#fff}
+.kmark.sel path,.kmark.sel rect{fill:#5fb4ff}
+.kmark.iv.sel rect{stroke:#5fb4ff}
+#kEase{height:28px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);font:11px var(--mono);padding:0 6px}
+#ramp{height:14px;border-radius:4px;margin-top:8px;border:1px solid var(--line)}
+.trackLbl{position:absolute;left:4px;font-size:8.5px;color:var(--faint);letter-spacing:.08em;pointer-events:none}
+.kbtn{height:28px;min-width:28px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:12px var(--mono);padding:0 7px}
+.kbtn:hover{border-color:var(--accent)}
+.kbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#panel{flex:0 0 330px;width:330px;height:100%;overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:0 0 60px}
+#panel::-webkit-scrollbar{width:8px}
+#panel::-webkit-scrollbar-thumb{background:#2c2c34;border-radius:4px}
+#panel header{padding:18px 16px 14px;border-bottom:1px solid var(--line)}
+#panel h1{margin:0 0 4px;font-size:15px;letter-spacing:.28em;font-weight:700}
+#panel h1 em{color:var(--accent);font-style:normal}
+#panel header p{margin:0;color:var(--sub);font-size:10.5px;letter-spacing:.02em}
+section{border-bottom:1px solid var(--line);padding:13px 16px}
+section>h2{margin:0 0 8px;font-size:10.5px;color:var(--sub);letter-spacing:.24em;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
+.sub{margin:12px 0 2px;color:var(--faint);font-size:9.5px;letter-spacing:.18em}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+.seg button{flex:1;background:none;border:none;color:var(--sub);font:10.5px var(--mono);padding:7px 2px;cursor:pointer;white-space:nowrap}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button:not(.on):hover{color:var(--text)}
+.seg.arrows button{font-size:14px;padding:5px 0;line-height:1}
+.prow{display:flex;align-items:center;gap:8px;margin-top:8px}
+.prow>span:first-child{flex:0 0 96px;color:var(--sub);font-size:10.5px}
+.prow input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:#33333c;outline:none;cursor:pointer}
+.prow input[type=range]:disabled{opacity:.35;cursor:default}
+.prow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
+.prow input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--text);border:2px solid var(--panel)}
+.prow input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
+.prow .pv{flex:0 0 52px;text-align:right;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;cursor:text}
+.prow .note{flex:1;color:var(--faint);font-size:10px}
+.prow select,.prow input[type=text]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--text);font:11px var(--mono);padding:4px 6px;min-width:0}
+.prow input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;margin:0}
+.prow input[type=color]{width:30px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--panel2);cursor:pointer}
+.prow input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+.prow input[type=color]::-webkit-color-swatch{border:none;border-radius:2px}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:6px 10px;cursor:pointer;letter-spacing:.04em}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.rec{color:#fff;background:var(--rec);border-color:var(--rec)}
+.btnrow{display:flex;gap:7px;margin-top:8px}
+.btnrow .btn{flex:1}
+.hint{color:var(--faint);font-size:9.5px;margin-top:6px;line-height:1.55}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--sub);font:10px var(--mono);padding:3px 9px 3px 4px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip i{width:26px;height:12px;border-radius:6px;display:block;border:1px solid rgba(255,255,255,.12)}
+.chip:hover{border-color:var(--line-hover);color:var(--text)}
+.chip.on{border-color:var(--accent);color:var(--text)}
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.drop{position:relative;display:flex;flex-direction:column;gap:5px;cursor:pointer;min-width:0}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.drop .thumb{position:relative;border:1px dashed var(--line-hover);border-radius:4px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;aspect-ratio:16/9}
+.drop .thumb canvas{display:block;width:100%;height:100%}
+.drop .thumb em{position:absolute;left:4px;bottom:4px;font-style:normal;font-weight:700;font-size:10px;line-height:1;color:#fff;background:rgba(10,10,12,.75);padding:3px 5px;border-radius:3px}
+.drop.over .thumb,.drop:hover .thumb{border-color:var(--accent)}
+.drop small{font-size:9.5px;color:var(--faint);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(10px);background:#1d1d23;border:1px solid var(--line);color:var(--text);padding:8px 14px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:min(560px,calc(100vw - 32px))}
+#toast.on{opacity:1;transform:translateX(-50%)}
+.hide{display:none!important}
+@media (max-width:820px){
+  body{overflow:auto}
+  #app{flex-direction:column;height:auto;min-height:100vh}
+  #stageWrap{flex:0 0 auto;height:56vh}
+  #stage{padding:16px}
+  #panel{flex:1 1 auto;width:100%;height:auto;border-left:none;border-top:1px solid var(--line)}
+  #bar{padding-left:16px;padding-right:16px;flex-wrap:wrap}
+  #tl{flex:1 1 100%;order:5}
+}
+</style>
+</head>
+<body>
+
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<div id="app">
+  <div id="stageWrap">
+    <div id="stage">
+      <canvas id="view" aria-label="プレビュー"></canvas>
+      <div id="meta"></div>
+      <div id="dropOv"><span>シーンA</span><span>シーンB</span></div>
+    </div>
+    <div id="bar">
+      <button id="play" title="再生 / 停止（Space）">▶</button>
+      <div id="tcode"><b id="tlabel">0:00:00:00</b><span id="tcEnd">/ 0:00:04:00</span></div>
+      <div id="tl" aria-label="タイムライン（ドラッグで時間を移動）">
+        <canvas id="ruler"></canvas>
+        <div id="ptrack"><canvas id="phase"></canvas></div>
+        <div id="ktrack"><canvas id="graph"></canvas><div id="kmarks"></div></div>
+        <div id="cti"><i></i></div>
+      </div>
+      <div id="kctl">
+        <button class="kbtn" id="kPrev" title="前のキーへ（J）">◂</button>
+        <button class="kbtn" id="kKey" title="今の時間に流れのキーを打つ／消す（⌥K）">◆</button>
+        <button class="kbtn" id="kInv" title="今の時間に反転のキーを打つ／消す（I）">反</button>
+        <button class="kbtn" id="kNext" title="次のキーへ（K）">▸</button>
+        <select id="kEase" title="選んだキーの補間（F9＝イーズ）" aria-label="キーの補間"><option value="smooth">イーズ</option><option value="linear">リニア</option><option value="hold">停止</option></select>
+        <button class="kbtn" id="kCut" title="覆いきった中央へ（C）">CUT</button>
+        <button class="kbtn on" id="kLoop" title="ループ再生（L）">⟲</button>
+      </div>
+    </div>
+  </div>
+
+  <aside id="panel">
+    <header>
+      <h1>U19 TILE <em>SCROLL</em></h1>
+      <p>Figmaの「HUD」の組みで流れるロゴタイルの帯が、シーンAを覆いながら抜けてシーンBへつなぐトランジション。</p>
+    </header>
+
+    <section>
+      <h2><span><b>01</b>シーン</span></h2>
+      <div class="scenes">
+        <label class="drop" id="dropA">
+          <div class="thumb"><canvas id="thumbA" width="160" height="90"></canvas><em>A</em></div>
+          <small id="nameA">サンプル</small>
+          <input type="file" id="fileA" accept="image/*,video/*,.mov,.mp4,.webm">
+        </label>
+        <label class="drop" id="dropB">
+          <div class="thumb"><canvas id="thumbB" width="160" height="90"></canvas><em>B</em></div>
+          <small id="nameB">サンプル</small>
+          <input type="file" id="fileB" accept="image/*,video/*,.mov,.mp4,.webm">
+        </label>
+      </div>
+      <div class="btnrow"><button class="btn" id="resetScenes">サンプルに戻す</button></div>
+      <div class="hint">クリックかドロップで画像・動画を差し替え（ステージの左半分＝A、右半分＝B）。シーンは確認用で、AEで重ねるなら「09 書き出し › タイルだけ（透過）」を使います。</div>
+    </section>
+
+    <section>
+      <h2><span><b>02</b>タイミング</span></h2>
+      <div id="timeRows"></div>
+      <div class="hint">トランジションの中で、帯が入りきってから抜け始めるまでが「全面タイル」。入り＋抜けがトランジションより長いと、画面を覆いきらずに帯が通り抜けます。</div>
+    </section>
+
+    <section>
+      <h2><span><b>03</b>つなぎ方（ワイプ）</span></h2>
+      <div class="sub">境目</div>
+      <div class="seg" id="edgeSeg"><button data-v="thermal">サーモ（液体）</button><button data-v="block">ブロック</button><button data-v="column">列ごと</button><button data-v="line">直線</button></div>
+      <div class="sub">進む向き</div>
+      <div class="seg arrows" id="wdirSeg">
+        <button data-v="90" title="上へ">↑</button><button data-v="45" title="右上へ">↗</button><button data-v="0" title="右へ">→</button><button data-v="315" title="右下へ">↘</button><button data-v="270" title="下へ">↓</button><button data-v="225" title="左下へ">↙</button><button data-v="180" title="左へ">←</button><button data-v="135" title="左上へ">↖</button>
+      </div>
+      <div id="wipeRows"></div>
+      <div class="sub">動きの緩急</div>
+      <div class="seg" id="weaseSeg"><button data-v="io">イーズ</button><button data-v="out">減速</button><button data-v="in">加速</button><button data-v="lin">リニア</button></div>
+      <div class="hint" id="wipeHint"></div>
+    </section>
+
+    <section>
+      <h2><span><b>04</b>スピード・キーフレーム</span></h2>
+      <div id="speedRows"></div>
+      <div class="sub">キーを自動で打つ</div>
+      <div class="seg" id="speedPreset">
+        <button data-p="smooth">なめらか</button><button data-p="std">標準</button><button data-p="snap">キレ強め</button><button data-p="linear">一定速</button>
+      </div>
+      <div id="autoRows"></div>
+      <div class="hint" id="kfState"></div>
+      <div class="btnrow"><button class="btn primary" id="kAuto">この設定でキーを打ち直す</button><button class="btn" id="kClear">キーを全部消す</button></div>
+      <div class="hint">タイムライン下段の◆が「流れの位置」のキー、上段の□が色の反転のキー。キーの間はイーズでつながるので、それが緩急になります（AEの位置キーと同じ）。◆ボタン／⌥Kで今の時間にキー、反ボタン／Iで反転キー。キーはドラッグで移動、Shift+クリックで複数選択、Delete で削除、ダブルクリックでその時間へ。キーがある間に「流れの位置」「角度」「大きさ」を動かすと、今の時間のキーに記録されます。巡航スピードと入り／抜けの勢いはキーとは別に足されます（0にすればキーだけの動き）。流れの位置・勢い・進む量の単位はブロック（ロゴの組み1つ分）。</div>
+    </section>
+
+    <section>
+      <h2><span><b>05</b>カラー</span></h2>
+      <div class="prow"><span>地の色</span><input type="color" id="bgC"><input type="text" id="bgT" spellcheck="false" maxlength="7"></div>
+      <div class="prow"><span>ロゴの色</span><input type="color" id="fgC"><input type="text" id="fgT" spellcheck="false" maxlength="7"></div>
+      <div class="chips" id="chips"></div>
+      <div class="btnrow"><button class="btn" id="swap">地とロゴを入れ替え</button></div>
+      <div class="sub">サーモの配色</div>
+      <div class="chips" id="palChips"></div>
+      <div id="ramp"></div>
+      <div class="prow"><span>配色の向き</span><input type="checkbox" id="palRev"><span class="note">熱い側と冷たい側を入れ替える</span></div>
+      <div class="hint">つなぎの熱（フチの光・液体・熱だまり）の色。Heatmap Blur と同じ配色。左が冷たい側（画面のフチ・液体の先端）、右が熱い側（タイルの赤に近い側）。MSI 2024 の右端は地の色に合わせて変わります。</div>
+    </section>
+
+    <section>
+      <h2><span><b>06</b>カラー反転</span></h2>
+      <div class="seg" id="invSeg"><button data-v="off">オフ</button><button data-v="each">加速ごと</button><button data-v="once">1回目だけ</button></div>
+      <div id="invRows"></div>
+      <div class="prow"><span>反転から始める</span><input type="checkbox" id="invStart"></div>
+      <div class="hint">反転はタイムライン上段の□キーで切り替わります。ここは「キーを自動で打つ」ときの打ち方です。</div>
+    </section>
+
+    <section>
+      <h2><span><b>07</b>角度・配置</span></h2>
+      <div id="angleRows"></div>
+      <div class="prow"><span>流れる向き</span><div class="seg" id="dirSeg" style="flex:1;margin:0"><button data-v="1">上へ</button><button data-v="-1">下へ</button></div></div>
+      <div class="btnrow"><button class="btn" id="angleReset">Figmaの配置（15°・100%）に戻す</button></div>
+    </section>
+
+    <section>
+      <h2><span><b>08</b>モーションブラー</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="blurOn" style="accent-color:var(--accent)">オン</label></h2>
+      <div id="blurRows"></div>
+      <div class="hint">AEのシャッター角と同じ考え方。180°で1コマの半分だけ残像が伸びます。速いところだけにかかります。</div>
+    </section>
+
+    <section>
+      <h2><span><b>09</b>書き出し</span></h2>
+      <div class="prow"><span>出力</span><div class="seg" id="outSeg" style="flex:1;margin:0"><button data-v="scene">シーンと合成</button><button data-v="tiles">タイルだけ（透過）</button></div></div>
+      <div class="prow"><span>範囲</span><div class="seg" id="rangeSeg" style="flex:1;margin:0"><button data-v="all">全体</button><button data-v="trans">トランジションのみ</button></div></div>
+      <div class="prow"><span>サイズ</span><select id="size">
+        <option value="1920x1080">1920 × 1080（16:9）</option>
+        <option value="3840x2160">3840 × 2160（4K）</option>
+        <option value="1080x1080">1080 × 1080（1:1）</option>
+        <option value="1080x1350">1080 × 1350（4:5）</option>
+        <option value="1080x1920">1080 × 1920（9:16）</option>
+      </select></div>
+      <div class="prow"><span>フレームレート</span><div class="seg" id="fpsSeg" style="flex:1;margin:0"><button data-v="24">24</button><button data-v="30">30</button><button data-v="60">60</button></div></div>
+      <div class="prow"><span>タイルの地を抜く</span><input type="checkbox" id="alpha"><span class="note">ロゴだけ残して地の色を透過</span></div>
+      <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
+      <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn primary" id="zip">連番PNG（ZIP）</button></div>
+      <div class="btnrow"><button class="btn" id="mp4">MP4</button><button class="btn" id="mov">ロスレスMOV</button></div>
+      <div class="hint" id="exHint">1コマずつ描いて書き出すのでコマ落ちしません。「タイルだけ（透過）」＋連番PNGかMOVなら、AEで素材の上に重ねるだけでつながります（連番は「読み込み → PNGシーケンス」）。MP4は透過なし。</div>
+    </section>
+
+    <section>
+      <h2><span><b>10</b>設定</span></h2>
+      <div class="btnrow"><button class="btn" id="cfgSave">設定をファイルに保存</button><button class="btn" id="cfgLoad">ファイルから読み込む</button></div>
+      <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
+      <input type="file" id="cfgFile" accept=".json,application/json" hidden>
+      <div class="hint">設定はこのブラウザに自動で残ります（読み込んだ画像・動画は残りません）。別のPCに持っていくときは .json に保存してください。</div>
+    </section>
+  </aside>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const P = {"MAIN": ["M272.61,170.84c-5.03,7.67-10.3,15.21-17.53,21.2-44.09,36.54-119.39,38.01-166.63,4.12-23.18-16.63-36.9-39.5-37.55-64.26l-.02-125.2,69.65-.03.02,113.85c.68,17.39,9.14,33.44,24.33,45.87,33.88,27.74,90.4,29.77,127.73,4.43Z", "M287.64,116.52c.05,23.08-15.15,43.67-41.53,53.89-27.19,10.53-60.41,7.59-83.02-7.48,19.61,3.76,38.4,1.29,53.85-7.99,13.7-8.24,22.82-21.07,22.83-35.44V6.71s47.65,0,47.65,0l.23,109.82Z", "M35.23,132.39c2,51.63,52.14,93.5,119.95,99.67C72.77,237.48.2,187.41.13,123.75L0,6.72l35.22-.05.02,125.72Z", "M224.18,119.83c-.53,15.32-14.09,27.85-32.21,31.67-19.31,4.07-39.72-2.12-50.07-15.95,10.2,2.16,20.16,1.48,28.85-3.3,7.34-4.04,13.37-11.01,13.37-18.86l.06-106.75,40.01.09v113.09Z", "M381.43,4.92c-6.36,0-13.59,0-20.24-.29-11.28,14.17-29.2,28.05-46.84,36.14.87,9.83,4.05,25.15,4.05,72.28s-.29,76.91-.58,108.43c17.93-.58,30.65-.58,42.21-.58s22.55.29,39.61.58c-.87-31.23-1.16-62.45-1.16-108.43s.29-79.8,1.16-108.43c-4.05.29-10.7.29-18.22.29Z", "M591.1,0c-115.65,0-163.36,31.23-163.36,76.62,0,40.48,40.77,61.87,138.5,61.87,55.51,0,100.62-6.36,125.49-27.47l1.16.58c-.87,6.07-1.45,11.28-2.02,15.32-4.91,34.41-34.7,45.68-101.49,45.68s-84.72-7.81-84.72-21.11v-1.73c-10.41,1.16-24.58,1.45-40.48,1.45s-28.63-.29-39.61-1.45v5.78c0,41.35,34.41,70.55,164.23,70.55,100.62,0,176.66-28.91,176.66-110.16S704.15,0,591.1,0ZM583.58,96.57c-61.01,0-77.78-6.07-77.78-20.82s25.73-21.69,86.74-21.69,85.01,6.07,85.01,21.69-28.05,20.82-93.97,20.82Z", "M97.44,244.93c-.09,2.03-.18,5.25-.18,8.11s0,6.27.18,8.2c-19.17-.09-53.84-.18-71.08-.18v10.6c19.91,0,54.67,0,70.06-.28-.09,3.6-.18,10.97-.09,14.84-15.12-.18-50.24-.37-69.97-.37v10.79c17.24,0,53.1-.09,71.08-.18-.18,2.21-.18,5.72-.18,8.94,0,2.95,0,6.36.18,8.67H0c.37-9.4.37-19.82.37-34.57s0-25.26-.37-34.57h97.44Z", "M364.31,273.97c-2.3-.18-7.93-.28-12.72-.28s-9.4.09-12.17.28c-.09-1.38-.18-2.67-.18-3.96,0-20.37,19.91-26.46,49.97-26.46,32.63,0,48.03,8.39,48.03,23.42,0,12.81-6.82,17.42-43.42,20.83-24.8,2.3-30.61,3.23-31.71,6.55,13.55.09,29.96-.18,39.18-.18,13,0,24.61-.18,34.75-.37-.09,3.13-.18,7.93-.18,12.35,0,3.32,0,6.36.18,7.93h-97.35c.09-1.47.18-3.96.18-6.55,0-1.75-.09-4.24-.09-6.08,0-17.33,14.57-20.28,43.42-24.15,25.9-3.5,30.15-4.24,30.15-9.5,0-4.7-6.18-7.1-22.68-7.1-19.36,0-25.35,2.86-25.35,10.88v2.4Z", "M496.04,316.29c-34.94,0-56.6-11.25-56.6-37.7s23.51-35.86,56.7-35.86,57.25,9.4,57.25,35.86-22.49,37.7-57.34,37.7ZM465.07,279.04c0,12.45,12.45,17.52,31.34,17.52s31.34-5.53,31.34-17.52-12.45-17.15-31.34-17.15-31.34,4.79-31.34,17.15Z", "M581.68,273.97c-2.3-.18-7.93-.28-12.72-.28s-9.4.09-12.17.28c-.09-1.38-.18-2.67-.18-3.96,0-20.37,19.91-26.46,49.97-26.46,32.63,0,48.03,8.39,48.03,23.42,0,12.81-6.82,17.42-43.42,20.83-24.8,2.3-30.61,3.23-31.71,6.55,13.55.09,29.96-.18,39.18-.18,13,0,24.61-.18,34.75-.37-.09,3.13-.18,7.93-.18,12.35,0,3.32,0,6.36.18,7.93h-97.35c.09-1.47.18-3.96.18-6.55,0-1.75-.09-4.24-.09-6.08,0-17.33,14.57-20.28,43.42-24.15,25.9-3.5,30.15-4.24,30.15-9.5,0-4.7-6.18-7.1-22.68-7.1-19.36,0-25.35,2.86-25.35,10.88v2.4Z", "M680.31,280.15c7.93-6.73,22.31-8.76,40.01-8.76,31.16,0,44.16,6.82,44.16,19.73,0,14.47-14.01,24.43-47.94,24.43-38.72,0-59.74-11.06-59.74-36.97s25.07-35.12,58.35-35.12c38.63,0,48.86,9.31,48.86,22.49v1.84c-3.5-.37-7.37-.46-12.63-.46s-9.59.09-12.91.46v-.55c0-4.24-4.06-6.73-23.51-6.73-22.59,0-32.82,3.6-34.39,14.57-.18,1.29-.37,2.95-.65,4.89l.37.18ZM739.59,291.4c0-4.7-5.99-6.64-24.8-6.64-21.3,0-29.96,1.84-29.96,6.64s8.85,6.91,29.96,6.91c18.35,0,24.8-2.21,24.8-6.91Z", "M251.94,291.49c0,4.7,5.99,6.55,27.93,6.55,24.15,0,27.2-1.57,27.2-4.52,0-3.13-1.66-4.7-30.7-5.62-39.18-1.29-49.6-7.74-49.6-22.03,0-15.21,13.83-23.14,51.26-23.14,39.82,0,52.36,4.98,52.36,21.02,0,1.38,0,2.77-.09,4.33-2.77-.18-7.65-.28-12.35-.28s-9.77.09-12.54.28v-1.75c0-4.7-3.32-6.27-27.75-6.27-22.49,0-25.81,1.38-25.81,4.15s1.75,3.96,32.63,5.53c36.6,1.84,47.85,7.19,47.85,22.68s-12.81,23.88-52.18,23.88-53.93-6.73-53.93-20.74c0-1.66.09-3.41.37-5.25,3.23.37,8.11.65,12.72.65s9.13-.09,12.63-.28v.83Z", "M195.7,272.41c0-7.01-9.68-9.77-32.08-9.77-24.43.65-33.92,4.42-33.92,15.86s10.42,16.96,35.03,16.96c23.23,0,30.97-3.32,30.97-9.68v-2.03c4.24.18,8.48.18,12.72.18s8.48,0,12.72-.18c0,1.01.09,2.12.09,3.13,0,16.78-12.17,28.67-56.51,28.67s-61.03-10.97-61.03-36.51c0-26.92,23.42-35.58,59.92-35.58s57.34,4.33,57.34,26.09c0,1.38-.09,2.95-.18,4.42-4.15-.18-8.39-.18-12.54-.18s-8.3,0-12.54.18v-1.57Z"], "WORD": ["M76.5543 56.5999L64.9043 5.96994H45.1943V44.05C45.7743 43.98 46.3543 43.93 46.9143 43.89C47.4843 43.85 48.0343 43.84 48.5843 43.84C50.3243 43.84 51.8943 43.9499 53.2843 44.1599C54.6743 44.3699 55.7943 44.6099 56.6443 44.8499C56.1643 44.7099 55.8043 44.13 55.5643 43.11C55.3243 42.1 55.2043 40.41 55.2043 38.06V8.67996L66.2943 59.0999H86.4643V5.95996H76.5543V56.59V56.5999Z", "M53.7842 48.43C51.9142 47.4 49.6342 46.88 46.9342 46.88C44.2342 46.88 41.5142 47.41 38.3642 48.46C35.2142 49.51 31.9342 51.26 28.5142 53.72C30.8042 51.16 33.1442 49.19 35.5242 47.82C37.9042 46.45 40.2342 45.46 42.5342 44.86C41.6742 44.57 40.9942 44.18 40.4842 43.68C39.9742 43.18 39.5742 42.6 39.2742 41.94C38.9842 41.28 38.7842 40.55 38.6842 39.75C38.5842 38.95 38.5342 38.09 38.5342 37.16V13.34C38.5342 11.28 38.8142 9.61001 39.3842 8.35001C39.9442 7.09001 40.7942 6.31 41.9242 6.03C39.1542 6.03 36.9342 6.20001 35.2742 6.54001C33.6142 6.88001 32.3242 7.43001 31.3942 8.20001C30.4742 8.97001 29.8342 9.97 29.4942 11.22C29.1542 12.47 28.9142 14 28.7742 15.81C28.6342 17.8 28.4342 20.03 28.1842 22.49C27.9242 24.95 27.5742 27.43 27.1042 29.94C26.6442 32.45 26.0642 34.88 25.3542 37.23C24.6542 39.58 23.7842 41.64 22.7342 43.4C21.6942 45.16 20.4542 46.52 19.0342 47.49C17.6142 48.45 15.9642 48.81 14.0842 48.56C12.4442 48.35 11.1542 47.62 10.2342 46.37C9.31424 45.12 8.67424 43.55 8.33424 41.64C7.99424 39.74 7.91424 37.59 8.10424 35.2C8.29424 32.81 8.67424 30.36 9.26424 27.83C9.84424 25.3 10.5942 22.81 11.5242 20.35C12.4542 17.89 13.4942 15.64 14.6542 13.59C15.8142 11.54 17.0642 9.79002 18.4042 8.33002C19.7442 6.87002 21.0942 5.89001 22.4642 5.39001C21.7442 5.39001 20.7842 5.58001 19.5942 5.95001C18.3942 6.32001 17.0942 6.72002 15.6942 7.15002C14.2942 7.58002 12.8442 7.98001 11.3542 8.35001C9.86424 8.72001 8.47424 8.91 7.17424 8.91C6.38424 8.91 5.64424 8.82001 4.94424 8.64001C4.24424 8.46001 3.63424 8.15002 3.12424 7.71002C2.61424 7.27002 2.19424 6.68001 1.86424 5.95001C1.54424 5.22001 1.36424 4.32 1.32424 3.25C0.674239 5.46 0.264239 7.61002 0.094239 9.71002C-0.075761 11.81 -0.0157607 13.68 0.274239 15.32C0.564239 16.96 1.08424 18.27 1.84424 19.25C2.59424 20.23 3.57424 20.72 4.76424 20.72C5.65424 20.72 6.71424 20.35 7.94424 19.6C8.83424 19.07 9.77424 18.38 10.7642 17.54C11.7542 16.7 12.7442 15.84 13.7442 14.95C12.7142 17.02 11.7842 18.96 10.9442 20.77C10.1042 22.59 9.33424 24.39 8.63424 26.19C7.93424 27.99 7.30424 29.85 6.76424 31.77C6.21424 33.69 5.72424 35.78 5.27424 38.02C4.79424 40.62 4.48424 43.2 4.35424 45.76C4.21424 48.32 4.33424 50.63 4.68424 52.68C5.04424 54.73 5.69424 56.38 6.63424 57.65C7.57424 58.91 8.88424 59.55 10.5642 59.55C11.1142 59.55 11.7142 59.48 12.3642 59.34C13.0142 59.2 13.6942 58.95 14.4142 58.59C16.2642 57.74 17.8842 56.4 19.2642 54.58C20.6542 52.76 21.8542 50.67 22.8842 48.3C23.9142 45.93 24.7642 43.38 25.4542 40.64C26.1342 37.9 26.7042 35.18 27.1542 32.49C27.5942 29.8 27.9442 27.24 28.2042 24.8C28.4642 22.36 28.6542 20.25 28.7942 18.47V46.19C28.7942 47.26 28.7642 48.32 28.6942 49.37C28.6242 50.42 28.4242 51.48 28.1042 52.55C27.7742 53.62 27.2542 54.7 26.5342 55.78C25.8142 56.86 24.8042 57.98 23.5042 59.12C24.4242 58.34 25.4942 57.65 26.6842 57.06C27.8842 56.47 29.1642 55.98 30.5342 55.59C31.9042 55.2 33.3142 54.9 34.7742 54.71C36.2242 54.52 37.6742 54.42 39.1142 54.42C41.3042 54.42 43.3642 54.66 45.3042 55.14C47.2442 55.62 48.8242 56.33 50.0542 57.28C51.2842 58.22 52.0342 59.42 52.2842 60.86C52.5442 62.3 52.0842 63.98 50.9242 65.91C53.8642 63.38 55.8242 60.97 56.8042 58.67C57.7842 56.37 57.9942 54.35 57.4442 52.61C56.8942 50.87 55.6942 49.48 53.8242 48.44L53.7842 48.43Z", "M185.874 8.05048C182.774 9.44048 180.074 11.3305 177.764 13.7405C175.454 16.1405 173.634 18.9605 172.294 22.1805C170.954 25.4005 170.294 28.8505 170.294 32.5205C170.294 36.1905 170.964 39.6905 172.294 42.9105C173.624 46.1305 175.454 48.9505 177.764 51.3505C180.074 53.7505 182.774 55.6505 185.874 57.0405C188.974 58.4305 192.294 59.1205 195.854 59.1205H208.894V48.7005H195.854C193.694 48.7005 191.684 48.2805 189.794 47.4505C187.914 46.6105 186.264 45.4605 184.844 43.9805C183.424 42.5005 182.314 40.7905 181.504 38.8305C180.704 36.8705 180.294 34.7705 180.294 32.5305C180.294 30.2905 180.694 28.1905 181.504 26.2305C182.304 24.2705 183.424 22.5605 184.844 21.1005C186.264 19.6405 187.914 18.4905 189.794 17.6505C191.674 16.8105 193.694 16.4005 195.854 16.4005H208.894V5.98047H195.854C192.294 5.98047 188.964 6.67049 185.874 8.06049V8.05048Z", "M236.254 5.96973H225.114L234.254 25.0898H221.414V5.96973H211.454V59.1097H221.414V35.5097H226.804L238.044 59.1097H249.184L237.944 35.5097H250.364L236.254 5.96973Z", "M332.084 26.9604H317.194C317.094 26.5704 316.984 26.1304 316.864 25.6304C316.744 25.1304 316.594 24.6004 316.424 24.0304C316.154 23.1104 315.844 21.9804 315.504 20.6604C315.164 19.3304 314.764 17.7604 314.324 15.9604H304.834C306.474 15.5004 307.904 15.1004 309.124 14.7604C310.334 14.4204 311.394 14.1304 312.284 13.8804C313.174 13.6304 313.924 13.4204 314.544 13.2404C315.164 13.0604 315.704 12.9205 316.184 12.8105C317.484 12.5605 318.684 12.4404 319.774 12.4404C322.134 12.4404 323.844 13.0005 324.904 14.1205C325.964 15.2405 326.104 16.8204 325.314 18.8504C326.104 18.1004 326.704 17.1904 327.114 16.1304C327.524 15.0604 327.734 13.9304 327.754 12.7404C327.774 11.5504 327.584 10.3704 327.194 9.21045C326.804 8.05045 326.194 7.00046 325.374 6.06046C324.554 5.12046 323.504 4.36044 322.214 3.79044C320.934 3.22044 319.414 2.94043 317.674 2.94043H316.564C316.204 2.94043 315.834 2.98045 315.464 3.05045C314.434 3.19045 313.154 3.48045 311.614 3.90045C310.074 4.33045 308.414 4.82045 306.634 5.37045C304.854 5.92045 302.994 6.51043 301.064 7.13043C299.134 7.75043 297.244 8.33045 295.394 8.87045C293.544 9.40045 291.804 9.86044 290.154 10.2304C288.514 10.6004 287.094 10.8305 285.894 10.9005C284.664 10.9705 283.434 10.9504 282.224 10.8504C281.004 10.7404 279.864 10.5104 278.784 10.1604C277.704 9.80043 276.704 9.29044 275.784 8.61044C274.854 7.93044 274.074 7.06045 273.424 5.99045C273.634 7.98045 274.194 9.79043 275.114 11.4104C276.044 13.0304 277.184 14.4104 278.554 15.5504C279.924 16.6904 281.454 17.5904 283.154 18.2504C284.844 18.9104 286.584 19.2905 288.364 19.4005C289.494 19.4405 290.534 19.3804 291.494 19.2404C292.344 19.1004 293.334 18.9005 294.444 18.6505C295.554 18.4005 296.764 18.1204 298.064 17.8004C297.554 18.0904 296.904 18.4405 296.134 18.8705C295.364 19.3005 294.574 19.7304 293.774 20.1805C292.974 20.6305 292.204 21.0704 291.494 21.5204C290.774 21.9704 290.214 22.3504 289.804 22.6704C289.014 23.2804 288.624 24.1105 288.624 25.1805V52.8504C288.624 54.6704 288.414 56.1304 288.004 57.2304C287.594 58.3304 286.994 58.8904 286.204 58.8904C285.724 58.8904 285.194 58.6504 284.614 58.1704C284.034 57.6904 283.394 56.9104 282.684 55.8504C281.974 54.7904 281.234 53.4004 280.454 51.7104C279.664 50.0205 278.844 47.9604 277.994 45.5404V59.1604H287.744C289.424 59.1604 290.934 58.8504 292.284 58.2304C293.634 57.6104 294.784 56.7404 295.724 55.6404C296.664 54.5404 297.384 53.2104 297.884 51.6604C298.384 50.1104 298.624 48.4304 298.624 46.6104V21.6704C298.624 20.3504 298.784 19.3505 299.084 18.6505C299.394 17.9605 299.834 17.4804 300.414 17.2304C301.064 17.0504 301.684 16.8804 302.284 16.7204C302.884 16.5604 303.454 16.4104 304.004 16.2704C304.144 16.8804 304.324 17.6404 304.564 18.5704C304.804 19.5004 305.074 20.5104 305.384 21.6104C305.694 22.7104 306.014 23.8704 306.334 25.0804C306.654 26.2904 306.974 27.4804 307.284 28.6604C307.664 30.0104 308.034 31.4204 308.414 32.8804C308.794 34.3404 309.184 35.8504 309.594 37.4204H301.174V59.1604H311.084V37.4204H332.074V59.1604H342.084V6.02045H332.074V27.0104L332.084 26.9604Z", "M345.504 8.61996C345.824 9.80996 346.194 11.1999 346.604 12.7899C347.014 14.3699 347.454 16.08 347.934 17.92C348.414 19.75 348.894 21.58 349.374 23.39C349.954 25.56 350.544 27.81 351.144 30.12C351.744 32.43 352.364 34.8599 353.014 37.3799H344.594V59.12H381.344V48.7H354.554V37.3799H375.544V26.96H360.664L357.844 16.3799H381.354V5.95996H344.804C344.944 6.52996 345.174 7.40995 345.494 8.59995L345.504 8.61996Z", "M405.244 8.61996C405.564 9.80996 405.934 11.1999 406.344 12.7899C406.754 14.3699 407.194 16.08 407.674 17.92C408.154 19.75 408.634 21.58 409.114 23.39C409.694 25.56 410.284 27.81 410.884 30.12C411.484 32.43 412.104 34.8599 412.754 37.3799H404.334V59.12H414.294V37.3799H435.284V26.96H420.404L417.584 16.3799H441.094V5.95996H404.544C404.684 6.52996 404.914 7.40995 405.234 8.59995L405.244 8.61996Z", "M476.414 48.7005H466.094C463.834 48.7005 461.914 48.3505 460.324 47.6605C458.734 46.9705 457.444 45.9805 456.454 44.7005C455.464 43.4205 454.744 41.8605 454.294 40.0305C453.844 38.2005 453.624 36.1205 453.624 33.8105V5.98047H443.614V33.7505C443.614 37.6705 444.114 41.1905 445.124 44.3305C446.134 47.4605 447.604 50.1205 449.534 52.3105C451.464 54.5005 453.824 56.1805 456.594 57.3605C459.364 58.5305 462.534 59.1205 466.084 59.1205H486.304V5.98047H476.394V48.7105L476.414 48.7005Z", "M488.884 16.3897H514.294H529.944V5.96973H488.884V16.3897Z", "M504.334 59.1096H514.294V16.3896L504.334 21.6696V59.1096Z", "M565.314 48.7005H554.994C552.734 48.7005 550.814 48.3505 549.224 47.6605C547.634 46.9705 546.344 45.9805 545.354 44.7005C544.364 43.4205 543.644 41.8605 543.194 40.0305C542.744 38.2005 542.524 36.1205 542.524 33.8105V5.98047H532.514V33.7505C532.514 37.6705 533.014 41.1905 534.024 44.3305C535.034 47.4605 536.504 50.1205 538.434 52.3105C540.364 54.5005 542.724 56.1805 545.494 57.3605C548.264 58.5305 551.434 59.1205 554.994 59.1205H575.214V5.98047H565.304V48.7105L565.314 48.7005Z", "M656.474 48.11C656.474 49.18 656.054 50.09 655.214 50.83C654.374 51.58 653.304 51.95 652.004 51.95C650.904 51.95 649.744 51.63 648.514 50.99C647.964 50.71 647.314 50.33 646.564 49.87C645.814 49.41 645.004 48.9 644.154 48.35C643.294 47.8 642.414 47.21 641.514 46.59C640.604 45.97 639.724 45.35 638.874 44.75C637.504 43.82 636.304 43.17 635.284 42.8C634.254 42.43 633.354 42.24 632.564 42.24C631.634 42.24 630.874 42.46 630.274 42.91C629.674 43.36 629.154 43.93 628.704 44.62C628.254 45.31 627.864 46.1 627.524 46.97C627.184 47.84 626.844 48.72 626.494 49.59C626.154 50.46 625.774 51.28 625.364 52.05C624.954 52.82 624.454 53.43 623.874 53.89C623.254 54.42 622.604 54.69 621.924 54.69C621.344 54.69 620.794 54.51 620.284 54.15C619.774 53.79 619.264 53.33 618.774 52.76C618.274 52.19 617.794 51.55 617.334 50.84C616.874 50.13 616.414 49.41 615.974 48.7C615.014 47.17 614.164 45.73 613.434 44.4C612.694 43.06 611.984 41.74 611.304 40.44C610.624 39.14 609.934 37.81 609.254 36.46C608.574 35.11 607.804 33.64 606.944 32.08C608.994 31.51 610.774 30.73 612.284 29.73C613.784 28.73 615.034 27.61 616.034 26.37C617.024 25.13 617.764 23.8 618.244 22.4C618.724 20.99 618.964 19.58 618.964 18.16C618.964 16.17 618.584 14.42 617.804 12.9C617.034 11.39 616.004 10.12 614.724 9.09003C613.444 8.06003 611.974 7.28002 610.334 6.77002C608.694 6.25002 606.974 6 605.204 6C603.974 6 602.824 6.11001 601.764 6.32001C600.704 6.53001 599.724 6.81002 598.834 7.15002C597.944 7.49002 597.114 7.87002 596.344 8.30002C595.574 8.73002 594.834 9.17001 594.114 9.64001C592.914 10.46 591.664 11.17 590.344 11.78C589.024 12.39 587.544 12.69 585.904 12.69C585.284 12.69 584.674 12.64 584.054 12.53C582.304 12.28 580.964 11.59 580.024 10.45C579.084 9.31001 578.804 7.83002 579.174 6.02002H578.964C578.244 8.01002 577.874 9.76 577.864 11.25C577.844 12.75 578.054 13.99 578.484 14.99C578.914 15.99 579.514 16.74 580.284 17.26C581.054 17.78 581.864 18.03 582.724 18.03C583.584 18.03 584.454 17.75 585.244 17.18C586.234 16.5 587.214 15.8 588.174 15.07C589.134 14.34 590.034 13.64 590.894 12.96C591.754 12.28 592.544 11.66 593.284 11.09C594.024 10.52 594.664 10.06 595.214 9.70001C596.374 9.02001 597.574 8.68002 598.804 8.68002C599.764 8.68002 600.684 8.87002 601.574 9.24002C602.464 9.61002 603.274 10.12 604.014 10.76C604.754 11.4 605.384 12.16 605.914 13.03C606.444 13.9 606.824 14.84 607.074 15.83C607.384 17.22 607.394 18.51 607.094 19.7C606.804 20.89 606.304 22.04 605.584 23.14C604.864 24.24 603.994 25.32 602.964 26.37C601.934 27.42 600.844 28.5 599.674 29.6C598.514 30.7 597.334 31.85 596.134 33.04C594.934 34.23 593.824 35.52 592.794 36.91V23.67C592.794 21.43 593.064 19.75 593.614 18.65C594.164 17.55 595.004 16.8 596.134 16.41C593.564 16.41 591.434 16.6 589.744 16.97C588.054 17.34 586.694 18.01 585.684 18.97C584.674 19.93 583.964 21.21 583.554 22.82C583.144 24.42 582.934 26.45 582.934 28.91V48.83L587.344 57.59C587.824 58.62 588.454 59.14 589.244 59.14C589.554 59.14 589.854 59.09 590.144 58.98C590.434 58.87 590.764 58.73 591.144 58.55L594.634 56.89C595.044 56.68 595.434 56.54 595.794 56.46C596.154 56.39 596.484 56.35 596.794 56.35C597.544 56.35 598.134 56.64 598.564 57.2C598.994 57.77 599.184 58.59 599.154 59.66C599.254 58.77 599.204 57.74 599.004 56.56C598.794 55.38 598.434 54.25 597.924 53.17C597.414 52.08 596.724 51.13 595.874 50.31C595.014 49.49 593.994 48.97 592.794 48.76V38.93C592.794 38 592.984 37.27 593.354 36.74C593.734 36.21 594.314 35.64 595.104 35.03C595.344 34.82 595.584 34.71 595.824 34.71C596.264 34.71 596.744 35.23 597.264 36.26C597.504 36.76 597.824 37.4 598.244 38.18C598.654 38.96 599.114 39.84 599.624 40.8C600.144 41.76 600.694 42.79 601.294 43.9C601.894 45 602.504 46.13 603.114 47.26C604.554 49.82 605.804 51.89 606.884 53.46C607.964 55.03 608.984 56.23 609.964 57.07C610.944 57.91 611.934 58.46 612.944 58.73C613.954 59 615.104 59.13 616.414 59.13C617.724 59.13 618.794 58.81 619.754 58.17C620.714 57.53 621.604 56.81 622.424 56.01C623.244 55.21 624.054 54.44 624.864 53.71C625.664 52.98 626.564 52.53 627.554 52.35C628.174 52.24 628.874 52.3 629.664 52.51C630.454 52.72 631.284 53.05 632.174 53.5C633.064 53.95 634.024 54.47 635.054 55.08C636.084 55.69 637.144 56.31 638.234 56.95C639.434 57.66 640.694 58.21 642.034 58.58C643.364 58.95 644.684 59.14 645.984 59.14C647.424 59.14 648.794 58.92 650.094 58.47C651.394 58.02 652.544 57.35 653.554 56.44C654.564 55.53 655.364 54.39 655.944 53.02C656.524 51.65 656.814 50.02 656.814 48.13V37.98H643.724C652.244 40.62 656.504 44 656.504 48.13L656.474 48.11Z", "M620.244 5.96973L628.504 37.3797H651.034V26.9597H636.104L633.334 16.3297H656.784V5.96973H620.244Z", "M165.924 20.97L164.844 24.38C161.434 24.42 166.224 18.87 161.374 14.43C159.764 12.96 159.014 11.05 157.994 9C156.794 11.69 158.184 13.65 157.464 15.67C157.204 16.39 154.054 15.66 153.024 10.97C152.444 8.35 151.054 6.10003 148.884 5.34003L148.644 7.95001C148.604 8.44001 146.894 8.77001 146.414 8.67001C144.704 8.32001 143.124 6.38002 143.064 4.68002C143.004 3.10002 144.044 1.51 145.434 0C136.414 0.12 135.704 8.93003 133.094 8.81003C131.764 8.75003 132.074 6.36002 132.994 5.49002C128.964 6.03002 126.844 9.59003 125.804 13.34C125.564 14.2 123.674 15.17 123.264 14.27C122.924 13.53 123.404 11.61 123.674 10.83C118.994 13.13 119.724 17.13 118.594 19.89C118.484 20.15 117.844 19.79 117.764 19.52L117.264 18.03C111.934 24.32 119.534 30.65 115.884 32.5C114.994 32.52 114.024 30.52 113.484 29.28C111.444 37.45 115.064 39.08 119.274 45.05C117.784 45.89 116.774 44.88 115.034 43.66C115.544 45.44 116.364 47.17 117.454 48.69H95.4644C96.7644 47.55 98.0544 46.42 99.3444 45.3C100.624 44.18 101.934 43.08 103.274 42.02C103.684 41.66 103.984 41.34 104.174 41.06C104.364 40.78 104.454 40.28 104.454 39.56V17.23C104.454 15.2 104.544 13.51 104.734 12.16C104.924 10.81 105.204 9.70001 105.584 8.85001C105.964 8.00001 106.404 7.35002 106.914 6.93002C107.424 6.51002 108.024 6.18 108.714 5.97C107.144 5.97 105.674 6.11002 104.324 6.40002C102.974 6.69002 101.634 7.01001 100.324 7.39001C99.0044 7.76001 97.6544 8.14001 96.2644 8.51001C94.8744 8.88001 93.3644 9.16003 91.7244 9.34003C92.4444 9.77003 92.9944 10.31 93.3644 10.97C93.7444 11.63 94.0144 12.36 94.1844 13.16C94.3544 13.96 94.4544 14.81 94.4944 15.7C94.5244 16.59 94.5444 17.48 94.5444 18.37V44.7C94.5444 46.27 94.3244 47.8 93.8744 49.29C93.4244 50.79 92.8744 52.24 92.2044 53.64C91.5344 55.05 90.8244 56.44 90.0744 57.81C89.3244 59.18 88.6344 60.51 88.0244 61.79C88.5744 61.04 89.1544 60.48 89.7744 60.11C90.3944 59.74 91.2244 59.48 92.2844 59.33C93.3444 59.19 94.7144 59.12 96.3944 59.12H102.914C104.594 59.12 106.074 58.98 107.384 58.69C108.684 58.41 109.874 58.04 110.954 57.59C112.034 57.15 113.034 56.66 113.954 56.15C114.874 55.64 115.814 55.15 116.754 54.71C117.694 54.27 118.674 53.9 119.684 53.61C120.694 53.33 121.814 53.18 123.044 53.18L122.494 52.72C122.894 52.88 123.294 53.03 123.734 53.14C125.304 53.52 126.064 53.73 127.974 54.84L124.744 56.05C130.944 60.7 135.874 54.33 138.204 58.46C137.824 59.04 136.474 59.92 135.354 60.67C139.754 62.15 144.174 60.4 147.764 57.22C149.374 55.79 150.514 54.62 152.694 54.21C152.224 56.07 151.374 56.81 150.194 57.93C153.674 57.25 157.774 55.43 159.144 51.87C160.614 48.06 159.854 44.12 162.934 43.69L163.264 47.01C167.064 43.87 168.504 39.02 166.304 34.4C164.204 30 169.894 26.63 165.964 20.95L165.924 20.97ZM157.424 37.82C156.044 44.86 150.434 50.97 142.714 52.21C145.704 50.14 148.884 48.5 150.074 44.61C143.294 50.62 133.814 50.93 127.054 44.98C122.124 40.64 119.824 34.79 121.364 28.72C122.074 32.03 122.564 34.95 125.334 36.87C123.144 29.87 124.774 23.73 130.444 19.33C135.534 15.38 143.294 15.03 149.134 18.48C155.794 22.42 158.894 30.3 157.424 37.83V37.82Z"], "ECS": ["M0 183.92V14.29H47.62V40.11H31.51V81.1H45.01V106.92H31.51V158.09H47.62V183.91H0V183.92Z", "M65.87 183.92C63.66 183.92 61.88 183.09 60.53 181.43C59.19 179.77 58.52 177.76 58.52 175.39V22.82C58.52 20.45 59.19 18.44 60.53 16.78C61.88 15.12 63.65 14.29 65.87 14.29H114.67C116.88 14.29 118.7 15.12 120.12 16.78C121.55 18.44 122.25 20.45 122.25 22.82V88.44H93.58V37.27C93.58 36.17 93.34 35.37 92.87 34.9C92.4 34.43 91.69 34.19 90.74 34.19C89.79 34.19 89.09 34.39 88.61 34.78C88.14 35.18 87.9 35.93 87.9 37.03V160.94C87.9 162.05 88.1 162.88 88.49 163.43C88.88 163.99 89.64 164.26 90.74 164.26C91.53 164.26 92.2 164.02 92.76 163.55C93.31 163.08 93.58 162.29 93.58 161.18V109.77H122.25V175.39C122.25 177.76 121.54 179.77 120.12 181.43C118.7 183.09 116.88 183.92 114.67 183.92H65.87Z", "M141.44 183.92C139.38 183.92 137.61 183.09 136.1 181.43C134.6 179.77 133.85 177.76 133.85 175.39V121.14L163.46 121.61V162.36C163.46 163.31 163.66 164.06 164.05 164.61C164.44 165.17 165.2 165.44 166.3 165.44C167.25 165.44 167.92 165.17 168.31 164.61C168.7 164.06 168.9 163.31 168.9 162.36V120.43C168.9 119.17 168.62 118.22 168.07 117.59C167.52 116.96 166.53 116.25 165.11 115.46L141.65 104.09C139.59 103.14 137.82 101.84 136.31 100.18C134.81 98.52 134.06 96.27 134.06 93.43V22.82C134.06 20.45 134.73 18.44 136.07 16.78C137.42 15.12 139.19 14.29 141.41 14.29H190.92C192.98 14.29 194.72 15.12 196.13 16.78C197.56 18.44 198.26 20.45 198.26 22.82V77.07H168.88V35.85C168.88 34.75 168.68 33.95 168.29 33.48C167.9 33.01 167.23 32.77 166.28 32.77C165.18 32.77 164.43 33.01 164.03 33.48C163.63 33.95 163.44 34.67 163.44 35.61V77.31C163.44 78.73 163.71 79.8 164.27 80.51C164.82 81.22 165.73 81.81 166.99 82.29L189.97 93.66C192.5 94.61 194.51 95.91 196.01 97.57C197.51 99.23 198.26 101.56 198.26 104.56V175.4C198.26 177.77 197.55 179.78 196.13 181.44C194.71 183.1 192.97 183.93 190.92 183.93H141.41L141.44 183.92Z", "M360.31 183.92V114.5C360.31 111.82 361.06 109.76 362.57 108.34C364.07 106.92 365.84 105.58 367.9 104.31L391.59 87.96C392.85 86.86 393.8 85.99 394.43 85.35C395.06 84.72 395.37 83.77 395.37 82.51V35.6C395.37 34.97 395.26 34.42 395.02 33.94C394.78 33.46 394.5 33.15 394.19 32.99C393.88 32.83 393.32 32.75 392.53 32.75C391.9 32.75 391.35 32.83 390.88 32.99C390.41 33.15 390.08 33.46 389.93 33.94C389.78 34.42 389.69 35.05 389.69 35.84V77.06H360.31V22.82C360.31 20.45 361.03 18.44 362.44 16.78C363.87 15.12 365.68 14.29 367.89 14.29H417.17C419.37 14.29 421.19 15.12 422.62 16.78C424.04 18.44 424.75 20.45 424.75 22.82V98.4C424.75 101.09 423.93 103.22 422.27 104.8C420.61 106.38 418.91 107.8 417.18 109.06L393.72 125.17C392.45 125.96 391.46 126.71 390.76 127.42C390.05 128.13 389.69 129.2 389.69 130.62V158.58H424.75V183.93H360.31V183.92Z", "M444.41 183.92C442.2 183.92 440.42 183.09 439.07 181.43C437.73 179.77 437.06 177.76 437.06 175.39V22.82C437.06 20.45 437.73 18.44 439.07 16.78C440.42 15.12 442.19 14.29 444.41 14.29H494.17C496.22 14.29 497.91 15.12 499.26 16.78C500.6 18.44 501.27 20.45 501.27 22.82V175.39C501.27 177.76 500.6 179.77 499.26 181.43C497.91 183.09 496.22 183.92 494.17 183.92H444.41ZM469.28 164.26C470.07 164.26 470.74 164.02 471.3 163.55C471.85 163.08 472.12 162.21 472.12 160.94V37.27C472.12 36.01 471.88 35.14 471.41 34.66C470.94 34.18 470.23 33.95 469.28 33.95C468.33 33.95 467.63 34.15 467.15 34.54C466.68 34.94 466.44 35.76 466.44 37.03V160.94C466.44 162.05 466.64 162.88 467.03 163.43C467.42 163.99 468.18 164.26 469.28 164.26Z", "M514.05 183.92V114.5C514.05 111.82 514.8 109.76 516.31 108.34C517.81 106.92 519.58 105.58 521.64 104.31L545.33 87.96C546.59 86.86 547.54 85.99 548.17 85.35C548.8 84.72 549.11 83.77 549.11 82.51V35.6C549.11 34.97 549 34.42 548.76 33.94C548.52 33.46 548.24 33.15 547.93 32.99C547.62 32.83 547.06 32.75 546.27 32.75C545.64 32.75 545.09 32.83 544.62 32.99C544.15 33.15 543.82 33.46 543.67 33.94C543.52 34.42 543.43 35.05 543.43 35.84V77.06H514.05V22.82C514.05 20.45 514.77 18.44 516.18 16.78C517.61 15.12 519.42 14.29 521.63 14.29H570.91C573.11 14.29 574.93 15.12 576.36 16.78C577.78 18.44 578.49 20.45 578.49 22.82V98.4C578.49 101.09 577.67 103.22 576.01 104.8C574.35 106.38 572.65 107.8 570.92 109.06L547.46 125.17C546.19 125.96 545.2 126.71 544.5 127.42C543.79 128.13 543.43 129.2 543.43 130.62V158.58H578.49V183.93H514.05V183.92Z", "M598.16 183.92C595.95 183.92 594.17 183.09 592.82 181.43C591.48 179.77 590.81 177.76 590.81 175.39V22.82C590.81 20.45 591.48 18.44 592.82 16.78C594.17 15.12 595.94 14.29 598.16 14.29H647.67C649.88 14.29 651.7 15.12 653.13 16.78C654.55 18.44 655.26 20.45 655.26 22.82V69.49H625.65V36.08C625.65 34.82 625.45 33.99 625.06 33.59C624.66 33.2 623.99 33 623.04 33C621.94 33 621.19 33.16 620.79 33.47C620.4 33.79 620.2 34.58 620.2 35.84V79.67H647.68C650.05 79.67 651.9 80.5 653.25 82.16C654.59 83.82 655.26 85.83 655.26 88.2V175.38C655.26 177.75 654.55 179.76 653.13 181.42C651.7 183.08 649.89 183.91 647.67 183.91H598.16V183.92ZM622.8 164.26H623.04C623.99 164.26 624.66 164.1 625.06 163.79C625.44 163.48 625.65 163 625.65 162.37V101.96C625.65 101.17 625.38 100.58 624.82 100.18C624.27 99.79 623.6 99.59 622.81 99.59C622.02 99.59 621.39 99.79 620.91 100.18C620.44 100.58 620.2 101.17 620.2 101.96V162.37C620.2 163 620.44 163.48 620.91 163.79C621.39 164.11 622.02 164.26 622.81 164.26H622.8Z", "M309.37 148.3C307.57 158.21 298.51 166.8 286.49 170.64C292.32 164.26 295.6 157.55 292.62 150.36C289.91 143.82 282.05 139.53 274.16 138.8C264.86 137.93 255.82 141.04 251.33 147.23C246.99 153.2 247.43 159.98 252.97 165.54C238.94 162.27 223.06 151.93 223.6 140.54C225.77 143.67 227.8 146.99 232.67 147.82C217.04 135.43 222.69 117.42 240.14 107.12C238.22 112.6 237.85 118.03 243.84 120.96C249.46 123.7 257.03 123.06 263.21 120.44C268.28 118.29 272.01 113.56 272.91 108.25C274.54 98.68 268.51 89.12 256.43 85.86C254.39 85.31 250.88 85.68 249.05 86.61C247.46 87.41 246.42 89.66 245.94 91.48C234.02 75.77 246.26 63.22 259.34 50.52L273.53 36.74C279.4 31.04 282.07 23.97 282.08 16.66C282.09 10.21 277.69 5.58 273.01 0C288.15 7.35 296.58 20.78 294.2 34.24C291.91 47.17 277.21 56.93 276.97 68.9C279.38 62.15 285.46 56.02 295.6 55.48C285.8 60.54 280.99 68.52 284.23 77.2C285.96 81.84 289.23 86.23 293.67 89.66L305.59 98.88C310.53 102.7 313.14 107.49 313.05 113.01L312.87 123.74C312.8 127.94 316.58 131.63 321.79 132.28C324.62 132.63 326.53 131.59 327.82 129.37C339.46 139.28 331.1 157.14 318.99 167.58C305.46 179.25 288.31 187.86 268.39 192.38L288.94 181.84C301.5 175.4 315.17 159.63 309.39 148.3H309.37Z"]};
+const $ = id => document.getElementById(id);
+
+/* ============ settings ============ */
+const DEFAULTS = {
+  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.8, wOut:0.8,
+  edge:"thermal", wdir:135, soft:6, jitter:25, wease:"out",
+  twarp:24, trim:110, tsmear:75, tlead:8,
+  cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.9, ease:5, kin:1.6, kout:1.6,
+  shift:0, kf:null, ikf:null, kfAuto:true, pal:"MSI 2024", palRev:false,
+  bg:"#ff2b12", fg:"#000000",
+  inv:"each", invPhase:50, invStart:false,
+  angle:15, scale:100, start:0, dir:1,
+  blur:true, shutter:180,
+  out:"scene", range:"all", size:"1920x1080", fps:30, alpha:false, q:0.5,
+};
+const SPEED_PRESETS = {
+  smooth:{cruise:40, dist:1.5, dur:1.2, ease:3},
+  std:   {cruise:60, dist:2,   dur:0.8, ease:5},
+  snap:  {cruise:30, dist:2.5, dur:0.55,ease:8},
+  linear:{cruise:180,dist:0,   dur:0.8, ease:5},
+};
+const COLOR_PRESETS = [
+  ["#ff2b12","#000000"],["#000000","#ff2b12"],["#ff0000","#000000"],["#ff5a2a","#000000"],["#ffffff","#000000"],["#000000","#ffffff"],
+];
+const STORE = "u19-tile-scroll-v7";
+let S = Object.assign({}, DEFAULTS);
+try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
+let saveT = 0;
+const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} }, 250); };
+
+/* ============ time model ============
+   0 ── A ──▶ holdA ── transition (trans) ──▶ ── B ──▶ total
+   inside the transition: band front enters over wIn, band back leaves over the last wOut */
+const total = () => S.holdA + S.trans + S.holdB;
+const wInD  = () => Math.min(S.wIn,  S.trans);
+const wOutD = () => Math.min(S.wOut, S.trans);
+const tileClock = t => t - S.holdA;
+const cutTime = () => S.holdA + (wInD() + (S.trans - wOutD())) / 2;   // the moment the band covers most
+const EASES = {
+  io:  u => u<.5 ? 4*u*u*u : 1 - Math.pow(-2*u+2, 3)/2,
+  out: u => 1 - Math.pow(1-u, 2.2),
+  in:  u => u*u*u,
+  lin: u => u,
+};
+const clamp01 = x => Math.min(1, Math.max(0, x));
+function wipeProgress(t){
+  const tc = tileClock(t), e = EASES[S.wease] || EASES.io;
+  const a = e(clamp01(tc / wInD()));
+  const b = e(clamp01((tc - (S.trans - wOutD())) / wOutD()));
+  return [a, b];
+}
+
+/* ============ speed curve (analytic, any frame can be rendered exactly) ============ */
+const BLOCK = 212;
+const E  = (u,n) => u<=0 ? 0 : u>=1 ? 1 : (u<.5 ? .5*Math.pow(2*u,n) : 1-.5*Math.pow(2*(1-u),n));
+const dE = (u,n) => (u<=0||u>=1) ? 0 : (u<.5 ? n*Math.pow(2*u,n-1) : n*Math.pow(2*(1-u),n-1));
+const iv = () => Math.max(S.interval, S.dur);
+function dashAt(tc){ if (tc < S.offset) return {k:-1,u:-1}; const k = Math.floor((tc - S.offset)/iv()); return {k, u:(tc - S.offset - k*iv())/S.dur}; }
+// entry / exit kick: tiles arrive already moving fast and settle (and speed up again as they leave)
+const kickIn  = () => [0, Math.max(0.15, wInD()*1.4)];
+const kickOut = () => { const d = Math.max(0.15, wOutD()*1.4); return [S.trans - d, d]; };
+function kickPos(tc){
+  const [a0, ad] = kickIn(), [b0, bd] = kickOut();
+  const u = clamp01((tc - a0)/ad), v = clamp01((tc - b0)/bd);
+  return S.kin*BLOCK*(1 - Math.pow(1-u, 3)) + S.kout*BLOCK*v*v*v;
+}
+function kickVel(tc){
+  const [a0, ad] = kickIn(), [b0, bd] = kickOut();
+  const u = (tc - a0)/ad, v = (tc - b0)/bd;
+  return (u>0&&u<1 ? S.kin*BLOCK*3*(1-u)*(1-u)/ad : 0) + (v>0&&v<1 ? S.kout*BLOCK*3*v*v/bd : 0);
+}
+function invCenters(){ const out=[]; if (S.inv==="off") return out; for (let k=0;;k++){ const c = S.offset + k*iv() + S.dur*S.invPhase/100; if (c > S.trans) break; out.push(c); if (S.inv==="once") break; } return out; }
+function dashStarts(){ const out=[]; for (let k=0;;k++){ const s = S.offset + k*iv(); if (s > S.trans) break; out.push(s); } return out; }
+
+/* ============ keyframes (AE-like) ============
+   S.kf  : [{t, ease:'smooth'|'linear'|'hold', v:{shift?, angle?, scale?}}]  — global time, sorted
+   S.ikf : [{t}]                                                             — colour flips          */
+const KF_PARAMS = ['shift','angle','scale'];
+const snapT = t => Math.round(t*S.fps)/S.fps;
+const keyAt = t => S.kf.find(k => Math.abs(k.t - t) < .5/S.fps);
+const ikeyAt = t => S.ikf.find(k => Math.abs(k.t - t) < .5/S.fps);
+const easeF = (e, f) => e === 'hold' ? (f >= 1 ? 1 : 0) : e === 'linear' ? f : E(f, S.ease);
+function sampleParam(p, t){
+  let a = null;
+  for (const k of S.kf){
+    if (k.v[p] === undefined) continue;
+    if (k.t >= t){ if (!a) return k.v[p]; const f = easeF(a.ease, (t - a.t)/Math.max(1e-6, k.t - a.t)); return a.v[p] + (k.v[p] - a.v[p])*f; }
+    a = k;
+  }
+  return a ? a.v[p] : undefined;
+}
+const keyed = p => S.kf.some(k => k.v[p] !== undefined);
+const shiftAt = t => { const v = sampleParam('shift', t); return v === undefined ? S.shift : v; };
+function posAt(tc){ return S.cruise*tc + kickPos(tc) + shiftAt(tc + S.holdA)*BLOCK; }
+function velAt(tc){ const h = 1/240, t = tc + S.holdA; return S.cruise + kickVel(tc) + (shiftAt(t + h) - shiftAt(t - h))/(2*h)*BLOCK; }
+function invAt(t){ let n = 0; for (const k of S.ikf) if (k.t <= t + 1e-6) n++; return ((S.invStart?1:0) + n) % 2; }
+function sortKeys(){ S.kf.sort((a,b)=>a.t-b.t); S.ikf.sort((a,b)=>a.t-b.t); }
+function snapshotAt(t){ const v = {}; for (const p of KF_PARAMS){ const s = sampleParam(p, t); v[p] = s === undefined ? S[p] : s; } return v; }
+// the old automatic dashes / flips, written out as ordinary keys
+function autoKeys(){
+  const kf = [], ikf = []; let sh = 0;
+  if (S.dist > 0) for (const s of dashStarts()){
+    const t0 = snapT(S.holdA + s), t1 = snapT(S.holdA + s + S.dur);
+    kf.push({ t:t0, ease:'smooth', v:{ shift:sh } }); sh += S.dist;
+    kf.push({ t:t1, ease:'linear', v:{ shift:sh } });
+  }
+  for (const c of invCenters()) ikf.push({ t:snapT(S.holdA + c) });
+  S.kf = kf; S.ikf = ikf; S.kfAuto = true; S.shift = 0; SEL.clear();
+}
+let kfUIDirty = false, dragKey = null;
+function applyKeys(t){
+  for (const p of KF_PARAMS){ const v = sampleParam(p, t); if (v !== undefined && Math.abs(S[p] - v) > 1e-9){ S[p] = v; kfUIDirty = true; } }
+}
+function syncKfUI(){
+  if (!kfUIDirty) return; kfUIDirty = false;
+  for (const p of KF_PARAMS){ const s = sliders[p]; if (!s || p === dragKey) continue; s.r.value = S[p]; s.pv.textContent = s.fmt(S[p]); }
+}
+function kfEdit(p){                     // editing a keyed value records it at the playhead (AE stopwatch on)
+  if (!KF_PARAMS.includes(p) || recording) return false;
+  if (!S.kf.length || (p !== 'shift' && !keyed(p))) return false;
+  playing = false;
+  let k = keyAt(playhead);
+  if (!k){ k = { t:snapT(playhead), ease:'smooth', v:{} }; S.kf.push(k); sortKeys(); toast(`${tc(k.t)} にキーを追加しました`); }
+  k.v[p] = S[p]; playhead = k.t; S.kfAuto = false; return true;
+}
+
+/* ============ tile atlas, measured from Figma frame "HUD" (985:5999) ============ */
+const AS = 3, PU = 951, PV = 424, CELL = 445, ORIGIN = [-552, -164];
+const AW = Math.round(PU*AS), AH = Math.round(PV*AS);
+function svgImage(paths, vb, w, h){
+  const body = paths.map(d => `<path d="${d}"/>`).join('');
+  const s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${Math.round(w)}" height="${Math.round(h)}" fill="#ff0000">${body}</svg>`;
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s); });
+}
+async function buildAtlas(){
+  try { await Promise.race([document.fonts.load('700 40px "Unbounded"'), new Promise(r=>setTimeout(r,1500))]); } catch(e){}
+  const [imgMain, imgEcs, imgWord, imgU] = await Promise.all([
+    svgImage(P.MAIN, '0 0 765.45 316.29', CELL*AS, 183.9*AS),
+    svgImage(P.ECS,  '0 0 656 193',       CELL*AS, 130.6*AS),
+    svgImage(P.WORD, '0 0 657 66',        CELL*AS, 44.7*AS),
+    svgImage(P.MAIN.slice(0,4), '0 6.6 287.7 225.5', 12.8*AS, 10*AS),
+  ]);
+  const c = document.createElement('canvas'); c.width = AW; c.height = AH;
+  const x = c.getContext('2d');
+  x.fillStyle = '#000'; x.fillRect(0,0,AW,AH);
+  const put = fn => { for (const dx of [-AW,0,AW]) for (const dy of [-AH,0,AH]) { x.save(); x.translate(dx,dy); fn(); x.restore(); } };
+  const textBlock = (ox, oy) => {
+    const X = v => (ox+v)*AS, Y = v => (oy+v)*AS;
+    x.drawImage(imgEcs,  X(0), Y(0),     CELL*AS, 130.6*AS);
+    x.drawImage(imgWord, X(0), Y(147.5), CELL*AS, 44.7*AS);
+    x.fillStyle = '#ff0000'; x.font = `700 ${10*AS}px "Unbounded", "Arial Black", sans-serif`; x.textBaseline = 'alphabetic';
+    const txt = 'U19ECS 2026', m = x.measureText(txt), capH = m.actualBoundingBoxAscent || 7.2*AS;
+    x.save(); x.translate(X(0), Y(142.9)); x.scale(80*AS/m.width, 6.6*AS/capH); x.fillText(txt, 0, 0); x.restore();
+    x.drawImage(imgU, X(384), Y(134.2), 12.8*AS, 10*AS);
+    const q = 3.6*AS; for (let i=0;i<5;i++) x.fillRect(X(402) + i*q, Y(134.6) + (i%2 ? q : 0), q, q);
+    const gx = X(436.6), gy = Y(139.2), rx = 8.2*AS, ry = 4.6*AS;
+    x.strokeStyle = '#ff0000'; x.lineWidth = 1.1*AS;
+    x.beginPath(); x.ellipse(gx,gy,rx,ry,0,0,Math.PI*2); x.stroke();
+    x.beginPath(); x.ellipse(gx,gy,rx*.45,ry,0,0,Math.PI*2); x.stroke();
+    x.beginPath(); x.moveTo(gx-rx,gy); x.lineTo(gx+rx,gy); x.moveTo(gx,gy-ry); x.lineTo(gx,gy+ry); x.stroke();
+  };
+  const logoBlock = (ox, oy) => x.drawImage(imgMain, ox*AS, oy*AS, CELL*AS, 183.9*AS);
+  put(() => { textBlock(0, 0); logoBlock(0, 215); textBlock(475.5, -94); logoBlock(475.5, 121); });
+  return c;
+}
+
+/* ============ scenes (A / B) ============ */
+const scenes = { A:{ kind:'sample', el:null, name:'サンプル' }, B:{ kind:'sample', el:null, name:'サンプル' } };
+const sceneCv = { A:document.createElement('canvas'), B:document.createElement('canvas') };
+let sceneDirty = true;
+function drawSample(which, g, w, h){
+  const A = which === 'A';
+  const gr = g.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, A ? '#16324a' : '#2a1036'); gr.addColorStop(1, A ? '#05090f' : '#0c0610');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.strokeStyle = A ? 'rgba(120,200,255,.14)' : 'rgba(255,140,220,.14)'; g.lineWidth = Math.max(1, w/960);
+  const step = w/16; for (let x = 0; x <= w; x += step){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (let y = 0; y <= h; y += step){ g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.fillStyle = '#fff'; g.font = `700 ${Math.round(h*0.12)}px "Unbounded", "Arial Black", sans-serif`; g.textBaseline = 'alphabetic';
+  g.fillText(A ? 'SCENE A' : 'SCENE B', w*0.06, h*0.2);
+  g.font = `${Math.round(h*0.03)}px ui-monospace, Menlo, monospace`; g.fillStyle = 'rgba(255,255,255,.6)';
+  g.fillText(A ? 'BEFORE · ROUND 03' : 'AFTER · FINAL', w*0.06, h*0.27);
+}
+function drawScene(which, g, w, h){
+  const s = scenes[which];
+  if (s.kind === 'sample' || !s.el){ drawSample(which, g, w, h); return; }
+  const el = s.el, iw = el.videoWidth || el.naturalWidth || el.width, ih = el.videoHeight || el.naturalHeight || el.height;
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+  if (!iw || !ih) return;
+  const k = Math.max(w/iw, h/ih), dw = iw*k, dh = ih*k;
+  g.drawImage(el, (w-dw)/2, (h-dh)/2, dw, dh);
+}
+function sceneTime(which, t){ return which === 'A' ? t : Math.max(0, t - (S.holdA + S.trans - wOutD())); }
+function drawThumbs(){ for (const w of ['A','B']){ const c = $('thumb'+w), g = c.getContext('2d'); drawScene(w, g, c.width, c.height); $('name'+w).textContent = scenes[w].name; } }
+function loadScene(which, file){
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const isVid = (file.type || '').startsWith('video') || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+  if (isVid){
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
+    v.addEventListener('loadeddata', () => { scenes[which] = { kind:'video', el:v, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に動画を読み込みました`); }, { once:true });
+    v.addEventListener('seeked', () => { sceneDirty = dirty = true; });
+    v.addEventListener('error', () => toast('この動画は読み込めませんでした（MP4 / WebM を試してください）'), { once:true });
+    v.src = url;
+  } else {
+    const i = new Image();
+    i.onload = () => { scenes[which] = { kind:'image', el:i, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に画像を読み込みました`); };
+    i.onerror = () => toast('この画像は読み込めませんでした');
+    i.src = url;
+  }
+}
+function syncVideos(t, exact){
+  for (const w of ['A','B']){
+    const s = scenes[w]; if (s.kind !== 'video') continue;
+    const v = s.el, st = Math.min(Math.max(0, sceneTime(w, t)), Math.max(0, v.duration - 1e-3));
+    if (!exact && playing){ if (v.paused) v.play().catch(()=>{}); if (Math.abs(v.currentTime - st) > 0.25) v.currentTime = st; }
+    else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - st) > 0.5/S.fps) v.currentTime = st; }
+  }
+}
+function seekExact(v, t){
+  return new Promise(res => {
+    const target = Math.min(Math.max(0, t), Math.max(0, v.duration - 1e-3));
+    if (Math.abs(v.currentTime - target) < 1e-4 && v.readyState >= 2){ res(); return; }
+    let done = false; const fin = () => { if (!done){ done = true; res(); } };
+    v.addEventListener('seeked', () => { if ('requestVideoFrameCallback' in v){ let ok = false; v.requestVideoFrameCallback(() => { ok = true; fin(); }); setTimeout(() => { if (!ok) fin(); }, 120); } else fin(); }, { once:true });
+    setTimeout(fin, 3000); v.currentTime = target;
+  });
+}
+
+/* ============ WebGL ============ */
+const view = $("view");
+const gl = view.getContext('webgl2', { antialias:false, alpha:true, premultipliedAlpha:true, preserveDrawingBuffer:true });
+const VS = `#version 300 es
+in vec2 a; void main(){ gl_Position = vec4(a,0.,1.); }`;
+const FS = `#version 300 es
+precision highp float;
+uniform sampler2D uTex, uA, uB, uLut;
+uniform vec2 uRes, uCenterPx, uBase, uRot;
+uniform float uPxPerFig, uScroll, uBlur, uInv, uAlpha;
+uniform int uTaps;
+uniform vec3 uBg, uFg;
+uniform vec2 uDir, uProj;                 // wipe direction (screen, y down), projection min & 1/extent
+uniform float uFrontIn, uFrontOut, uSoft, uJitter, uUnderB;
+uniform int uEdge, uOut;                  // edge: 0 line, 1 block, 2 column, 3 thermal · out: 0 composite, 1 tiles only
+uniform float uTWarp, uTRim, uTSmear, uTLead, uTime, uPre, uFrSp;
+uniform vec4 uFr;                         // frame heat fronts: grow-in, cool-in, grow-out, cool-out
+out vec4 o;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1./6.,1./3.); const vec4 D=vec4(0.,.5,1.,2.);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+  float n_=.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.+1.; vec4 s1=floor(b1)*2.+1.; vec4 sh=-step(h,vec4(0.));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.); m=m*m;
+  return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+float fbm(vec3 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ s+=a*snoise(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s; }
+// thermal ramp: 0 = tile ground colour … .8 = violet rim … 1 = black
+vec3 heat(float h){ return texture(uLut, vec2(clamp(1. - h, 0., 1.)*.99 + .005, .5)).rgb; }   // palette: left = cold, right = hot
+vec2 toScreen(vec2 R){                    // inverse of the tile mapping
+  vec2 q = R - uBase - vec2(0., uScroll);
+  vec2 f = vec2(q.x*uRot.x + q.y*uRot.y, -q.x*uRot.y + q.y*uRot.x);
+  return f * uPxPerFig + uCenterPx;
+}
+float sOf(vec2 p){ return (dot(p, uDir) - uProj.x) * uProj.y; }
+void main(){
+  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec2 f = (p - uCenterPx) / uPxPerFig;
+  vec2 R = vec2(f.x*uRot.x - f.y*uRot.y, f.x*uRot.y + f.y*uRot.x) + uBase + vec2(0., uScroll);
+  const vec2 period = vec2(951., 424.);
+
+  /* wipe position: thermal (warped), per pixel, per block, or per column */
+  float s;
+  vec2 q = p / uRes.y;
+  vec2 flow = vec2(0.);
+  float bd = 1., n = 0.;
+  if (uEdge == 3){
+    n = fbm(vec3(q*2.0, uTime*.55)) + .35*fbm(vec3(q*5.2 + 3.1, uTime*.9));
+    vec2 uvp = p / uRes; bd = min(min(uvp.x, uvp.y), min(1.-uvp.x, 1.-uvp.y)) * uRes.y / min(uRes.x, uRes.y);
+    s = sOf(p) + n*uTWarp;
+    flow = vec2(fbm(vec3(q*1.6, uTime*.4 + 7.)), fbm(vec3(q*1.6 + 4.7, uTime*.4 + 7.)));
+  }
+  else if (uEdge == 0) s = sOf(p);
+  else {
+    float c = floor(R.x / 475.5);
+    float off = mod(c, 2.) > .5 ? -94. : 0.;
+    float r = floor((R.y - off) / 212.);
+    vec2 cc = vec2(c*475.5 + 222.5, off + r*212. + 100.);
+    if (uEdge == 2){ cc.y = R.y; r = 0.; }
+    s = sOf(toScreen(cc)) + (hash(vec2(c, r)) - .5) * uJitter;
+  }
+  float cIn  = 1. - smoothstep(uFrontIn  - uSoft, uFrontIn,  s);   // 1 = band has arrived
+  float cOut = 1. - smoothstep(uFrontOut - uSoft, uFrontOut, s);   // 1 = band has left (B)
+  float wT = max(cIn - cOut, 0.), wA = 1. - cIn, wB = min(cOut, cIn);
+
+  vec2 uv = p / uRes;
+  vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
+
+  if (uEdge == 3){
+    /* thermal: every pixel walks the same stages, at its own time
+       0 scene → .06 violet fringe → .32 white/yellow/orange → .50 red over the scene → .62 red → 1 sharp tiles
+       pixels near the frame edge start earlier (uTLead) and walk slower, so the frame stays hot the longest */
+    float border = 1. - smoothstep(0., .22, bd);
+    float wid = uTRim * (1. + .6*border);                          // edges walk a little slower
+    float Lin  = clamp((uFrontIn  - s) / wid, 0., 1.);
+    float Lout = clamp((uFrontOut - s) / wid, 0., 1.);
+    float st = min(Lin, 1. - Lout);
+    float u = clamp((st - .62) / .38, 0., 1.);                     // tile focus 0 → 1
+    float soft = 1. - u;
+    float smear = uTSmear * pow(soft, 1.5);
+    vec2 Rs = R + flow * 140. * smear;
+    float bias = smear * 7.;
+    float m = 0.;
+    if (uTaps <= 1) m = texture(uTex, Rs / period, bias).r;
+    else {
+      for (int i = 0; i < 48; i++){
+        if (i >= uTaps) break;
+        float k = float(i) / float(uTaps - 1) - .5;
+        m += texture(uTex, (Rs + vec2(0., k*uBlur)) / period, bias).r;
+      }
+      m /= float(uTaps);
+    }
+    vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
+    float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
+
+    float nb = fbm(vec3(q*3.1 + 11., uTime*.8));
+    vec3 oc; float oa;
+    // inside the picture the heat is warm (yellow → orange) and turns into a see-through red;
+    // the white / violet / black part of the ramp lives on the frame edge (below)
+    if (st < .25){ float k = st / .25; oc = heat(mix(.42, .17, k) + .05*nb); oa = .72 * smoothstep(0., 1., k); }
+    else if (st < .45){ float k = (st - .25) / .20; oc = mix(heat(.17), uBg, smoothstep(0., .7, k)); oa = mix(.72, .9, k) + .06*nb; }
+    else if (st < .62){ float k = (st - .45) / .17; oc = uBg; oa = mix(.9, 1., k); }
+    else {
+      float f = smoothstep(0., .4, u);
+      oc = mix(uBg, tcol, f); oa = mix(1., ta, f);
+      // leftover heat pockets inside the red, cooling as the tiles come into focus
+      float pocket = smoothstep(.12, .55, nb) * soft * soft * (.55 + .45*border);
+      float lum = max(oc.r, max(oc.g, oc.b));
+      oc = mix(oc, heat(.18 + .25*smoothstep(.12, .9, nb)) * (.25 + .75*lum), pocket); oa = max(oa, pocket);
+    }
+    // frame heat: black at the very edge → violet → white → yellow → orange, fading into the picture.
+    // It travels along the frame from the corner the wipe starts at (bottom-right by default)
+    // to the opposite corner, and cools away in the same order — on the way in and on the way out
+    float sd = clamp(sOf(p), 0., 1.);
+    float aIn  = smoothstep(0., 1., clamp((uFr.x - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.y - sd)/uFrSp, 0., 1.)));
+    float aOut = smoothstep(0., 1., clamp((uFr.z - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.w - sd)/uFrSp, 0., 1.)));
+    float amt = max(aIn, aOut);
+    if (amt > 0.001){
+      float bw = uTLead * amt * (1. + .6*(1. - sd));               // thicker on the side the wipe comes from
+      float bh = clamp(1. - (bd + (n + .6*nb)*.045*amt) / max(bw, 1e-4), 0., 1.);
+      float vw = smoothstep(0., .5, bh);
+      vec3 vc = heat(.15 + .85*pow(bh, 2.2));                       // mostly orange/yellow, violet & black only at the very edge
+      float na = oa + vw*(1. - oa);
+      oc = (oc*oa*(1. - vw) + vc*vw) / max(na, 1e-4); oa = na;
+    }
+
+    if (uOut == 1){ o = vec4(oc * oa, oa); return; }
+    vec3 scene = Lout > 0. ? texture(uB, uv).rgb : texture(uA, uv).rgb;
+    o = vec4(scene * (1. - oa) + oc * oa, 1.);
+    return;
+  }
+
+  /* block / column / line */
+  float m = 0.;
+  if (uTaps <= 1) m = texture(uTex, R / period).r;
+  else {
+    for (int i = 0; i < 48; i++){
+      if (i >= uTaps) break;
+      float k = float(i) / float(uTaps - 1) - .5;
+      m += texture(uTex, (R + vec2(0., k*uBlur)) / period).r;
+    }
+    m /= float(uTaps);
+  }
+  vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
+  float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
+  if (uOut == 1){ o = vec4(tcol * ta * wT, ta * wT); return; }
+  vec3 sa = texture(uA, uv).rgb, sb = texture(uB, uv).rgb;
+  vec3 under = mix(sa, sb, uUnderB);
+  vec3 col = (tcol * ta + under * (1. - ta)) * wT + sa * wA + sb * wB;
+  o = vec4(col, 1.);
+}`;
+let U = {}, texA, texB, texLut, lutDirty = true;
+/* thermal palettes — same colours as Heatmap Blur (0 = cold … 1 = hot); "BG" = the tile ground colour */
+const PALETTES = {
+  "MSI 2024": [[0,"#080014"],[0.2,"#701ff5"],[0.36,"#ccbdff"],[0.48,"#ffffcc"],[0.6,"#ffcc29"],[0.78,"#ff6600"],[1,"BG"]],
+  "HEAT（動画）": [[0.00,"#000000"],[0.05,"#0d0317"],[0.11,"#1e0839"],[0.17,"#330e5e"],[0.23,"#4b1468"],[0.29,"#71205a"],[0.35,"#a4263a"],[0.41,"#d33412"],[0.48,"#ef6800"],[0.55,"#f9a50b"],[0.62,"#ffcf24"],[0.69,"#f5e42c"],[0.76,"#e6f34c"],[0.83,"#e0fb7c"],[0.90,"#ecfcb6"],[0.96,"#f6fbe4"],[1.00,"#fbfbf6"]],
+  "U19": [[0,"#000000"],[0.06,"#04121c"],[0.14,"#0c3a57"],[0.23,"#2c86b4"],[0.32,"#54B6DF"],[0.42,"#a9d9de"],[0.52,"#F2EFC9"],[0.62,"#E6A06D"],[0.72,"#FF5A2A"],[0.86,"#FFA64A"],[1,"#FFD873"]],
+  "U19 ミラー": [[0,"#000000"],[0.05,"#061722"],[0.12,"#1a6a92"],[0.19,"#54B6DF"],[0.29,"#F2EFC9"],[0.41,"#E6A06D"],[0.48,"#FF5A2A"],[0.53,"#FFD873"],[0.58,"#FF5A2A"],[0.66,"#E6A06D"],[0.79,"#F2EFC9"],[0.91,"#54B6DF"],[1,"#89C9D3"]],
+  "U19 アイス": [[0,"#000000"],[0.07,"#160a05"],[0.16,"#5a1a0c"],[0.26,"#FF5A2A"],[0.36,"#E6A06D"],[0.47,"#F2EFC9"],[0.58,"#89C9D3"],[0.7,"#54B6DF"],[0.84,"#a9dcef"],[1,"#f4fbfd"]],
+  "U19 レッド": [[0,"#000000"],[0.08,"#1a0604"],[0.2,"#5a1208"],[0.36,"#b8230f"],[0.52,"#FF5A2A"],[0.68,"#ff8452"],[0.82,"#E6A06D"],[0.93,"#F2EFC9"],[1,"#fbf8ea"]],
+  "IRONBOW": [[0,"#000000"],[0.15,"#140a4a"],[0.32,"#5a0f8a"],[0.5,"#c4204d"],[0.66,"#f26a16"],[0.82,"#ffc83a"],[1,"#fffbe8"]],
+  "THERMO": [[0,"#000000"],[0.12,"#0a0f5c"],[0.28,"#0060ff"],[0.44,"#00e0ff"],[0.58,"#30ff60"],[0.72,"#ffe600"],[0.86,"#ff3a00"],[1,"#ffffff"]],
+  "ACID": [[0,"#000000"],[0.2,"#0b2410"],[0.42,"#1f7a2a"],[0.64,"#7bdc23"],[0.82,"#d9ff4a"],[1,"#f6ffe4"]],
+  "ACID RED": [[0,"#000000"],[0.2,"#26050a"],[0.42,"#8f0a16"],[0.64,"#f5101c"],[0.82,"#ff3a26"],[0.93,"#ff7a4e"],[1,"#ffc9b0"]],
+  "ICE": [[0,"#000000"],[0.18,"#06122e"],[0.38,"#163f99"],[0.58,"#2f8fff"],[0.78,"#9ae6ff"],[1,"#ffffff"]],
+  "MAGENTA": [[0,"#000000"],[0.18,"#1b0425"],[0.38,"#6c0b5b"],[0.56,"#e0197d"],[0.74,"#ff7ab6"],[0.9,"#ffd1e6"],[1,"#ffffff"]],
+  "MONO": [[0,"#000000"],[1,"#ffffff"]],
+};
+const palStops = (name, rev) => (PALETTES[name] || PALETTES["MSI 2024"]).map(([p, c]) => [rev ? 1 - p : p, c === 'BG' ? S.bg : c]).sort((a,b)=>a[0]-b[0]);
+const palCSS = (name, rev) => `linear-gradient(90deg,${palStops(name, rev).map(([p,c]) => `${c} ${(p*100).toFixed(1)}%`).join(',')})`;
+function uploadLut(){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
+  for (const [p, col] of palStops(S.pal, S.palRev)) gr.addColorStop(Math.min(1, Math.max(0, p)), col);
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 1);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texLut);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  lutDirty = false;
+}
+function compile(){
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  ['uTex','uA','uB','uLut','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre','uFr','uFrSp'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+}
+function makeTex(unit, mip){
+  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const wrap = mip ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,255]));
+  return t;
+}
+function uploadAtlas(img){
+  makeTex(0, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
+  const an = gl.getExtension('EXT_texture_filter_anisotropic');
+  if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  texA = makeTex(1, false); texB = makeTex(2, false); texLut = makeTex(3, false);
+  gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uA, 1); gl.uniform1i(U.uB, 2); gl.uniform1i(U.uLut, 3);
+}
+function uploadScenes(W, H){
+  for (const [w, unit, tex] of [['A',1,texA],['B',2,texB]]){
+    const c = sceneCv[w]; if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+    drawScene(w, c.getContext('2d'), W, H);
+    gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  }
+}
+const hex3 = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
+const outSize = () => S.size.split('x').map(Number);
+let forceQ = null, lastSceneKey = '';
+function render(t, q){
+  const [OW, OH] = outSize(); const qq = q ?? forceQ ?? S.q;
+  const W = Math.round(OW*qq), H = Math.round(OH*qq);
+  if (view.width !== W || view.height !== H){ view.width = W; view.height = H; sceneDirty = true; }
+  gl.viewport(0, 0, W, H);
+  const k0 = Math.max(W, H) / 1920, k = k0 * S.scale/100;
+  const cf = [W/2/k0, H/2/k0];
+  const c15 = Math.cos(15*Math.PI/180), s15 = Math.sin(15*Math.PI/180);
+  const base = [cf[0]*c15 - cf[1]*s15 - ORIGIN[0], cf[0]*s15 + cf[1]*c15 - ORIGIN[1]];
+  const a = S.angle*Math.PI/180, tc = tileClock(t);
+  const v = velAt(tc), blurLen = S.blur ? v * (S.shutter/360) / S.fps : 0;
+  const taps = blurLen < 0.6 ? 1 : Math.min(48, Math.max(6, Math.ceil(blurLen * k * 0.9)));
+  // wipe geometry
+  const wa = S.wdir*Math.PI/180, dir = [Math.cos(wa), -Math.sin(wa)];
+  const pr = [[0,0],[W,0],[0,H],[W,H]].map(([x,y]) => x*dir[0] + y*dir[1]);
+  const pmin = Math.min(...pr), ext = Math.max(...pr) - pmin;
+  const th = S.edge === 'thermal';
+  const soft = S.edge === 'line' ? Math.max(0.002, S.soft/100) : th ? 0.003 : 0.004;
+  const jit = (S.edge === 'line' || th) ? 0 : S.jitter/100;
+  const cellR = (S.edge === 'line' || th) ? 0 : 260*k/ext;        // half a block, in wipe units
+  // start just before the earliest point can be reached (edges lead, warp pulls it forward) and end once the rim has cleared
+  const base0 = soft + jit/2 + cellR;
+  const mStart = base0 + (th ? S.twarp/100*0.8 : 0);
+  const mEnd   = base0 + (th ? S.twarp/100*0.8 + S.trim/100*1.6 : 0);
+  const [pa, pb] = wipeProgress(t);
+  const front = u => -mStart + u*(1 + mStart + mEnd);
+  gl.uniform2f(U.uRes, W, H); gl.uniform2f(U.uCenterPx, W/2, H/2);
+  gl.uniform2f(U.uBase, base[0], base[1]); gl.uniform2f(U.uRot, Math.cos(a), Math.sin(a));
+  gl.uniform1f(U.uPxPerFig, k); gl.uniform1f(U.uScroll, S.dir * (posAt(tc) + S.start*BLOCK));
+  gl.uniform1f(U.uBlur, blurLen); gl.uniform1i(U.uTaps, taps);
+  gl.uniform1f(U.uInv, invAt(t)); gl.uniform1f(U.uAlpha, S.alpha ? 1 : 0);
+  gl.uniform3fv(U.uBg, hex3(S.bg)); gl.uniform3fv(U.uFg, hex3(S.fg));
+  gl.uniform2f(U.uDir, dir[0], dir[1]); gl.uniform2f(U.uProj, pmin, 1/ext);
+  gl.uniform1f(U.uFrontIn, front(pa)); gl.uniform1f(U.uFrontOut, front(pb));
+  gl.uniform1f(U.uSoft, soft); gl.uniform1f(U.uJitter, jit);
+  gl.uniform1f(U.uUnderB, t >= cutTime() ? 1 : 0);
+  gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : S.edge === 'column' ? 2 : 3);
+  gl.uniform1f(U.uTWarp, S.twarp/100); gl.uniform1f(U.uTRim, S.trim/100); gl.uniform1f(U.uTSmear, S.tsmear/100); gl.uniform1f(U.uTLead, S.tlead/100); gl.uniform1f(U.uTime, tc);
+  { // frame heat fronts in wipe units (0 = start corner … 1 = far corner); each sweeps 0 → 1 + spread
+    const wi = wInD(), wo = wOutD(), sp = 0.3, f = u => clamp01(u) * (1 + sp);
+    // fire on paper: it smoulders at the corner for a moment, then each burning bit lights the next and it runs away
+    // the corner catches at once, then the spread speeds up
+    const catchUp = u => u <= 0 ? 0 : .16 + .84 * (Math.exp(2.6*Math.min(u,1)) - 1) / (Math.exp(2.6) - 1);
+    const gIn  = f(catchUp(tc / (wi*.42)));
+    const cIn  = f(catchUp((tc - wi*.36) / (wi*.5)));
+    const xs = S.trans - wo;                                         // exit starts
+    const gOut = f(catchUp((tc - xs) / (wo*.42)));
+    const cOut = f(catchUp((tc - xs - wo*.42) / (wo*.5)));
+    gl.uniform4f(U.uFr, th ? gIn : 0, th ? cIn : 0, th ? gOut : 0, th ? cOut : 0);
+    gl.uniform1f(U.uFrSp, sp); gl.uniform1f(U.uPre, 0); }
+  gl.uniform1i(U.uOut, S.out === 'tiles' ? 1 : 0);
+  if (S.out !== 'tiles'){
+    const hasVid = scenes.A.kind === 'video' || scenes.B.kind === 'video';
+    const key = `${W}x${H}`;
+    if (sceneDirty || hasVid || key !== lastSceneKey){ uploadScenes(W, H); sceneDirty = false; lastSceneKey = key; }
+  }
+  if (lutDirty) uploadLut();
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* ============ UI builders ============ */
+const ROWS = {
+  timeRows: [
+    ["holdA","Aの長さ",0,5,0.05, v=>`${v.toFixed(2)}s`],
+    ["trans","トランジション",0.4,8,0.05, v=>`${v.toFixed(2)}s`],
+    ["holdB","Bの長さ",0,5,0.05, v=>`${v.toFixed(2)}s`],
+    ["wIn","帯が入る長さ",0.1,4,0.05, v=>`${v.toFixed(2)}s`],
+    ["wOut","帯が抜ける長さ",0.1,4,0.05, v=>`${v.toFixed(2)}s`],
+  ],
+  wipeRows: [
+    ["wdir","角度",0,359,1, v=>`${v}°`],
+    ["jitter","ばらつき",0,100,1, v=>`${v}%`],
+    ["soft","ぼかし",0,40,0.5, v=>`${v}%`],
+    ["twarp","うねり",0,40,0.5, v=>`${v}%`],
+    ["trim","熱の段階の長さ",20,200,1, v=>`${v}%`],
+    ["tsmear","にじみ",0,100,1, v=>`${v}%`],
+    ["tlead","フチの熱",0,40,0.5, v=>`${v}%`],
+  ],
+  speedRows: [
+    ["shift","流れの位置",-20,20,0.05, v=>v.toFixed(2)],
+    ["ease","イーズの強さ",1,10,0.5, v=>`${v}`],
+    ["cruise","巡航スピード",0,400,5, v=>`${v}px/s`],
+    ["kin","入りの勢い",0,5,0.1, v=>v.toFixed(1)],
+    ["kout","抜けの勢い",0,5,0.1, v=>v.toFixed(1)],
+  ],
+  autoRows: [
+    ["dist","加速で進む量",0,8,0.25, v=>v.toFixed(2)],
+    ["dur","加速の長さ",0.2,3,0.05, v=>`${v.toFixed(2)}s`],
+    ["interval","加速の間隔",0.4,8,0.1, v=>`${v.toFixed(1)}s`],
+    ["offset","最初の加速",0,8,0.05, v=>`${v.toFixed(2)}s`],
+  ],
+  invRows: [["invPhase","反転の瞬間",0,100,1, v=>v===50?"最速":`${v}%`]],
+  angleRows: [
+    ["angle","角度",-90,90,0.5, v=>`${v}°`],
+    ["scale","大きさ",40,300,1, v=>`${v}%`],
+    ["start","柄の開始位置",0,2,0.01, v=>v.toFixed(2)],
+  ],
+  blurRows: [["shutter","シャッター角",0,360,5, v=>`${v}°`]],
+};
+const sliders = {};
+function buildRows(){
+  for (const [cid, rows] of Object.entries(ROWS)){
+    const box = $(cid);
+    for (const [key, label, min, max, step, fmt] of rows){
+      const row = document.createElement('div'); row.className = 'prow';
+      row.innerHTML = `<span>${label}</span><input type="range" id="r_${key}" min="${min}" max="${max}" step="${step}" aria-label="${label}"><span class="pv" id="v_${key}" title="クリックで数値入力"></span>`;
+      box.appendChild(row);
+      const r = row.querySelector('input'), pv = row.querySelector('.pv');
+      sliders[key] = { r, pv, fmt, row };
+      r.addEventListener('input', () => { S[key] = parseFloat(r.value); pv.textContent = fmt(S[key]); changed(key); });
+      r.addEventListener('pointerdown', () => { dragKey = key; });
+      r.addEventListener('pointerup', () => { dragKey = null; });
+      r.addEventListener('dblclick', () => { S[key] = DEFAULTS[key]; changed(key); });
+      pv.addEventListener('click', () => {
+        const inp = document.createElement('input'); inp.type = 'text'; inp.value = S[key];
+        inp.style.cssText = 'width:52px;flex:0 0 52px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:10px var(--mono);padding:1px 3px;text-align:right';
+        pv.replaceWith(inp); inp.focus(); inp.select();
+        let closed = false;
+        const done = ok => { if (closed) return; closed = true; if (ok){ const n = parseFloat(inp.value); if (!isNaN(n)){ S[key] = Math.min(max, Math.max(min, n)); changed(key); } } inp.replaceWith(pv); syncUI(); };
+        inp.addEventListener('keydown', e => { if (e.key==='Enter') done(true); if (e.key==='Escape') done(false); e.stopPropagation(); });
+        inp.addEventListener('blur', () => done(true), { once:true });
+      });
+    }
+  }
+}
+function segBind(id, key, parse){
+  $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S[key] = parse(b.dataset.v); changed(key); });
+}
+function syncSeg(id, val){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(val))); }
+const WIPE_HINT = {
+  thermal:'参考動画の入り方。どの場所も「シーン → 紫のフチ → 白・黄・オレンジの熱 → 透ける赤 → 赤 → ぼけたタイル → くっきり」の順に変わり、右下から先に進みます。画面のフチのサーモは、紙に火が移るように右下の角でくすぶってから加速して左上の角まで燃え広がり、冷めるのも右下からです（フチの熱）。熱の段階の長さを上げると、画面全体がゆっくり同時に変わる感じに、下げると線のワイプに近づきます。',
+  block:'タイルの区切りごとに、帯の進む順で切り替わります。ばらつきで順番を少し崩せます。',
+  column:'傾いた列ごとに切り替わります。ばらつきで列ごとのタイミングをずらせます。',
+  line:'まっすぐなワイプ。ぼかしで境目を柔らかくできます。',
+};
+function syncUI(){
+  for (const [k, s] of Object.entries(sliders)){ s.r.value = S[k]; s.pv.textContent = s.fmt(S[k]); }
+  syncSeg('invSeg', S.inv); syncSeg('dirSeg', S.dir); syncSeg('fpsSeg', S.fps); syncSeg('qSeg', S.q);
+  syncSeg('edgeSeg', S.edge); syncSeg('wdirSeg', S.wdir); syncSeg('weaseSeg', S.wease); syncSeg('outSeg', S.out); syncSeg('rangeSeg', S.range);
+  $('speedPreset').querySelectorAll('button').forEach(b => { const p = SPEED_PRESETS[b.dataset.p]; b.classList.toggle('on', Object.keys(p).every(k => S[k] === p[k])); });
+  $('bgC').value = S.bg; $('bgT').value = S.bg.toUpperCase(); $('fgC').value = S.fg; $('fgT').value = S.fg.toUpperCase();
+  $('chips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.bg === S.bg && c.dataset.fg === S.fg));
+  $('invStart').checked = S.invStart; $('blurOn').checked = S.blur; $('alpha').checked = S.alpha; $('size').value = S.size;
+  sliders.invPhase.r.disabled = S.inv === 'off';
+  sliders.soft.row.classList.toggle('hide', S.edge !== 'line');
+  sliders.jitter.row.classList.toggle('hide', S.edge === 'line' || S.edge === 'thermal');
+  for (const k of ['twarp','trim','tsmear','tlead']) sliders[k].row.classList.toggle('hide', S.edge !== 'thermal');
+  $('wipeHint').textContent = WIPE_HINT[S.edge];
+  $('palChips').querySelectorAll('.chip').forEach(c => { c.classList.toggle('on', c.dataset.p === S.pal); c.querySelector('i').style.background = palCSS(c.dataset.p, S.palRev); });
+  $('ramp').style.background = palCSS(S.pal, S.palRev); $('palRev').checked = S.palRev;
+  $('kfState').textContent = S.kfAuto ? `キー：自動（下の設定とタイミングに追従）— 流れ ${S.kf.length}・反転 ${S.ikf.length}。キーを動かす・消す・足すと手動になります。`
+                                      : `キー：手動 — 流れ ${S.kf.length}・反転 ${S.ikf.length}。「この設定でキーを打ち直す」で自動に戻ります（今のキーは上書き）。`;
+  view.classList.toggle('alpha', S.out === 'tiles');
+  $('tcEnd').textContent = '/ ' + tc(total());
+  const [w,h] = outSize(); $('meta').textContent = `${w}×${h} · ${S.fps}fps · ${total().toFixed(2)}s`;
+}
+const GEN_KEYS = new Set(['dist','dur','interval','offset','holdA','trans','inv','invPhase','preset','all']);
+function changed(key){
+  if (playhead > total()) playhead = 0;
+  if (kfEdit(key)) {} else if (S.kfAuto && GEN_KEYS.has(key)) autoKeys();
+  if (key === 'pal' || key === 'palRev' || key === 'bg' || key === 'all') lutDirty = true;
+  syncUI(); drawTimeline(); persist(); dirty = true;
+}
+
+/* colour */
+function setColor(which, v){ if (!/^#[0-9a-f]{6}$/i.test(v)) return false; S[which] = v.toLowerCase(); changed(which); return true; }
+function buildColor(){
+  for (const w of ['bg','fg']){
+    $(w+'C').addEventListener('input', e => setColor(w, e.target.value));
+    $(w+'T').addEventListener('change', e => { let v = e.target.value.trim(); if (!v.startsWith('#')) v = '#'+v; if (!setColor(w, v)){ toast('#RRGGBB の形で入れてください'); syncUI(); } });
+    $(w+'T').addEventListener('keydown', e => e.stopPropagation());
+  }
+  for (const [bg, fg] of COLOR_PRESETS){
+    const c = document.createElement('button'); c.className = 'chip'; c.dataset.bg = bg; c.dataset.fg = fg; c.type = 'button';
+    c.innerHTML = `<i style="background:linear-gradient(90deg,${bg} 0 55%,${fg} 55%)"></i>${bg.slice(1).toUpperCase()}`;
+    c.addEventListener('click', () => { S.bg = bg; S.fg = fg; changed('bg'); });
+    $('chips').appendChild(c);
+  }
+  $('swap').addEventListener('click', () => { [S.bg, S.fg] = [S.fg, S.bg]; changed('bg'); });
+  for (const name of Object.keys(PALETTES)){
+    const c = document.createElement('button'); c.className = 'chip'; c.dataset.p = name; c.type = 'button';
+    c.innerHTML = `<i></i>${name}`;
+    c.addEventListener('click', () => { S.pal = name; changed('pal'); });
+    $('palChips').appendChild(c);
+  }
+  $('palRev').addEventListener('change', e => { S.palRev = e.target.checked; changed('palRev'); });
+}
+
+/* scenes UI */
+function buildScenes(){
+  for (const w of ['A','B']){
+    $('file'+w).addEventListener('change', e => { loadScene(w, e.target.files[0]); e.target.value = ''; });
+    const d = $('drop'+w);
+    d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+    d.addEventListener('dragleave', () => d.classList.remove('over'));
+    d.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); d.classList.remove('over'); loadScene(w, e.dataTransfer.files[0]); });
+  }
+  const st = $('stage'), ov = $('dropOv');
+  st.addEventListener('dragover', e => { e.preventDefault(); ov.classList.add('on'); });
+  st.addEventListener('dragleave', e => { if (!st.contains(e.relatedTarget)) ov.classList.remove('on'); });
+  st.addEventListener('drop', e => { e.preventDefault(); ov.classList.remove('on'); const r = st.getBoundingClientRect(); loadScene(e.clientX < r.left + r.width/2 ? 'A' : 'B', e.dataTransfer.files[0]); });
+  $('resetScenes').addEventListener('click', () => { for (const w of ['A','B']){ if (scenes[w].kind === 'video') scenes[w].el.pause(); scenes[w] = { kind:'sample', el:null, name:'サンプル' }; } drawThumbs(); sceneDirty = dirty = true; });
+}
+
+/* ============ timeline ============ */
+let playhead = 0, playing = false, looping = true, dirty = true;
+const tc = t => { const f = Math.round(t*S.fps), fr = f % S.fps, s = Math.floor(f/S.fps); return `0:${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}:${String(fr).padStart(2,'0')}`; };
+function sizeCanvas(cv){ const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio||1, 2); const w = Math.max(1, Math.round(r.width*d)), h = Math.max(1, Math.round(r.height*d)); if (cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; } return [w,h,d]; }
+const FONT = () => getComputedStyle(document.body).fontFamily;
+function drawTimeline(){
+  const L = total(), x = (t, w) => t/L*w;
+  // ruler
+  let [w,h,d] = sizeCanvas($('ruler')); let g = $('ruler').getContext('2d');
+  g.clearRect(0,0,w,h); g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'top';
+  const step = L > 12 ? 2 : L > 5 ? 1 : 0.5;
+  for (let s = 0; s <= L + 1e-6; s += step){
+    const X = Math.round(x(s,w-1)) + .5;
+    g.fillStyle = '#5a5a64'; g.fillRect(X-.5, h-7*d, 1, 7*d);
+    g.fillStyle = '#8a8a96'; if (X < w - 26*d) g.fillText(s.toFixed(step < 1 ? 1 : 0)+'s', X+3*d, 1*d);
+  }
+  const sub = S.fps >= 30 ? S.fps/6 : S.fps/4; g.fillStyle = '#3a3a42';
+  for (let f = 0; f <= L*S.fps; f += sub){ g.fillRect(Math.round(f/S.fps/L*(w-1)), h-3*d, 1, 3*d); }
+
+  // phase strip: A | 入る | タイル | 抜ける | B
+  [w,h,d] = sizeCanvas($('phase')); g = $('phase').getContext('2d'); g.clearRect(0,0,w,h);
+  const t0 = S.holdA, t1 = t0 + wInD(), t3 = t0 + S.trans, t2 = t3 - wOutD();
+  const seg = (a, b, fill, label, col) => { if (b <= a) return; g.fillStyle = fill; g.fillRect(x(a,w), 0, x(b,w)-x(a,w), h); if (label && x(b,w)-x(a,w) > 40*d){ g.fillStyle = col; g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'middle'; g.fillText(label, x(a,w)+5*d, h/2); } };
+  seg(0, t0, '#121216', 'A', '#6a6a74');
+  const grIn = g.createLinearGradient(x(t0,w),0,x(t1,w),0); grIn.addColorStop(0,'#2a1410'); grIn.addColorStop(1, S.bg);
+  seg(t0, t1, grIn, '帯が入る', '#fff');
+  seg(t1, t2, S.bg, 'タイル', S.fg);
+  const grOut = g.createLinearGradient(x(t2,w),0,x(t3,w),0); grOut.addColorStop(0, S.bg); grOut.addColorStop(1,'#1a1220');
+  seg(Math.max(t2, t0), t3, grOut, '帯が抜ける', '#fff');
+  seg(t3, L, '#121216', 'B', '#6a6a74');
+  if (t2 < t1){ g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x(t2,w), 0, x(t1,w)-x(t2,w), h); }
+  const cx = x(cutTime(), w); g.fillStyle = '#e6e6ef'; g.fillRect(cx-.5*d, 0, 1.5*d, h);
+
+  // speed graph (tile clock), only meaningful inside the transition
+  [w,h,d] = sizeCanvas($('graph')); g = $('graph').getContext('2d'); g.clearRect(0,0,w,h);
+  const n = Math.min(800, Math.round(w)); let vmax = 1; const vs = [];
+  for (let i=0;i<=n;i++){ const tt = i/n*L, v = velAt(tileClock(tt)); vs.push(v); if (tt >= t0 && tt <= t3 && v > vmax) vmax = v; }
+  const Y = v => h - 3*d - Math.min(1, v/vmax)*(h - 8*d);
+  g.save(); g.beginPath(); g.rect(x(t0,w), 0, x(t3,w)-x(t0,w), h); g.clip();
+  g.beginPath(); g.moveTo(0, h); vs.forEach((v,i) => g.lineTo(i/n*w, Y(v))); g.lineTo(w, h); g.closePath();
+  g.fillStyle = 'rgba(255,90,31,.18)'; g.fill();
+  g.beginPath(); vs.forEach((v,i) => i ? g.lineTo(i/n*w, Y(v)) : g.moveTo(0, Y(v)));
+  g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.4*d; g.stroke(); g.restore();
+  g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(0, 0, w, 17*d);           // flip-key lane
+  g.fillStyle = '#6a6a74'; g.font = `${8.5*d}px ${FONT()}`; g.textBaseline = 'top';
+  g.fillText('反転', 4*d, 3*d); g.textBaseline = 'bottom'; g.fillText('流れ', 4*d, h - 3*d);
+  g.fillText(`max ${Math.round(vmax)}px/s`, w - 92*d, h - 2*d);
+  drawKeys(); syncBar();
+}
+const KSHAPE = { linear:'M6.5 .6L12.4 6.5L6.5 12.4L.6 6.5Z', smooth:'M1.2 .8H11.8L7.6 6.5L11.8 12.2H1.2L5.4 6.5Z', hold:'M1.6 1.6H11.4V11.4H1.6Z' };
+const SEL = new Set();
+const keyOf = el => el.dataset.k[0] === 'f' ? S.kf[+el.dataset.k.slice(1)] : S.ikf[+el.dataset.k.slice(1)];
+function drawKeys(){
+  for (const k of [...SEL]) if (!S.kf.includes(k) && !S.ikf.includes(k)) SEL.delete(k);
+  const W = $('tl').clientWidth, L = total(), X = t => (t/L*W).toFixed(1);
+  $('kmarks').innerHTML =
+    S.kf.map((k,i) => `<i class="kmark f${SEL.has(k)?' sel':''}" data-k="f${i}" style="left:${X(k.t)}px" title="流れ ${tc(k.t)}"><svg viewBox="0 0 13 13"><path d="${KSHAPE[k.ease]||KSHAPE.smooth}"/></svg></i>`).join('') +
+    S.ikf.map((k,i) => `<i class="kmark iv${SEL.has(k)?' sel':''}" data-k="i${i}" style="left:${X(k.t)}px" title="反転 ${tc(k.t)}"><svg viewBox="0 0 11 11"><rect x=".8" y=".8" width="9.4" height="9.4"/><rect class="half" x="1.4" y="1.4" width="4.1" height="8.2"/></svg></i>`).join('');
+  const k = keyAt(playhead), tg = SEL.size ? [...SEL].filter(q => S.kf.includes(q)) : (k ? [k] : []);
+  $('kEase').disabled = !tg.length; if (tg.length) $('kEase').value = tg[0].ease;
+  $('kKey').classList.toggle('on', !!k); $('kInv').classList.toggle('on', !!ikeyAt(playhead));
+}
+let lastKB = '';
+function drawKeysLite(){ const s = (keyAt(playhead)?1:0) + '' + (ikeyAt(playhead)?1:0); if (s === lastKB) return; lastKB = s; $('kKey').classList.toggle('on', s[0]==='1'); $('kInv').classList.toggle('on', s[1]==='1'); }
+function keysEdited(){ S.kfAuto = false; sortKeys(); persist(); syncUI(); drawTimeline(); dirty = true; }
+function toggleKey(){
+  if (recording) return; playing = false;
+  const k = keyAt(playhead);
+  if (k){ S.kf = S.kf.filter(x => x !== k); toast('流れのキーを削除しました'); }
+  else { const nk = { t:snapT(playhead), ease:'smooth', v:snapshotAt(playhead) }; S.kf.push(nk); playhead = nk.t; toast(`${tc(nk.t)} に流れのキーを打ちました`); }
+  keysEdited();
+}
+function toggleInvKey(){
+  if (recording) return; playing = false;
+  const k = ikeyAt(playhead);
+  if (k){ S.ikf = S.ikf.filter(x => x !== k); toast('反転のキーを削除しました'); }
+  else { S.ikf.push({ t:snapT(playhead) }); toast(`${tc(snapT(playhead))} で色が反転します`); }
+  keysEdited();
+}
+function deleteSelected(){ if (!SEL.size) return; const n = SEL.size; S.kf = S.kf.filter(k => !SEL.has(k)); S.ikf = S.ikf.filter(k => !SEL.has(k)); SEL.clear(); keysEdited(); toast(`${n}個のキーを削除しました`); }
+function setEase(v){
+  const k = keyAt(playhead), tg = SEL.size ? [...SEL].filter(q => S.kf.includes(q)) : (k ? [k] : []);
+  if (!tg.length) return toast('流れのキーを選んでください');
+  for (const q of tg) q.ease = v; keysEdited(); toast({ smooth:'イーズ', linear:'リニア', hold:'停止' }[v] + 'にしました');
+}
+function bindKeys(){
+  const km = $('kmarks');
+  km.addEventListener('pointerdown', e => {
+    const mk = e.target.closest('.kmark'); if (!mk || recording) return;
+    e.stopPropagation(); e.preventDefault(); playing = false;
+    const k = keyOf(mk); if (!k) return;
+    if (e.shiftKey){ SEL.has(k) ? SEL.delete(k) : SEL.add(k); } else if (!SEL.has(k)){ SEL.clear(); SEL.add(k); }
+    const x0 = e.clientX, W = $('tl').clientWidth, orig = new Map([...SEL].map(q => [q, q.t])); let moved = false;
+    mk.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      if (!moved && Math.abs(ev.clientX - x0) < 3) return; moved = true;
+      const dt = (ev.clientX - x0)/W*total();
+      for (const [q, t0] of orig) q.t = Math.min(total(), Math.max(0, snapT(t0 + dt)));
+      km.querySelectorAll('.kmark').forEach(el => { const q = keyOf(el); if (q) el.style.left = (q.t/total()*W) + 'px'; });
+      dirty = true;
+    };
+    const up = () => { mk.removeEventListener('pointermove', mv); mk.removeEventListener('pointerup', up); if (moved) keysEdited(); else drawKeys(); };
+    mk.addEventListener('pointermove', mv); mk.addEventListener('pointerup', up);
+    drawKeys();
+  });
+  km.addEventListener('dblclick', e => { const mk = e.target.closest('.kmark'); if (mk){ const k = keyOf(mk); if (k){ playing = false; seekTo(k.t); } } });
+  $('kKey').addEventListener('click', toggleKey);
+  $('kInv').addEventListener('click', toggleInvKey);
+  $('kEase').addEventListener('change', e => setEase(e.target.value));
+  $('kAuto').addEventListener('click', () => { autoKeys(); syncUI(); drawTimeline(); persist(); dirty = true; toast('設定どおりにキーを打ち直しました'); });
+  $('kClear').addEventListener('click', () => { if (!S.kf.length && !S.ikf.length) return toast('キーはありません'); S.kf = []; S.ikf = []; S.shift = 0; SEL.clear(); keysEdited(); toast('キーを全部消しました（流れは巡航と勢いだけになります）'); });
+}
+function syncBar(){
+  $('cti').style.left = (playhead / total() * $('tl').clientWidth) + 'px';
+  $('tlabel').textContent = tc(playhead);
+  $('play').textContent = playing ? '❚❚' : '▶';
+}
+function seekTo(t){ const fr = 1/S.fps; playhead = Math.min(total(), Math.max(0, Math.round(t/fr)*fr)); dirty = true; syncBar(); }
+function stepFrames(n){ playing = false; seekTo(playhead + n/S.fps); }
+function marks(){ const ks = S.kf.map(k=>k.t).concat(S.ikf.map(k=>k.t)); return (ks.length ? ks.concat([0, total()]) : [0, S.holdA, cutTime(), S.holdA+S.trans, total()]).sort((a,b)=>a-b); }
+function jump(dir){
+  const pts = marks(), eps = 1/(S.fps*2);
+  const t = dir > 0 ? pts.find(p => p > playhead + eps) : [...pts].reverse().find(p => p < playhead - eps);
+  playing = false; seekTo(t ?? (dir > 0 ? total() : 0));
+}
+function bindTimeline(){
+  const tl = $('tl');
+  const at = e => { const r = tl.getBoundingClientRect(); return (e.clientX - r.left) / r.width * total(); };
+  tl.addEventListener('pointerdown', e => {
+    if (recording) return;
+    if (SEL.size && !e.shiftKey){ SEL.clear(); }
+    tl.setPointerCapture(e.pointerId); playing = false; seekTo(at(e));
+    const mv = ev => seekTo(ev.shiftKey && Math.abs(at(ev) - cutTime()) < .15 ? cutTime() : at(ev));
+    const up = () => { tl.removeEventListener('pointermove', mv); tl.removeEventListener('pointerup', up); };
+    tl.addEventListener('pointermove', mv); tl.addEventListener('pointerup', up);
+  });
+  $('play').addEventListener('click', togglePlay);
+  $('kPrev').addEventListener('click', () => jump(-1));
+  $('kNext').addEventListener('click', () => jump(1));
+  $('kCut').addEventListener('click', () => { playing = false; seekTo(cutTime()); });
+  $('kLoop').addEventListener('click', toggleLoop);
+  addEventListener('resize', () => { drawTimeline(); dirty = true; });
+}
+function toggleLoop(){ looping = !looping; $('kLoop').classList.toggle('on', looping); }
+function togglePlay(){ if (recording) return; if (!playing && playhead >= total() - 1e-6) playhead = 0; playing = !playing; syncBar(); }
+
+/* keyboard (AE-like) */
+const typing = () => { const el = document.activeElement; if (!el) return false; if (/TEXTAREA|SELECT/.test(el.tagName)) return true; return el.tagName === 'INPUT' && !['range','checkbox','button','color','file'].includes(el.type); };
+addEventListener('keydown', e => {
+  if (typing()) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')){ e.preventDefault(); stepFrames((e.code==='ArrowLeft'?-1:1)*(e.shiftKey?10:1)); return; }
+  if (mod) return;
+  switch (e.code){
+    case 'Space': e.preventDefault(); togglePlay(); break;
+    case 'KeyJ': e.preventDefault(); jump(-1); break;
+    case 'KeyK': e.preventDefault(); if (e.altKey) toggleKey(); else jump(1); break;
+    case 'KeyI': e.preventDefault(); toggleInvKey(); break;
+    case 'Delete': case 'Backspace': if (SEL.size){ e.preventDefault(); deleteSelected(); } break;
+    case 'F9': e.preventDefault(); setEase('smooth'); break;
+    case 'Escape': if (SEL.size){ SEL.clear(); drawKeys(); } break;
+    case 'KeyC': e.preventDefault(); playing = false; seekTo(cutTime()); break;
+    case 'KeyL': e.preventDefault(); toggleLoop(); break;
+    case 'PageUp': e.preventDefault(); stepFrames(e.shiftKey?-10:-1); break;
+    case 'PageDown': e.preventDefault(); stepFrames(e.shiftKey?10:1); break;
+    case 'Home': e.preventDefault(); playing = false; seekTo(0); break;
+    case 'End': e.preventDefault(); playing = false; seekTo(total()); break;
+  }
+});
+
+/* ============ toast / save ============ */
+let toastT = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3200); }
+const inClaude = !!(window.claude && window.claude.use);
+let DL = null;
+if (inClaude){ window.claude.use('downloads').then(d => { DL = d; }).catch(() => {}); }
+async function saveFile(blob, name){
+  if (inClaude){
+    if (!DL) DL = await window.claude.use('downloads').catch(() => null);
+    if (!DL){ toast('この表示では保存できません'); return false; }
+    try { await DL.save({ filename:name, data:blob }); toast(`${name} を保存しました`); return true; }
+    catch(e){
+      const c = e && e.code;
+      if (c === 'declined') toast('保存をキャンセルしました');
+      else if (c === 'rate_limited') toast('保存の確認がまだ開いています。少し待ってからもう一度');
+      else if (c === 'too_large') toast('ファイルが大きすぎます。サイズか尺を小さくしてください');
+      else toast('保存できませんでした（' + (c || e) + '）');
+      return false;
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(`${name} を保存しました`); return true;
+}
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
+const canvasPNG = () => new Promise((res, rej) => view.toBlob(b => b ? res(b) : rej(new Error('PNGに変換できませんでした')), 'image/png'));
+
+/* ============ binary helpers (MOV / MP4 / ZIP) ============ */
+const enc = new TextEncoder();
+function joinBytes(...parts){ const arrays = parts.map(p => typeof p === 'string' ? enc.encode(p) : p), out = new Uint8Array(arrays.reduce((n,a)=>n+a.length,0)); let i = 0; for (const a of arrays){ out.set(a,i); i += a.length; } return out; }
+function be32(...v){ const out = new Uint8Array(v.length*4), dv = new DataView(out.buffer); v.forEach((n,i)=>dv.setUint32(i*4,n)); return out; }
+function be16(...v){ const out = new Uint8Array(v.length*2), dv = new DataView(out.buffer); v.forEach((n,i)=>dv.setUint16(i*2,n)); return out; }
+function atom(type, ...parts){ const data = joinBytes(...parts); return joinBytes(be32(data.length+8), type, data); }
+// lossless PNG-in-MOV (same writer as Thermal Flow / Heatmap Blur / Flame Transition)
+function makeLosslessMov(frames, w, h, fps){
+  const count = frames.length, matrix = be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000), ftyp = atom('ftyp','qt  ',be32(0),'qt  '), mdatSize = frames.reduce((n,f)=>n+f.length,8);
+  const mvhd = atom('mvhd',be32(0,0,0,fps,count,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2));
+  const tkhd = atom('tkhd',be32(7,0,0,1,0,count),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536));
+  const mdhd = atom('mdhd',be32(0,0,0,fps,count),be16(0,0));
+  const hdlr = atom('hdlr',be32(0),'mhlr','vide',new Uint8Array(12),new Uint8Array([12]),'VideoHandler');
+  const vmhd = atom('vmhd',be32(1),be16(0,0,0,0));
+  const dinf = atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1))));
+  const compressor = new Uint8Array(32); compressor[0] = 3; compressor.set(enc.encode('PNG'),1);
+  const sample = atom('png ',new Uint8Array(6),be16(1,0,0),be32(0,0,0),be16(w,h),be32(72*65536,72*65536,0),be16(1),compressor,be16(32,65535));
+  const stbl = atom('stbl',atom('stsd',be32(0,1),sample),atom('stts',be32(0,1,count,1)),atom('stsc',be32(0,1,1,count,1)),atom('stsz',be32(0,0,count),be32(...frames.map(f=>f.length))),atom('stco',be32(0,1,ftyp.length+8)));
+  const moov = atom('moov',mvhd,atom('trak',tkhd,atom('mdia',mdhd,hdlr,atom('minf',vmhd,dinf,stbl))));
+  return new Blob([ftyp,be32(mdatSize),enc.encode('mdat'),...frames,moov],{type:'video/quicktime'});
+}
+// store-only ZIP (PNG is already compressed)
+const CRC = (() => { const t = new Uint32Array(256); for (let n=0;n<256;n++){ let c = n; for (let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n] = c>>>0; } return t; })();
+function crc32(b){ let c = 0xFFFFFFFF; for (let i=0;i<b.length;i++) c = CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function makeZip(files){
+  const parts = [], central = []; let off = 0;
+  for (const f of files){
+    const nm = enc.encode(f.name), crc = crc32(f.data), sz = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,sz,true); lh.setUint32(22,sz,true); lh.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(lh.buffer), nm, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(14,0x21,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,sz,true); ch.setUint32(24,sz,true); ch.setUint16(28,nm.length,true); ch.setUint32(42,off,true);
+    central.push(new Uint8Array(ch.buffer), nm);
+    off += 30 + nm.length + sz;
+  }
+  const csz = central.reduce((n,a)=>n+a.length,0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true); end.setUint32(12,csz,true); end.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(end.buffer)],{type:'application/zip'});
+}
+// MP4 (H.264 via WebCodecs)
+function mp4Codecs(w,h){ const big = w*h > 1920*1088; return big ? ["avc1.640033","avc1.4d0033","avc1.42e033"] : ["avc1.640028","avc1.4d0028","avc1.42e028"]; }
+async function pickMp4Config(w,h,fps){
+  if (!('VideoEncoder' in window)) return null;
+  const bitrate = Math.round(Math.min(120e6, Math.max(8e6, w*h*fps*.33)));
+  for (const codec of mp4Codecs(w,h)){
+    const cfg = { codec, width:w, height:h, bitrate, framerate:fps, avc:{format:'avc'}, latencyMode:'quality' };
+    try { const r = await VideoEncoder.isConfigSupported(cfg); if (r.supported) return cfg; } catch(e){}
+  }
+  return null;
+}
+function makeMp4(samples, desc, w, h, fps){
+  const N = samples.length, matrix = be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000);
+  const ftyp = atom('ftyp','isom',be32(512),'isom','iso2','avc1','mp41');
+  const pts = samples.map(s => Math.round(s.ts*fps/1e6)), D = Math.max(0, ...samples.map((s,i) => i - pts[i]));
+  const reorder = pts.some((p,i) => p !== i);
+  const build = off => {
+    const avc1 = atom('avc1',new Uint8Array(6),be16(1),be16(0,0),be32(0,0,0),be16(w,h),be32(0x00480000,0x00480000,0),be16(1),new Uint8Array(32),be16(0x18,0xffff),atom('avcC',desc),atom('colr','nclx',be16(1,1,1),new Uint8Array([0])));
+    const keys = []; samples.forEach((s,i) => { if (s.key) keys.push(i+1); });
+    const parts = [atom('stsd',be32(0,1),avc1), atom('stts',be32(0,1,N,1))];
+    if (reorder) parts.push(atom('ctts',be32(0,N),...samples.map((s,i)=>be32(1,pts[i]-i+D))));
+    parts.push(atom('stss',be32(0,keys.length),be32(...keys)), atom('stsc',be32(0,1,1,N,1)), atom('stsz',be32(0,0,N),be32(...samples.map(s=>s.data.length))), atom('stco',be32(0,1,off)));
+    const stbl = atom('stbl',...parts);
+    const mdia = atom('mdia',atom('mdhd',be32(0,0,0,fps,N),be16(0x55c4,0)),atom('hdlr',be32(0,0),'vide',new Uint8Array(12),'VideoHandler\0'),atom('minf',atom('vmhd',be32(1),be16(0,0,0,0)),atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1)))),stbl));
+    const edts = reorder ? atom('edts',atom('elst',be32(0,1,N,D,0x10000))) : new Uint8Array(0);
+    const trak = atom('trak',atom('tkhd',be32(3,0,0,1,0,N),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536)),edts,mdia);
+    return atom('moov',atom('mvhd',be32(0,0,0,fps,N,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2)),trak);
+  };
+  const mdatSize = samples.reduce((n,s)=>n+s.data.length,8);
+  const moov0 = build(0), moov = build(ftyp.length + moov0.length + 8);
+  return new Blob([ftyp,moov,be32(mdatSize),enc.encode('mdat'),...samples.map(s=>s.data)],{type:'video/mp4'});
+}
+
+/* ============ export ============ */
+let recording = null;
+const exportBtns = ['png','zip','mp4','mov'];
+const labels = { zip:'連番PNG（ZIP）', mp4:'MP4', mov:'ロスレスMOV' };
+function lockExport(activeId, on){ exportBtns.forEach(id => { if (id !== activeId) $(id).disabled = on; }); $(activeId).classList.toggle('rec', on); }
+const exportSpan = () => S.range === 'trans' ? [S.holdA, S.holdA + S.trans] : [0, total()];
+async function prepareFrame(t){
+  applyKeys(t);
+  if (S.out !== 'tiles') for (const w of ['A','B']){ const s = scenes[w]; if (s.kind === 'video'){ s.el.pause(); await seekExact(s.el, sceneTime(w, t)); sceneDirty = true; } }
+  render(t, 1);
+}
+async function runFrames(id, perFrame){
+  if (recording){ recording.stop = true; return null; }
+  const fps = S.fps, [t0, t1] = exportSpan(), N = Math.max(1, Math.round((t1 - t0)*fps));
+  const session = { stop:false, wasPlaying:playing, head:playhead }; recording = session; playing = false; forceQ = 1;
+  lockExport(id, true);
+  let ok = true;
+  try {
+    for (let i=0;i<N;i++){
+      if (session.stop){ ok = false; break; }
+      playhead = t0 + i/fps; await prepareFrame(playhead); syncBar();
+      await perFrame(i, N);
+      $(id).textContent = `■ 中止 ${i+1}/${N}`;
+      if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+  } catch(err){ ok = false; toast('書き出しに失敗しました：' + (err && err.message || err)); }
+  recording = null; forceQ = null; playing = session.wasPlaying; playhead = session.head; dirty = sceneDirty = true;
+  lockExport(id, false); $(id).textContent = labels[id]; syncBar();
+  if (session.stop) toast('書き出しを中止しました');
+  return ok && !session.stop;
+}
+const baseName = () => `u19-tile-scroll-${S.out === 'tiles' ? 'tiles-' : ''}${stamp()}`;
+$('png').addEventListener('click', async () => {
+  forceQ = 1; await prepareFrame(playhead); const b = await canvasPNG(); forceQ = null; dirty = sceneDirty = true;
+  saveFile(b, `${baseName()}_${tc(playhead).replace(/:/g,'-')}.png`);
+});
+$('zip').addEventListener('click', async () => {
+  const files = [], name = baseName(); let bytes = 0;
+  const ok = await runFrames('zip', async (i) => {
+    const data = new Uint8Array(await (await canvasPNG()).arrayBuffer()); bytes += data.length;
+    if (bytes > 1536*1024*1024) throw new Error('1.5GBを超えました。サイズか尺を小さくしてください');
+    files.push({ name:`${name}/${name}_${String(i).padStart(5,'0')}.png`, data });
+  });
+  if (ok) saveFile(makeZip(files), `${name}_${S.fps}fps.zip`);
+});
+$('mov').addEventListener('click', async () => {
+  const frames = []; let bytes = 0;
+  const ok = await runFrames('mov', async () => {
+    const data = new Uint8Array(await (await canvasPNG()).arrayBuffer()); bytes += data.length;
+    if (bytes > 1536*1024*1024) throw new Error('1.5GBを超えました。サイズか尺を小さくしてください');
+    frames.push(data);
+  });
+  if (ok){ const [w,h] = outSize(); saveFile(makeLosslessMov(frames, w, h, S.fps), `${baseName()}_${S.fps}fps.mov`); }
+});
+$('mp4').addEventListener('click', async () => {
+  if (recording){ recording.stop = true; return; }
+  const [w,h] = outSize(), fps = S.fps, cfg = await pickMp4Config(w, h, fps);
+  if (!cfg){ toast('このブラウザはMP4の書き出しに対応していません。連番PNGを使ってください'); return; }
+  const samples = []; let desc = null, encErr = null;
+  const encoder = new VideoEncoder({ output:(chunk, meta) => { if (!desc && meta && meta.decoderConfig && meta.decoderConfig.description) desc = new Uint8Array(meta.decoderConfig.description); const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({ data:b, key:chunk.type==='key', ts:chunk.timestamp }); }, error:e => { encErr = e; } });
+  encoder.configure(cfg);
+  const ok = await runFrames('mp4', async (i) => {
+    if (encErr) throw encErr;
+    const frame = new VideoFrame(view, { timestamp:Math.round(i*1e6/fps), duration:Math.round(1e6/fps), alpha:'discard' });
+    encoder.encode(frame, { keyFrame: i % (fps*2) === 0 }); frame.close();
+    while (encoder.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2));
+  });
+  try { await encoder.flush(); encoder.close(); } catch(e){ encErr = encErr || e; }
+  if (!ok) return;
+  if (encErr || !desc || !samples.length){ toast('MP4の書き出しに失敗しました' + (encErr ? '：' + encErr.message : '')); return; }
+  saveFile(makeMp4(samples, desc, w, h, fps), `${baseName()}_${fps}fps.mp4`);
+});
+
+/* ============ settings file ============ */
+$('cfgSave').addEventListener('click', () => saveFile(new Blob([JSON.stringify(S, null, 2)], { type:'application/json' }), `u19-tile-scroll-settings-${stamp()}.json`));
+$('cfgLoad').addEventListener('click', () => $('cfgFile').click());
+$('cfgFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const obj = JSON.parse(await f.text()); S = Object.assign({}, DEFAULTS, obj); if (!Array.isArray(S.kf) || !Array.isArray(S.ikf)) autoKeys(); changed('all'); toast('設定を読み込みました'); }
+  catch(err){ toast('読み込めませんでした：JSONの形式を確認してください'); }
+  e.target.value = '';
+});
+$('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); autoKeys(); changed('all'); toast('初期設定に戻しました'); });
+
+/* ============ boot ============ */
+(async function boot(){
+  if (!gl){ toast('WebGL2 が使えないブラウザです'); return; }
+  buildRows(); buildColor(); buildScenes();
+  segBind('invSeg','inv', v => v); segBind('dirSeg','dir', Number); segBind('fpsSeg','fps', Number); segBind('qSeg','q', Number);
+  segBind('edgeSeg','edge', v => v); segBind('wdirSeg','wdir', Number); segBind('weaseSeg','wease', v => v);
+  segBind('outSeg','out', v => v); segBind('rangeSeg','range', v => v);
+  $('speedPreset').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; Object.assign(S, SPEED_PRESETS[b.dataset.p]); changed('preset'); });
+  $('invStart').addEventListener('change', e => { S.invStart = e.target.checked; changed('invStart'); });
+  $('blurOn').addEventListener('change', e => { S.blur = e.target.checked; changed('blur'); });
+  $('alpha').addEventListener('change', e => { S.alpha = e.target.checked; changed('alpha'); });
+  $('size').addEventListener('change', e => { S.size = e.target.value; changed('size'); });
+  $('angleReset').addEventListener('click', () => { S.angle = 15; S.scale = 100; S.start = 0; changed('angle'); });
+  if (inClaude){ $('mov').classList.add('hide'); $('exHint').textContent += ' ロスレスMOVはMOTION LAB版で使えます。'; }
+  if (!Array.isArray(S.kf) || !Array.isArray(S.ikf)) autoKeys();
+  bindTimeline(); bindKeys(); syncUI();
+  compile(); uploadAtlas(await buildAtlas());
+  drawThumbs(); drawTimeline();
+  document.fonts && document.fonts.ready.then(() => { drawThumbs(); sceneDirty = dirty = true; });
+  let last = performance.now();
+  function loop(now){
+    const dt = Math.min(.1, (now - last)/1000); last = now;
+    if (playing && !recording){
+      playhead += dt;
+      if (playhead >= total()){ if (looping) playhead %= total(); else { playhead = total(); playing = false; } }
+      dirty = true; syncBar();
+    }
+    if (!recording){
+      const vids = scenes.A.kind === 'video' || scenes.B.kind === 'video';
+      if (vids && S.out !== 'tiles') syncVideos(playhead, false);
+      if (dirty || (vids && playing)){ applyKeys(playhead); syncKfUI(); render(playhead); dirty = false; drawKeysLite(); }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  playing = true; syncBar();
+  window.U19TS = { get state(){ return S; }, seek:t => { playing = false; seekTo(t); }, render:(t,q) => render(t,q), cutTime, total, wipeProgress };
+})().catch(err => toast('起動できませんでした：' + (err && err.message || err)));
+</script>
+</body>
+</html>
