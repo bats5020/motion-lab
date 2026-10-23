@@ -289,7 +289,7 @@ const $ = id => document.getElementById(id);
 const DEFAULTS = {
   holdA:0.6, trans:2.4, holdB:0.6, wIn:0.8, wOut:0.8,
   edge:"thermal", wdir:135, soft:6, jitter:25, wease:"out",
-  twarp:24, trim:110, tsmear:75, tlead:8,
+  twarp:24, trim:110, tsmear:75, tlead:7,
   cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.9, ease:5, kin:1.6, kout:1.6,
   shift:0, kf:null, ikf:null, kfAuto:true, pal:"MSI 2024", palRev:false,
   bg:"#ff2b12", fg:"#000000",
@@ -638,26 +638,46 @@ void main(){
       float lum = max(oc.r, max(oc.g, oc.b));
       oc = mix(oc, heat(.18 + .25*smoothstep(.12, .9, nb)) * (.25 + .75*lum), pocket); oa = max(oa, pocket);
     }
-    // frame heat: black at the very edge → violet → white → yellow → orange, fading into the picture.
-    // It grows as the wipe starts, sits over the tiles while they come into focus, then cools away.
-    // the frame heat travels along the frame from the corner the wipe starts at (bottom-right by default)
-    // to the opposite corner, and cools away in the same order — on the way in and on the way out
-    float sd = clamp(sOf(p), 0., 1.);
-    float aIn  = smoothstep(0., 1., clamp((uFr.x - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.y - sd)/uFrSp, 0., 1.)));
-    float aOut = smoothstep(0., 1., clamp((uFr.z - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.w - sd)/uFrSp, 0., 1.)));
-    float amt = max(aIn, aOut);
-    if (amt > 0.001){
-      float bw = uTLead * amt * (1. + .6*(1. - sd));               // thicker on the side the wipe comes from
-      float bh = clamp(1. - (bd + (n + .6*nb)*.045*amt) / max(bw, 1e-4), 0., 1.);
-      float vw = smoothstep(0., .5, bh);
-      vec3 vc = heat(.15 + .85*pow(bh, 2.2));                       // mostly orange/yellow, violet & black only at the very edge
-      float na = oa + vw*(1. - oa);
-      oc = (oc*oa*(1. - vw) + vc*vw) / max(na, 1e-4); oa = na;
-    }
+    /* frame = burning paper.
+       The fire catches at the corner the wipe starts from and runs along the frame edge to the opposite corner,
+       eating inward behind it. From the edge inward: burnt-through hole → black char → thin glowing ember line
+       → orange heat → browned paper → picture. Cooling flakes it away in the same corner-to-corner order. */
+    vec3 pc; float pa;                                             // premultiplied colour so far
+    if (uOut == 1){ pc = oc * oa; pa = oa; }
+    else { vec3 scene = Lout > 0. ? texture(uB, uv).rgb : texture(uA, uv).rgb; pc = scene * (1. - oa) + oc * oa; pa = 1.; }
 
-    if (uOut == 1){ o = vec4(oc * oa, oa); return; }
-    vec3 scene = Lout > 0. ? texture(uB, uv).rgb : texture(uA, uv).rgb;
-    o = vec4(scene * (1. - oa) + oc * oa, 1.);
+    float sd = clamp(sOf(p), 0., 1.);
+    bool outPhase = uFr.z > 0.;
+    float grow = smoothstep(0., 1., clamp(((outPhase ? uFr.z : uFr.x) - sd) / uFrSp, 0., 1.));
+    float cool = smoothstep(0., 1., clamp(((outPhase ? uFr.w : uFr.y) - sd) / uFrSp, 0., 1.));
+    float vis = 1. - cool;
+    if (grow > 0.001 && vis > 0.001){
+      // paper fibre edge: fixed in place (no wobble), big lobes + fine ragged teeth
+      float rough = fbm(vec3(q*1.6, 3.)) * .55 + fbm(vec3(q*6.5, 7.)) * .28 + snoise(vec3(q*22., 11.)) * .08;
+      float D = bd + rough * .032;                                 // how far into the paper this pixel is
+      float depth = uTLead * (1. + .6*(1. - sd)) * grow;           // how far the fire has eaten here
+      float r = depth - D;                                         // > 0 burnt
+      float ew = .0065, cw = .011, sw = .075;
+      float flick = .7 + .3 * snoise(vec3(q*16., uTime*7.));
+      float on = smoothstep(0., .25, grow);
+      float hole   = smoothstep(ew + cw, ew + cw + .004, r);
+      float charA  = smoothstep(ew, ew + .003, r) * (1. - hole);
+      float ember  = smoothstep(-.0018, .0012, r) * (1. - smoothstep(ew, ew + .003, r));
+      float scorch = (1. - smoothstep(0., sw, -r)) * (1. - step(0., r)) * on;
+      float glow   = exp(-max(-r, 0.) / .02) * (1. - step(ew, r)) * on;
+      // sparks: little embers left glowing in the char just behind the line
+      vec2 cell = floor(p / max(2., uRes.y*.0035));
+      float spark = step(.965, hash(cell + floor(uTime*9.))) * smoothstep(ew + cw + .03, ew, r) * step(ew*.5, r);
+      // layers (premultiplied "over")
+      #define OVER(c, a) { float _a = (a); pc = (c) * _a + pc * (1. - _a); pa = _a + pa * (1. - _a); }
+      OVER(vec3(.12, .05, .015), scorch * .78 * vis);              // paper browning ahead of the fire
+      pc += heat(.2) * glow * .85 * vis * flick; pa = max(pa, glow * .8 * vis);
+      OVER(heat(.97) * .55 + vec3(.03, .012, 0.), charA * vis);   // charred rim
+      OVER(vec3(0.), hole * vis);                                  // burnt through
+      OVER(mix(heat(.3), heat(.48), flick), ember * vis);          // glowing line
+      OVER(heat(.35), spark * vis * .9);
+    }
+    o = uOut == 1 ? vec4(pc, pa) : vec4(pc, 1.);
     return;
   }
 
@@ -787,8 +807,8 @@ function render(t, q){
   { // frame heat fronts in wipe units (0 = start corner … 1 = far corner); each sweeps 0 → 1 + spread
     const wi = wInD(), wo = wOutD(), sp = 0.3, f = u => clamp01(u) * (1 + sp);
     const ease = u => 1 - Math.pow(1 - clamp01(u), 2);
-    const gIn  = f(ease(tc / (wi*.38)));
-    const cIn  = f((tc - wi*.30) / (wi*.48));
+    const gIn  = f(ease(tc / (wi*.42)));
+    const cIn  = f((tc - wi*.40) / (wi*.55));
     const xs = S.trans - wo;                                         // exit starts
     const gOut = f(ease((tc - xs - wo*.05) / (wo*.38)));
     const cOut = f((tc - xs - wo*.45) / (wo*.5));
@@ -821,7 +841,7 @@ const ROWS = {
     ["twarp","うねり",0,40,0.5, v=>`${v}%`],
     ["trim","熱の段階の長さ",20,200,1, v=>`${v}%`],
     ["tsmear","にじみ",0,100,1, v=>`${v}%`],
-    ["tlead","フチの熱",0,40,0.5, v=>`${v}%`],
+    ["tlead","燃える深さ",0,40,0.5, v=>`${v}%`],
   ],
   speedRows: [
     ["shift","流れの位置",-20,20,0.05, v=>v.toFixed(2)],
@@ -875,7 +895,7 @@ function segBind(id, key, parse){
 }
 function syncSeg(id, val){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(val))); }
 const WIPE_HINT = {
-  thermal:'参考動画の入り方。どの場所も「シーン → 紫のフチ → 白・黄・オレンジの熱 → 透ける赤 → 赤 → ぼけたタイル → くっきり」の順に変わり、右下から先に進みます。動き出しと同時に画面のフチがサーモ色に光り、タイルにピントが合うまで残ります（フチの熱）。熱の段階の長さを上げると、画面全体がゆっくり同時に変わる感じに、下げると線のワイプに近づきます。',
+  thermal:'参考動画の入り方。どの場所も「シーン → 紫のフチ → 白・黄・オレンジの熱 → 透ける赤 → 赤 → ぼけたタイル → くっきり」の順に変わり、右下から先に進みます。画面のフチは燃えやすい紙のように、右下の角から火がついてフチを走り、内側へ焦げながら燃え進みます（燃える深さ）。冷めると右下から剥がれ落ちるように消えます。熱の段階の長さを上げると、画面全体がゆっくり同時に変わる感じに、下げると線のワイプに近づきます。',
   block:'タイルの区切りごとに、帯の進む順で切り替わります。ばらつきで順番を少し崩せます。',
   column:'傾いた列ごとに切り替わります。ばらつきで列ごとのタイミングをずらせます。',
   line:'まっすぐなワイプ。ぼかしで境目を柔らかくできます。',
