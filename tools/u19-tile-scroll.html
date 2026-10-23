@@ -35,15 +35,29 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #tcode{flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2;font-variant-numeric:tabular-nums;min-width:86px}
 #tcode b{color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.02em}
 #tcode span{color:var(--faint);font-size:9.5px}
-#tl{flex:1;position:relative;min-width:0;height:62px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:ew-resize}
+#tl{flex:1;position:relative;min-width:0;height:74px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:ew-resize}
 #ruler{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
 #ptrack{position:absolute;left:0;right:0;top:20px;height:16px;border:1px solid var(--line);border-radius:4px 4px 0 0;overflow:hidden;background:#121216}
 #ptrack canvas,#ktrack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-#ktrack{position:absolute;left:0;right:0;top:35px;height:27px;background:#121216;border:1px solid var(--line);border-top:none;border-radius:0 0 4px 4px;overflow:hidden}
+#ktrack{position:absolute;left:0;right:0;top:35px;height:39px;background:#121216;border:1px solid var(--line);border-top:none;border-radius:0 0 4px 4px;overflow:hidden}
 #cti{position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:2}
 #cti::before{content:"";position:absolute;left:-.5px;top:9px;bottom:0;width:1px;background:var(--accent)}
 #cti i{position:absolute;left:-6px;top:0;width:12px;height:13px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 58%,50% 100%,0 58%)}
 #kctl{display:flex;gap:6px;align-items:center}
+#kmarks{position:absolute;inset:0}
+.kmark{position:absolute;width:13px;height:13px;margin-left:-6.5px;cursor:grab;touch-action:none}
+.kmark.f{bottom:3px}
+.kmark.iv{top:3px;width:11px;height:11px;margin-left:-5.5px}
+.kmark svg{display:block;width:100%;height:100%;overflow:visible}
+.kmark path,.kmark rect{fill:#c9c9d4;stroke:#0a0a0b;stroke-width:1.2}
+.kmark.iv rect{fill:#0a0a0b;stroke:#c9c9d4}
+.kmark.iv rect.half{fill:#c9c9d4;stroke:none}
+.kmark:hover path,.kmark:hover rect{fill:#fff}
+.kmark.sel path,.kmark.sel rect{fill:#5fb4ff}
+.kmark.iv.sel rect{stroke:#5fb4ff}
+#kEase{height:28px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--text);font:11px var(--mono);padding:0 6px}
+#ramp{height:14px;border-radius:4px;margin-top:8px;border:1px solid var(--line)}
+.trackLbl{position:absolute;left:4px;font-size:8.5px;color:var(--faint);letter-spacing:.08em;pointer-events:none}
 .kbtn{height:28px;min-width:28px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:12px var(--mono);padding:0 7px}
 .kbtn:hover{border-color:var(--accent)}
 .kbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -131,14 +145,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
       <div id="tl" aria-label="タイムライン（ドラッグで時間を移動）">
         <canvas id="ruler"></canvas>
         <div id="ptrack"><canvas id="phase"></canvas></div>
-        <div id="ktrack"><canvas id="graph"></canvas></div>
+        <div id="ktrack"><canvas id="graph"></canvas><div id="kmarks"></div></div>
         <div id="cti"><i></i></div>
       </div>
       <div id="kctl">
-        <button class="kbtn" id="kPrev" title="前の区切りへ（J）">◂</button>
+        <button class="kbtn" id="kPrev" title="前のキーへ（J）">◂</button>
+        <button class="kbtn" id="kKey" title="今の時間に流れのキーを打つ／消す（⌥K）">◆</button>
+        <button class="kbtn" id="kInv" title="今の時間に反転のキーを打つ／消す（I）">反</button>
+        <button class="kbtn" id="kNext" title="次のキーへ（K）">▸</button>
+        <select id="kEase" title="選んだキーの補間（F9＝イーズ）" aria-label="キーの補間"><option value="smooth">イーズ</option><option value="linear">リニア</option><option value="hold">停止</option></select>
         <button class="kbtn" id="kCut" title="覆いきった中央へ（C）">CUT</button>
         <button class="kbtn on" id="kLoop" title="ループ再生（L）">⟲</button>
-        <button class="kbtn" id="kNext" title="次の区切りへ（K）">▸</button>
       </div>
     </div>
   </div>
@@ -188,12 +205,16 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
     </section>
 
     <section>
-      <h2><span><b>04</b>スピード（緩急）</span></h2>
+      <h2><span><b>04</b>スピード・キーフレーム</span></h2>
+      <div id="speedRows"></div>
+      <div class="sub">キーを自動で打つ</div>
       <div class="seg" id="speedPreset">
         <button data-p="smooth">なめらか</button><button data-p="std">標準</button><button data-p="snap">キレ強め</button><button data-p="linear">一定速</button>
       </div>
-      <div id="speedRows"></div>
-      <div class="hint">タイルの中身が流れる速さ。下の帯がスピードカーブで、山が加速、◆が色の反転。時間はトランジションの頭から数えます。入りの勢いは、タイルが現れる瞬間に速く流れていて巡航に落ち着く量（参考動画の気持ちよさの元）。</div>
+      <div id="autoRows"></div>
+      <div class="hint" id="kfState"></div>
+      <div class="btnrow"><button class="btn primary" id="kAuto">この設定でキーを打ち直す</button><button class="btn" id="kClear">キーを全部消す</button></div>
+      <div class="hint">タイムライン下段の◆が「流れの位置」のキー、上段の□が色の反転のキー。キーの間はイーズでつながるので、それが緩急になります（AEの位置キーと同じ）。◆ボタン／⌥Kで今の時間にキー、反ボタン／Iで反転キー。キーはドラッグで移動、Shift+クリックで複数選択、Delete で削除、ダブルクリックでその時間へ。キーがある間に「流れの位置」「角度」「大きさ」を動かすと、今の時間のキーに記録されます。巡航スピードと入り／抜けの勢いはキーとは別に足されます（0にすればキーだけの動き）。流れの位置・勢い・進む量の単位はブロック（ロゴの組み1つ分）。</div>
     </section>
 
     <section>
@@ -202,6 +223,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
       <div class="prow"><span>ロゴの色</span><input type="color" id="fgC"><input type="text" id="fgT" spellcheck="false" maxlength="7"></div>
       <div class="chips" id="chips"></div>
       <div class="btnrow"><button class="btn" id="swap">地とロゴを入れ替え</button></div>
+      <div class="sub">サーモの配色</div>
+      <div class="chips" id="palChips"></div>
+      <div id="ramp"></div>
+      <div class="prow"><span>配色の向き</span><input type="checkbox" id="palRev"><span class="note">熱い側と冷たい側を入れ替える</span></div>
+      <div class="hint">つなぎの熱（フチの光・液体・熱だまり）の色。Heatmap Blur と同じ配色。左が冷たい側（画面のフチ・液体の先端）、右が熱い側（タイルの赤に近い側）。MSI 2024 の右端は地の色に合わせて変わります。</div>
     </section>
 
     <section>
@@ -209,6 +235,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
       <div class="seg" id="invSeg"><button data-v="off">オフ</button><button data-v="each">加速ごと</button><button data-v="once">1回目だけ</button></div>
       <div id="invRows"></div>
       <div class="prow"><span>反転から始める</span><input type="checkbox" id="invStart"></div>
+      <div class="hint">反転はタイムライン上段の□キーで切り替わります。ここは「キーを自動で打つ」ときの打ち方です。</div>
     </section>
 
     <section>
@@ -264,6 +291,7 @@ const DEFAULTS = {
   edge:"thermal", wdir:135, soft:6, jitter:25, wease:"out",
   twarp:24, trim:110, tsmear:75, tlead:8,
   cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.9, ease:5, kin:1.6, kout:1.6,
+  shift:0, kf:null, ikf:null, kfAuto:true, pal:"MSI 2024", palRev:false,
   bg:"#ff2b12", fg:"#000000",
   inv:"each", invPhase:50, invStart:false,
   angle:15, scale:100, start:0, dir:1,
@@ -279,7 +307,7 @@ const SPEED_PRESETS = {
 const COLOR_PRESETS = [
   ["#ff2b12","#000000"],["#000000","#ff2b12"],["#ff0000","#000000"],["#ff5a2a","#000000"],["#ffffff","#000000"],["#000000","#ffffff"],
 ];
-const STORE = "u19-tile-scroll-v6";
+const STORE = "u19-tile-scroll-v7";
 let S = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
 let saveT = 0;
@@ -326,11 +354,60 @@ function kickVel(tc){
   const u = (tc - a0)/ad, v = (tc - b0)/bd;
   return (u>0&&u<1 ? S.kin*BLOCK*3*(1-u)*(1-u)/ad : 0) + (v>0&&v<1 ? S.kout*BLOCK*3*v*v/bd : 0);
 }
-function posAt(tc){ const {k,u} = dashAt(tc); const n = k<0 ? 0 : k + E(u,S.ease); return S.cruise*tc + S.dist*BLOCK*n + kickPos(tc); }
-function velAt(tc){ const {k,u} = dashAt(tc); return S.cruise + (k<0 ? 0 : S.dist*BLOCK/S.dur*dE(u,S.ease)) + kickVel(tc); }
 function invCenters(){ const out=[]; if (S.inv==="off") return out; for (let k=0;;k++){ const c = S.offset + k*iv() + S.dur*S.invPhase/100; if (c > S.trans) break; out.push(c); if (S.inv==="once") break; } return out; }
-function invAt(tc){ let n = 0; if (S.inv!=="off"){ const c0 = S.offset + S.dur*S.invPhase/100; if (tc >= c0) n = S.inv==="once" ? 1 : Math.floor((tc - c0)/iv()) + 1; } return ((S.invStart?1:0) + n) % 2; }
 function dashStarts(){ const out=[]; for (let k=0;;k++){ const s = S.offset + k*iv(); if (s > S.trans) break; out.push(s); } return out; }
+
+/* ============ keyframes (AE-like) ============
+   S.kf  : [{t, ease:'smooth'|'linear'|'hold', v:{shift?, angle?, scale?}}]  — global time, sorted
+   S.ikf : [{t}]                                                             — colour flips          */
+const KF_PARAMS = ['shift','angle','scale'];
+const snapT = t => Math.round(t*S.fps)/S.fps;
+const keyAt = t => S.kf.find(k => Math.abs(k.t - t) < .5/S.fps);
+const ikeyAt = t => S.ikf.find(k => Math.abs(k.t - t) < .5/S.fps);
+const easeF = (e, f) => e === 'hold' ? (f >= 1 ? 1 : 0) : e === 'linear' ? f : E(f, S.ease);
+function sampleParam(p, t){
+  let a = null;
+  for (const k of S.kf){
+    if (k.v[p] === undefined) continue;
+    if (k.t >= t){ if (!a) return k.v[p]; const f = easeF(a.ease, (t - a.t)/Math.max(1e-6, k.t - a.t)); return a.v[p] + (k.v[p] - a.v[p])*f; }
+    a = k;
+  }
+  return a ? a.v[p] : undefined;
+}
+const keyed = p => S.kf.some(k => k.v[p] !== undefined);
+const shiftAt = t => { const v = sampleParam('shift', t); return v === undefined ? S.shift : v; };
+function posAt(tc){ return S.cruise*tc + kickPos(tc) + shiftAt(tc + S.holdA)*BLOCK; }
+function velAt(tc){ const h = 1/240, t = tc + S.holdA; return S.cruise + kickVel(tc) + (shiftAt(t + h) - shiftAt(t - h))/(2*h)*BLOCK; }
+function invAt(t){ let n = 0; for (const k of S.ikf) if (k.t <= t + 1e-6) n++; return ((S.invStart?1:0) + n) % 2; }
+function sortKeys(){ S.kf.sort((a,b)=>a.t-b.t); S.ikf.sort((a,b)=>a.t-b.t); }
+function snapshotAt(t){ const v = {}; for (const p of KF_PARAMS){ const s = sampleParam(p, t); v[p] = s === undefined ? S[p] : s; } return v; }
+// the old automatic dashes / flips, written out as ordinary keys
+function autoKeys(){
+  const kf = [], ikf = []; let sh = 0;
+  if (S.dist > 0) for (const s of dashStarts()){
+    const t0 = snapT(S.holdA + s), t1 = snapT(S.holdA + s + S.dur);
+    kf.push({ t:t0, ease:'smooth', v:{ shift:sh } }); sh += S.dist;
+    kf.push({ t:t1, ease:'linear', v:{ shift:sh } });
+  }
+  for (const c of invCenters()) ikf.push({ t:snapT(S.holdA + c) });
+  S.kf = kf; S.ikf = ikf; S.kfAuto = true; S.shift = 0; SEL.clear();
+}
+let kfUIDirty = false, dragKey = null;
+function applyKeys(t){
+  for (const p of KF_PARAMS){ const v = sampleParam(p, t); if (v !== undefined && Math.abs(S[p] - v) > 1e-9){ S[p] = v; kfUIDirty = true; } }
+}
+function syncKfUI(){
+  if (!kfUIDirty) return; kfUIDirty = false;
+  for (const p of KF_PARAMS){ const s = sliders[p]; if (!s || p === dragKey) continue; s.r.value = S[p]; s.pv.textContent = s.fmt(S[p]); }
+}
+function kfEdit(p){                     // editing a keyed value records it at the playhead (AE stopwatch on)
+  if (!KF_PARAMS.includes(p) || recording) return false;
+  if (!S.kf.length || (p !== 'shift' && !keyed(p))) return false;
+  playing = false;
+  let k = keyAt(playhead);
+  if (!k){ k = { t:snapT(playhead), ease:'smooth', v:{} }; S.kf.push(k); sortKeys(); toast(`${tc(k.t)} にキーを追加しました`); }
+  k.v[p] = S[p]; playhead = k.t; S.kfAuto = false; return true;
+}
 
 /* ============ tile atlas, measured from Figma frame "HUD" (985:5999) ============ */
 const AS = 3, PU = 951, PV = 424, CELL = 445, ORIGIN = [-552, -164];
@@ -442,7 +519,7 @@ const VS = `#version 300 es
 in vec2 a; void main(){ gl_Position = vec4(a,0.,1.); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform sampler2D uTex, uA, uB;
+uniform sampler2D uTex, uA, uB, uLut;
 uniform vec2 uRes, uCenterPx, uBase, uRot;
 uniform float uPxPerFig, uScroll, uBlur, uInv, uAlpha;
 uniform int uTaps;
@@ -478,16 +555,7 @@ float snoise(vec3 v){
 }
 float fbm(vec3 p){ float a=.5,s=0.; for(int i=0;i<4;i++){ s+=a*snoise(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s; }
 // thermal ramp: 0 = tile ground colour … .8 = violet rim … 1 = black
-vec3 heat(float h){
-  vec3 c=uBg;
-  c=mix(c,vec3(1.,.40,0.),  smoothstep(.00,.22,h));
-  c=mix(c,vec3(1.,.80,.16), smoothstep(.22,.40,h));
-  c=mix(c,vec3(1.,1.,.80),  smoothstep(.40,.52,h));
-  c=mix(c,vec3(.80,.74,1.), smoothstep(.52,.64,h));
-  c=mix(c,vec3(.44,.12,.96),smoothstep(.64,.80,h));
-  c=mix(c,vec3(.03,0.,.08), smoothstep(.80,1.,h));
-  return c;
-}
+vec3 heat(float h){ return texture(uLut, vec2(clamp(1. - h, 0., 1.)*.99 + .005, .5)).rgb; }   // palette: left = cold, right = hot
 vec2 toScreen(vec2 R){                    // inverse of the tile mapping
   vec2 q = R - uBase - vec2(0., uScroll);
   vec2 f = vec2(q.x*uRot.x + q.y*uRot.y, -q.x*uRot.y + q.y*uRot.x);
@@ -606,7 +674,34 @@ void main(){
   vec3 col = (tcol * ta + under * (1. - ta)) * wT + sa * wA + sb * wB;
   o = vec4(col, 1.);
 }`;
-let U = {}, texA, texB;
+let U = {}, texA, texB, texLut, lutDirty = true;
+/* thermal palettes — same colours as Heatmap Blur (0 = cold … 1 = hot); "BG" = the tile ground colour */
+const PALETTES = {
+  "MSI 2024": [[0,"#080014"],[0.2,"#701ff5"],[0.36,"#ccbdff"],[0.48,"#ffffcc"],[0.6,"#ffcc29"],[0.78,"#ff6600"],[1,"BG"]],
+  "HEAT（動画）": [[0.00,"#000000"],[0.05,"#0d0317"],[0.11,"#1e0839"],[0.17,"#330e5e"],[0.23,"#4b1468"],[0.29,"#71205a"],[0.35,"#a4263a"],[0.41,"#d33412"],[0.48,"#ef6800"],[0.55,"#f9a50b"],[0.62,"#ffcf24"],[0.69,"#f5e42c"],[0.76,"#e6f34c"],[0.83,"#e0fb7c"],[0.90,"#ecfcb6"],[0.96,"#f6fbe4"],[1.00,"#fbfbf6"]],
+  "U19": [[0,"#000000"],[0.06,"#04121c"],[0.14,"#0c3a57"],[0.23,"#2c86b4"],[0.32,"#54B6DF"],[0.42,"#a9d9de"],[0.52,"#F2EFC9"],[0.62,"#E6A06D"],[0.72,"#FF5A2A"],[0.86,"#FFA64A"],[1,"#FFD873"]],
+  "U19 ミラー": [[0,"#000000"],[0.05,"#061722"],[0.12,"#1a6a92"],[0.19,"#54B6DF"],[0.29,"#F2EFC9"],[0.41,"#E6A06D"],[0.48,"#FF5A2A"],[0.53,"#FFD873"],[0.58,"#FF5A2A"],[0.66,"#E6A06D"],[0.79,"#F2EFC9"],[0.91,"#54B6DF"],[1,"#89C9D3"]],
+  "U19 アイス": [[0,"#000000"],[0.07,"#160a05"],[0.16,"#5a1a0c"],[0.26,"#FF5A2A"],[0.36,"#E6A06D"],[0.47,"#F2EFC9"],[0.58,"#89C9D3"],[0.7,"#54B6DF"],[0.84,"#a9dcef"],[1,"#f4fbfd"]],
+  "U19 レッド": [[0,"#000000"],[0.08,"#1a0604"],[0.2,"#5a1208"],[0.36,"#b8230f"],[0.52,"#FF5A2A"],[0.68,"#ff8452"],[0.82,"#E6A06D"],[0.93,"#F2EFC9"],[1,"#fbf8ea"]],
+  "IRONBOW": [[0,"#000000"],[0.15,"#140a4a"],[0.32,"#5a0f8a"],[0.5,"#c4204d"],[0.66,"#f26a16"],[0.82,"#ffc83a"],[1,"#fffbe8"]],
+  "THERMO": [[0,"#000000"],[0.12,"#0a0f5c"],[0.28,"#0060ff"],[0.44,"#00e0ff"],[0.58,"#30ff60"],[0.72,"#ffe600"],[0.86,"#ff3a00"],[1,"#ffffff"]],
+  "ACID": [[0,"#000000"],[0.2,"#0b2410"],[0.42,"#1f7a2a"],[0.64,"#7bdc23"],[0.82,"#d9ff4a"],[1,"#f6ffe4"]],
+  "ACID RED": [[0,"#000000"],[0.2,"#26050a"],[0.42,"#8f0a16"],[0.64,"#f5101c"],[0.82,"#ff3a26"],[0.93,"#ff7a4e"],[1,"#ffc9b0"]],
+  "ICE": [[0,"#000000"],[0.18,"#06122e"],[0.38,"#163f99"],[0.58,"#2f8fff"],[0.78,"#9ae6ff"],[1,"#ffffff"]],
+  "MAGENTA": [[0,"#000000"],[0.18,"#1b0425"],[0.38,"#6c0b5b"],[0.56,"#e0197d"],[0.74,"#ff7ab6"],[0.9,"#ffd1e6"],[1,"#ffffff"]],
+  "MONO": [[0,"#000000"],[1,"#ffffff"]],
+};
+const palStops = (name, rev) => (PALETTES[name] || PALETTES["MSI 2024"]).map(([p, c]) => [rev ? 1 - p : p, c === 'BG' ? S.bg : c]).sort((a,b)=>a[0]-b[0]);
+const palCSS = (name, rev) => `linear-gradient(90deg,${palStops(name, rev).map(([p,c]) => `${c} ${(p*100).toFixed(1)}%`).join(',')})`;
+function uploadLut(){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
+  for (const [p, col] of palStops(S.pal, S.palRev)) gr.addColorStop(Math.min(1, Math.max(0, p)), col);
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 1);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texLut);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  lutDirty = false;
+}
 function compile(){
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
   const prog = gl.createProgram();
@@ -616,7 +711,7 @@ function compile(){
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  ['uTex','uA','uB','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  ['uTex','uA','uB','uLut','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
 }
 function makeTex(unit, mip){
   const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -631,8 +726,8 @@ function uploadAtlas(img){
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
   const an = gl.getExtension('EXT_texture_filter_anisotropic');
   if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
-  texA = makeTex(1, false); texB = makeTex(2, false);
-  gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uA, 1); gl.uniform1i(U.uB, 2);
+  texA = makeTex(1, false); texB = makeTex(2, false); texLut = makeTex(3, false);
+  gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uA, 1); gl.uniform1i(U.uB, 2); gl.uniform1i(U.uLut, 3);
 }
 function uploadScenes(W, H){
   for (const [w, unit, tex] of [['A',1,texA],['B',2,texB]]){
@@ -675,7 +770,7 @@ function render(t, q){
   gl.uniform2f(U.uBase, base[0], base[1]); gl.uniform2f(U.uRot, Math.cos(a), Math.sin(a));
   gl.uniform1f(U.uPxPerFig, k); gl.uniform1f(U.uScroll, S.dir * (posAt(tc) + S.start*BLOCK));
   gl.uniform1f(U.uBlur, blurLen); gl.uniform1i(U.uTaps, taps);
-  gl.uniform1f(U.uInv, invAt(tc)); gl.uniform1f(U.uAlpha, S.alpha ? 1 : 0);
+  gl.uniform1f(U.uInv, invAt(t)); gl.uniform1f(U.uAlpha, S.alpha ? 1 : 0);
   gl.uniform3fv(U.uBg, hex3(S.bg)); gl.uniform3fv(U.uFg, hex3(S.fg));
   gl.uniform2f(U.uDir, dir[0], dir[1]); gl.uniform2f(U.uProj, pmin, 1/ext);
   gl.uniform1f(U.uFrontIn, front(pa)); gl.uniform1f(U.uFrontOut, front(pb));
@@ -693,6 +788,7 @@ function render(t, q){
     const key = `${W}x${H}`;
     if (sceneDirty || hasVid || key !== lastSceneKey){ uploadScenes(W, H); sceneDirty = false; lastSceneKey = key; }
   }
+  if (lutDirty) uploadLut();
   gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -716,14 +812,17 @@ const ROWS = {
     ["tlead","フチの熱",0,40,0.5, v=>`${v}%`],
   ],
   speedRows: [
+    ["shift","流れの位置",-20,20,0.05, v=>v.toFixed(2)],
+    ["ease","イーズの強さ",1,10,0.5, v=>`${v}`],
     ["cruise","巡航スピード",0,400,5, v=>`${v}px/s`],
-    ["dist","加速で進む量",0,8,0.25, v=>`${v}ブロック`],
+    ["kin","入りの勢い",0,5,0.1, v=>v.toFixed(1)],
+    ["kout","抜けの勢い",0,5,0.1, v=>v.toFixed(1)],
+  ],
+  autoRows: [
+    ["dist","加速で進む量",0,8,0.25, v=>v.toFixed(2)],
     ["dur","加速の長さ",0.2,3,0.05, v=>`${v.toFixed(2)}s`],
     ["interval","加速の間隔",0.4,8,0.1, v=>`${v.toFixed(1)}s`],
     ["offset","最初の加速",0,8,0.05, v=>`${v.toFixed(2)}s`],
-    ["ease","緩急の強さ",1,10,0.5, v=>`${v}`],
-    ["kin","入りの勢い",0,5,0.1, v=>`${v}ブロック`],
-    ["kout","抜けの勢い",0,5,0.1, v=>`${v}ブロック`],
   ],
   invRows: [["invPhase","反転の瞬間",0,100,1, v=>v===50?"最速":`${v}%`]],
   angleRows: [
@@ -744,6 +843,8 @@ function buildRows(){
       const r = row.querySelector('input'), pv = row.querySelector('.pv');
       sliders[key] = { r, pv, fmt, row };
       r.addEventListener('input', () => { S[key] = parseFloat(r.value); pv.textContent = fmt(S[key]); changed(key); });
+      r.addEventListener('pointerdown', () => { dragKey = key; });
+      r.addEventListener('pointerup', () => { dragKey = null; });
       r.addEventListener('dblclick', () => { S[key] = DEFAULTS[key]; changed(key); });
       pv.addEventListener('click', () => {
         const inp = document.createElement('input'); inp.type = 'text'; inp.value = S[key];
@@ -780,12 +881,19 @@ function syncUI(){
   sliders.jitter.row.classList.toggle('hide', S.edge === 'line' || S.edge === 'thermal');
   for (const k of ['twarp','trim','tsmear','tlead']) sliders[k].row.classList.toggle('hide', S.edge !== 'thermal');
   $('wipeHint').textContent = WIPE_HINT[S.edge];
+  $('palChips').querySelectorAll('.chip').forEach(c => { c.classList.toggle('on', c.dataset.p === S.pal); c.querySelector('i').style.background = palCSS(c.dataset.p, S.palRev); });
+  $('ramp').style.background = palCSS(S.pal, S.palRev); $('palRev').checked = S.palRev;
+  $('kfState').textContent = S.kfAuto ? `キー：自動（下の設定とタイミングに追従）— 流れ ${S.kf.length}・反転 ${S.ikf.length}。キーを動かす・消す・足すと手動になります。`
+                                      : `キー：手動 — 流れ ${S.kf.length}・反転 ${S.ikf.length}。「この設定でキーを打ち直す」で自動に戻ります（今のキーは上書き）。`;
   view.classList.toggle('alpha', S.out === 'tiles');
   $('tcEnd').textContent = '/ ' + tc(total());
   const [w,h] = outSize(); $('meta').textContent = `${w}×${h} · ${S.fps}fps · ${total().toFixed(2)}s`;
 }
+const GEN_KEYS = new Set(['dist','dur','interval','offset','holdA','trans','inv','invPhase','preset','all']);
 function changed(key){
   if (playhead > total()) playhead = 0;
+  if (kfEdit(key)) {} else if (S.kfAuto && GEN_KEYS.has(key)) autoKeys();
+  if (key === 'pal' || key === 'palRev' || key === 'bg' || key === 'all') lutDirty = true;
   syncUI(); drawTimeline(); persist(); dirty = true;
 }
 
@@ -804,6 +912,13 @@ function buildColor(){
     $('chips').appendChild(c);
   }
   $('swap').addEventListener('click', () => { [S.bg, S.fg] = [S.fg, S.bg]; changed('bg'); });
+  for (const name of Object.keys(PALETTES)){
+    const c = document.createElement('button'); c.className = 'chip'; c.dataset.p = name; c.type = 'button';
+    c.innerHTML = `<i></i>${name}`;
+    c.addEventListener('click', () => { S.pal = name; changed('pal'); });
+    $('palChips').appendChild(c);
+  }
+  $('palRev').addEventListener('change', e => { S.palRev = e.target.checked; changed('palRev'); });
 }
 
 /* scenes UI */
@@ -857,8 +972,6 @@ function drawTimeline(){
 
   // speed graph (tile clock), only meaningful inside the transition
   [w,h,d] = sizeCanvas($('graph')); g = $('graph').getContext('2d'); g.clearRect(0,0,w,h);
-  g.fillStyle = 'rgba(255,90,31,.07)';
-  for (const s of dashStarts()) g.fillRect(x(t0+s,w), 0, S.dur/L*w, h);
   const n = Math.min(800, Math.round(w)); let vmax = 1; const vs = [];
   for (let i=0;i<=n;i++){ const tt = i/n*L, v = velAt(tileClock(tt)); vs.push(v); if (tt >= t0 && tt <= t3 && v > vmax) vmax = v; }
   const Y = v => h - 3*d - Math.min(1, v/vmax)*(h - 8*d);
@@ -867,14 +980,74 @@ function drawTimeline(){
   g.fillStyle = 'rgba(255,90,31,.18)'; g.fill();
   g.beginPath(); vs.forEach((v,i) => i ? g.lineTo(i/n*w, Y(v)) : g.moveTo(0, Y(v)));
   g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.4*d; g.stroke(); g.restore();
-  for (const c of invCenters()){
-    const X = x(t0+c, w), cy = 7*d, r = 4.5*d;
-    g.beginPath(); g.moveTo(X, cy-r); g.lineTo(X+r, cy); g.lineTo(X, cy+r); g.lineTo(X-r, cy); g.closePath();
-    g.fillStyle = '#c9c9d4'; g.fill(); g.strokeStyle = '#0a0a0b'; g.lineWidth = 1.2*d; g.stroke();
-  }
-  g.fillStyle = '#6a6a74'; g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'bottom';
+  g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(0, 0, w, 17*d);           // flip-key lane
+  g.fillStyle = '#6a6a74'; g.font = `${8.5*d}px ${FONT()}`; g.textBaseline = 'top';
+  g.fillText('反転', 4*d, 3*d); g.textBaseline = 'bottom'; g.fillText('流れ', 4*d, h - 3*d);
   g.fillText(`max ${Math.round(vmax)}px/s`, w - 92*d, h - 2*d);
-  syncBar();
+  drawKeys(); syncBar();
+}
+const KSHAPE = { linear:'M6.5 .6L12.4 6.5L6.5 12.4L.6 6.5Z', smooth:'M1.2 .8H11.8L7.6 6.5L11.8 12.2H1.2L5.4 6.5Z', hold:'M1.6 1.6H11.4V11.4H1.6Z' };
+const SEL = new Set();
+const keyOf = el => el.dataset.k[0] === 'f' ? S.kf[+el.dataset.k.slice(1)] : S.ikf[+el.dataset.k.slice(1)];
+function drawKeys(){
+  for (const k of [...SEL]) if (!S.kf.includes(k) && !S.ikf.includes(k)) SEL.delete(k);
+  const W = $('tl').clientWidth, L = total(), X = t => (t/L*W).toFixed(1);
+  $('kmarks').innerHTML =
+    S.kf.map((k,i) => `<i class="kmark f${SEL.has(k)?' sel':''}" data-k="f${i}" style="left:${X(k.t)}px" title="流れ ${tc(k.t)}"><svg viewBox="0 0 13 13"><path d="${KSHAPE[k.ease]||KSHAPE.smooth}"/></svg></i>`).join('') +
+    S.ikf.map((k,i) => `<i class="kmark iv${SEL.has(k)?' sel':''}" data-k="i${i}" style="left:${X(k.t)}px" title="反転 ${tc(k.t)}"><svg viewBox="0 0 11 11"><rect x=".8" y=".8" width="9.4" height="9.4"/><rect class="half" x="1.4" y="1.4" width="4.1" height="8.2"/></svg></i>`).join('');
+  const k = keyAt(playhead), tg = SEL.size ? [...SEL].filter(q => S.kf.includes(q)) : (k ? [k] : []);
+  $('kEase').disabled = !tg.length; if (tg.length) $('kEase').value = tg[0].ease;
+  $('kKey').classList.toggle('on', !!k); $('kInv').classList.toggle('on', !!ikeyAt(playhead));
+}
+let lastKB = '';
+function drawKeysLite(){ const s = (keyAt(playhead)?1:0) + '' + (ikeyAt(playhead)?1:0); if (s === lastKB) return; lastKB = s; $('kKey').classList.toggle('on', s[0]==='1'); $('kInv').classList.toggle('on', s[1]==='1'); }
+function keysEdited(){ S.kfAuto = false; sortKeys(); persist(); syncUI(); drawTimeline(); dirty = true; }
+function toggleKey(){
+  if (recording) return; playing = false;
+  const k = keyAt(playhead);
+  if (k){ S.kf = S.kf.filter(x => x !== k); toast('流れのキーを削除しました'); }
+  else { const nk = { t:snapT(playhead), ease:'smooth', v:snapshotAt(playhead) }; S.kf.push(nk); playhead = nk.t; toast(`${tc(nk.t)} に流れのキーを打ちました`); }
+  keysEdited();
+}
+function toggleInvKey(){
+  if (recording) return; playing = false;
+  const k = ikeyAt(playhead);
+  if (k){ S.ikf = S.ikf.filter(x => x !== k); toast('反転のキーを削除しました'); }
+  else { S.ikf.push({ t:snapT(playhead) }); toast(`${tc(snapT(playhead))} で色が反転します`); }
+  keysEdited();
+}
+function deleteSelected(){ if (!SEL.size) return; const n = SEL.size; S.kf = S.kf.filter(k => !SEL.has(k)); S.ikf = S.ikf.filter(k => !SEL.has(k)); SEL.clear(); keysEdited(); toast(`${n}個のキーを削除しました`); }
+function setEase(v){
+  const k = keyAt(playhead), tg = SEL.size ? [...SEL].filter(q => S.kf.includes(q)) : (k ? [k] : []);
+  if (!tg.length) return toast('流れのキーを選んでください');
+  for (const q of tg) q.ease = v; keysEdited(); toast({ smooth:'イーズ', linear:'リニア', hold:'停止' }[v] + 'にしました');
+}
+function bindKeys(){
+  const km = $('kmarks');
+  km.addEventListener('pointerdown', e => {
+    const mk = e.target.closest('.kmark'); if (!mk || recording) return;
+    e.stopPropagation(); e.preventDefault(); playing = false;
+    const k = keyOf(mk); if (!k) return;
+    if (e.shiftKey){ SEL.has(k) ? SEL.delete(k) : SEL.add(k); } else if (!SEL.has(k)){ SEL.clear(); SEL.add(k); }
+    const x0 = e.clientX, W = $('tl').clientWidth, orig = new Map([...SEL].map(q => [q, q.t])); let moved = false;
+    mk.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      if (!moved && Math.abs(ev.clientX - x0) < 3) return; moved = true;
+      const dt = (ev.clientX - x0)/W*total();
+      for (const [q, t0] of orig) q.t = Math.min(total(), Math.max(0, snapT(t0 + dt)));
+      km.querySelectorAll('.kmark').forEach(el => { const q = keyOf(el); if (q) el.style.left = (q.t/total()*W) + 'px'; });
+      dirty = true;
+    };
+    const up = () => { mk.removeEventListener('pointermove', mv); mk.removeEventListener('pointerup', up); if (moved) keysEdited(); else drawKeys(); };
+    mk.addEventListener('pointermove', mv); mk.addEventListener('pointerup', up);
+    drawKeys();
+  });
+  km.addEventListener('dblclick', e => { const mk = e.target.closest('.kmark'); if (mk){ const k = keyOf(mk); if (k){ playing = false; seekTo(k.t); } } });
+  $('kKey').addEventListener('click', toggleKey);
+  $('kInv').addEventListener('click', toggleInvKey);
+  $('kEase').addEventListener('change', e => setEase(e.target.value));
+  $('kAuto').addEventListener('click', () => { autoKeys(); syncUI(); drawTimeline(); persist(); dirty = true; toast('設定どおりにキーを打ち直しました'); });
+  $('kClear').addEventListener('click', () => { if (!S.kf.length && !S.ikf.length) return toast('キーはありません'); S.kf = []; S.ikf = []; S.shift = 0; SEL.clear(); keysEdited(); toast('キーを全部消しました（流れは巡航と勢いだけになります）'); });
 }
 function syncBar(){
   $('cti').style.left = (playhead / total() * $('tl').clientWidth) + 'px';
@@ -883,7 +1056,7 @@ function syncBar(){
 }
 function seekTo(t){ const fr = 1/S.fps; playhead = Math.min(total(), Math.max(0, Math.round(t/fr)*fr)); dirty = true; syncBar(); }
 function stepFrames(n){ playing = false; seekTo(playhead + n/S.fps); }
-function marks(){ const t0 = S.holdA; return [0, t0, t0+wInD(), cutTime(), t0+S.trans-wOutD(), t0+S.trans, total()].concat(dashStarts().map(s=>t0+s), invCenters().map(c=>t0+c)).sort((a,b)=>a-b); }
+function marks(){ const ks = S.kf.map(k=>k.t).concat(S.ikf.map(k=>k.t)); return (ks.length ? ks.concat([0, total()]) : [0, S.holdA, cutTime(), S.holdA+S.trans, total()]).sort((a,b)=>a-b); }
 function jump(dir){
   const pts = marks(), eps = 1/(S.fps*2);
   const t = dir > 0 ? pts.find(p => p > playhead + eps) : [...pts].reverse().find(p => p < playhead - eps);
@@ -894,6 +1067,7 @@ function bindTimeline(){
   const at = e => { const r = tl.getBoundingClientRect(); return (e.clientX - r.left) / r.width * total(); };
   tl.addEventListener('pointerdown', e => {
     if (recording) return;
+    if (SEL.size && !e.shiftKey){ SEL.clear(); }
     tl.setPointerCapture(e.pointerId); playing = false; seekTo(at(e));
     const mv = ev => seekTo(ev.shiftKey && Math.abs(at(ev) - cutTime()) < .15 ? cutTime() : at(ev));
     const up = () => { tl.removeEventListener('pointermove', mv); tl.removeEventListener('pointerup', up); };
@@ -919,7 +1093,11 @@ addEventListener('keydown', e => {
   switch (e.code){
     case 'Space': e.preventDefault(); togglePlay(); break;
     case 'KeyJ': e.preventDefault(); jump(-1); break;
-    case 'KeyK': e.preventDefault(); jump(1); break;
+    case 'KeyK': e.preventDefault(); if (e.altKey) toggleKey(); else jump(1); break;
+    case 'KeyI': e.preventDefault(); toggleInvKey(); break;
+    case 'Delete': case 'Backspace': if (SEL.size){ e.preventDefault(); deleteSelected(); } break;
+    case 'F9': e.preventDefault(); setEase('smooth'); break;
+    case 'Escape': if (SEL.size){ SEL.clear(); drawKeys(); } break;
     case 'KeyC': e.preventDefault(); playing = false; seekTo(cutTime()); break;
     case 'KeyL': e.preventDefault(); toggleLoop(); break;
     case 'PageUp': e.preventDefault(); stepFrames(e.shiftKey?-10:-1); break;
@@ -1038,6 +1216,7 @@ const labels = { zip:'連番PNG（ZIP）', mp4:'MP4', mov:'ロスレスMOV' };
 function lockExport(activeId, on){ exportBtns.forEach(id => { if (id !== activeId) $(id).disabled = on; }); $(activeId).classList.toggle('rec', on); }
 const exportSpan = () => S.range === 'trans' ? [S.holdA, S.holdA + S.trans] : [0, total()];
 async function prepareFrame(t){
+  applyKeys(t);
   if (S.out !== 'tiles') for (const w of ['A','B']){ const s = scenes[w]; if (s.kind === 'video'){ s.el.pause(); await seekExact(s.el, sceneTime(w, t)); sceneDirty = true; } }
   render(t, 1);
 }
@@ -1108,11 +1287,11 @@ $('cfgSave').addEventListener('click', () => saveFile(new Blob([JSON.stringify(S
 $('cfgLoad').addEventListener('click', () => $('cfgFile').click());
 $('cfgFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const obj = JSON.parse(await f.text()); S = Object.assign({}, DEFAULTS, obj); changed('all'); toast('設定を読み込みました'); }
+  try { const obj = JSON.parse(await f.text()); S = Object.assign({}, DEFAULTS, obj); if (!Array.isArray(S.kf) || !Array.isArray(S.ikf)) autoKeys(); changed('all'); toast('設定を読み込みました'); }
   catch(err){ toast('読み込めませんでした：JSONの形式を確認してください'); }
   e.target.value = '';
 });
-$('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); changed('all'); toast('初期設定に戻しました'); });
+$('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); autoKeys(); changed('all'); toast('初期設定に戻しました'); });
 
 /* ============ boot ============ */
 (async function boot(){
@@ -1128,7 +1307,8 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); ch
   $('size').addEventListener('change', e => { S.size = e.target.value; changed('size'); });
   $('angleReset').addEventListener('click', () => { S.angle = 15; S.scale = 100; S.start = 0; changed('angle'); });
   if (inClaude){ $('mov').classList.add('hide'); $('exHint').textContent += ' ロスレスMOVはMOTION LAB版で使えます。'; }
-  bindTimeline(); syncUI();
+  if (!Array.isArray(S.kf) || !Array.isArray(S.ikf)) autoKeys();
+  bindTimeline(); bindKeys(); syncUI();
   compile(); uploadAtlas(await buildAtlas());
   drawThumbs(); drawTimeline();
   document.fonts && document.fonts.ready.then(() => { drawThumbs(); sceneDirty = dirty = true; });
@@ -1143,7 +1323,7 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); ch
     if (!recording){
       const vids = scenes.A.kind === 'video' || scenes.B.kind === 'video';
       if (vids && S.out !== 'tiles') syncVideos(playhead, false);
-      if (dirty || (vids && playing)){ render(playhead); dirty = false; }
+      if (dirty || (vids && playing)){ applyKeys(playhead); syncKfUI(); render(playhead); dirty = false; drawKeysLite(); }
     }
     requestAnimationFrame(loop);
   }
