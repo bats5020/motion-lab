@@ -12,7 +12,7 @@
 :root{
   --barLeft:150px;
   --bg:#0a0a0b;--panel:#141417;--panel2:#1c1c21;--line:#2a2a31;--line-hover:#3d3d46;
-  --text:#e6e6ef;--sub:#9a9aa6;--faint:#6a6a74;--accent:#ff5a1f;--rec:#b3122a;--key:#5fb4ff;
+  --text:#e6e6ef;--sub:#9a9aa6;--faint:#6a6a74;--accent:#ff5a1f;--rec:#b3122a;
   --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
   color-scheme:dark;
 }
@@ -25,16 +25,21 @@ body{background:var(--bg);color:var(--text);font:12px/1.5 var(--mono);-webkit-fo
 #view{max-width:100%;max-height:100%;display:block;background:#000;box-shadow:0 18px 70px rgba(0,0,0,.6),0 0 0 1px #232329}
 #view.alpha{background:repeating-conic-gradient(#26262c 0% 25%,#1a1a1f 0% 50%) 0 0/18px 18px}
 #meta{position:absolute;top:10px;right:14px;color:var(--faint);font-size:10px;letter-spacing:.06em;pointer-events:none}
+#dropOv{position:absolute;inset:12px;border:2px dashed var(--accent);border-radius:10px;display:none;align-items:center;justify-content:center;color:var(--accent);font-size:13px;letter-spacing:.18em;background:rgba(255,90,31,.06);pointer-events:none;z-index:5}
+#dropOv.on{display:flex}
+#dropOv span{flex:1;text-align:center}
+#dropOv span+span{border-left:1px dashed var(--accent)}
 #bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:10px 18px 14px var(--barLeft,18px);border-top:1px solid var(--line);background:rgba(12,12,14,.7)}
 #play{width:34px;height:28px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:13px var(--mono)}
 #play:hover{border-color:var(--accent)}
 #tcode{flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2;font-variant-numeric:tabular-nums;min-width:86px}
 #tcode b{color:var(--accent);font-size:13px;font-weight:700;letter-spacing:.02em}
 #tcode span{color:var(--faint);font-size:9.5px}
-#tl{flex:1;position:relative;min-width:0;height:52px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:ew-resize}
+#tl{flex:1;position:relative;min-width:0;height:62px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:ew-resize}
 #ruler{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
-#ktrack{position:absolute;left:0;right:0;top:20px;height:32px;background:#121216;border:1px solid var(--line);border-radius:4px;overflow:hidden}
-#graph{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ptrack{position:absolute;left:0;right:0;top:20px;height:16px;border:1px solid var(--line);border-radius:4px 4px 0 0;overflow:hidden;background:#121216}
+#ptrack canvas,#ktrack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ktrack{position:absolute;left:0;right:0;top:35px;height:27px;background:#121216;border:1px solid var(--line);border-top:none;border-radius:0 0 4px 4px;overflow:hidden}
 #cti{position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:2}
 #cti::before{content:"";position:absolute;left:-.5px;top:9px;bottom:0;width:1px;background:var(--accent)}
 #cti i{position:absolute;left:-6px;top:0;width:12px;height:13px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 58%,50% 100%,0 58%)}
@@ -57,13 +62,16 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
 .seg button{flex:1;background:none;border:none;color:var(--sub);font:10.5px var(--mono);padding:7px 2px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--accent);color:#fff}
 .seg button:not(.on):hover{color:var(--text)}
+.seg.arrows button{font-size:14px;padding:5px 0;line-height:1}
 .prow{display:flex;align-items:center;gap:8px;margin-top:8px}
 .prow>span:first-child{flex:0 0 96px;color:var(--sub);font-size:10.5px}
 .prow input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:#33333c;outline:none;cursor:pointer}
+.prow input[type=range]:disabled{opacity:.35;cursor:default}
 .prow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
 .prow input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--text);border:2px solid var(--panel)}
 .prow input[type=range]:hover::-webkit-slider-thumb{background:var(--accent)}
 .prow .pv{flex:0 0 52px;text-align:right;color:var(--faint);font-size:10px;font-variant-numeric:tabular-nums;cursor:text}
+.prow .note{flex:1;color:var(--faint);font-size:10px}
 .prow select,.prow input[type=text]{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--text);font:11px var(--mono);padding:4px 6px;min-width:0}
 .prow input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;margin:0}
 .prow input[type=color]{width:30px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:var(--panel2);cursor:pointer}
@@ -85,7 +93,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
 .chip i{width:26px;height:12px;border-radius:6px;display:block;border:1px solid rgba(255,255,255,.12)}
 .chip:hover{border-color:var(--line-hover);color:var(--text)}
 .chip.on{border-color:var(--accent);color:var(--text)}
-#toast{position:fixed;left:50%;bottom:72px;transform:translateX(-50%) translateY(10px);background:#1d1d23;border:1px solid var(--line);color:var(--text);padding:8px 14px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:min(560px,calc(100vw - 32px))}
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.drop{position:relative;display:flex;flex-direction:column;gap:5px;cursor:pointer;min-width:0}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.drop .thumb{position:relative;border:1px dashed var(--line-hover);border-radius:4px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;aspect-ratio:16/9}
+.drop .thumb canvas{display:block;width:100%;height:100%}
+.drop .thumb em{position:absolute;left:4px;bottom:4px;font-style:normal;font-weight:700;font-size:10px;line-height:1;color:#fff;background:rgba(10,10,12,.75);padding:3px 5px;border-radius:3px}
+.drop.over .thumb,.drop:hover .thumb{border-color:var(--accent)}
+.drop small{font-size:9.5px;color:var(--faint);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(10px);background:#1d1d23;border:1px solid var(--line);color:var(--text);padding:8px 14px;border-radius:6px;font-size:11px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:min(560px,calc(100vw - 32px))}
 #toast.on{opacity:1;transform:translateX(-50%)}
 .hide{display:none!important}
 @media (max-width:820px){
@@ -107,19 +123,22 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
     <div id="stage">
       <canvas id="view" aria-label="プレビュー"></canvas>
       <div id="meta"></div>
+      <div id="dropOv"><span>シーンA</span><span>シーンB</span></div>
     </div>
     <div id="bar">
       <button id="play" title="再生 / 停止（Space）">▶</button>
       <div id="tcode"><b id="tlabel">0:00:00:00</b><span id="tcEnd">/ 0:00:04:00</span></div>
       <div id="tl" aria-label="タイムライン（ドラッグで時間を移動）">
         <canvas id="ruler"></canvas>
+        <div id="ptrack"><canvas id="phase"></canvas></div>
         <div id="ktrack"><canvas id="graph"></canvas></div>
         <div id="cti"><i></i></div>
       </div>
       <div id="kctl">
-        <button class="kbtn" id="kPrev" title="前の加速へ（J）">◂</button>
-        <button class="kbtn on" id="kLoop" title="ループ再生">⟲</button>
-        <button class="kbtn" id="kNext" title="次の加速へ（K）">▸</button>
+        <button class="kbtn" id="kPrev" title="前の区切りへ（J）">◂</button>
+        <button class="kbtn" id="kCut" title="覆いきった中央へ（C）">CUT</button>
+        <button class="kbtn on" id="kLoop" title="ループ再生（L）">⟲</button>
+        <button class="kbtn" id="kNext" title="次の区切りへ（K）">▸</button>
       </div>
     </div>
   </div>
@@ -127,48 +146,88 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
   <aside id="panel">
     <header>
       <h1>U19 TILE <em>SCROLL</em></h1>
-      <p>Figmaの「HUD」の組みで流れるロゴタイル。巡航と急加速の緩急、加速に合わせた色の反転で切り替えるトランジション素材。</p>
+      <p>Figmaの「HUD」の組みで流れるロゴタイルの帯が、シーンAを覆いながら抜けてシーンBへつなぐトランジション。</p>
     </header>
 
-    <section id="secSpeed">
-      <h2><span><b>01</b>スピード（緩急）</span></h2>
+    <section>
+      <h2><span><b>01</b>シーン</span></h2>
+      <div class="scenes">
+        <label class="drop" id="dropA">
+          <div class="thumb"><canvas id="thumbA" width="160" height="90"></canvas><em>A</em></div>
+          <small id="nameA">サンプル</small>
+          <input type="file" id="fileA" accept="image/*,video/*,.mov,.mp4,.webm">
+        </label>
+        <label class="drop" id="dropB">
+          <div class="thumb"><canvas id="thumbB" width="160" height="90"></canvas><em>B</em></div>
+          <small id="nameB">サンプル</small>
+          <input type="file" id="fileB" accept="image/*,video/*,.mov,.mp4,.webm">
+        </label>
+      </div>
+      <div class="btnrow"><button class="btn" id="resetScenes">サンプルに戻す</button></div>
+      <div class="hint">クリックかドロップで画像・動画を差し替え（ステージの左半分＝A、右半分＝B）。シーンは確認用で、AEで重ねるなら「09 書き出し › タイルだけ（透過）」を使います。</div>
+    </section>
+
+    <section>
+      <h2><span><b>02</b>タイミング</span></h2>
+      <div id="timeRows"></div>
+      <div class="hint">トランジションの中で、帯が入りきってから抜け始めるまでが「全面タイル」。入り＋抜けがトランジションより長いと、画面を覆いきらずに帯が通り抜けます。</div>
+    </section>
+
+    <section>
+      <h2><span><b>03</b>つなぎ方（ワイプ）</span></h2>
+      <div class="sub">境目</div>
+      <div class="seg" id="edgeSeg"><button data-v="block">ブロック</button><button data-v="column">列ごと</button><button data-v="line">直線</button></div>
+      <div class="sub">進む向き</div>
+      <div class="seg arrows" id="wdirSeg">
+        <button data-v="90" title="上へ">↑</button><button data-v="45" title="右上へ">↗</button><button data-v="0" title="右へ">→</button><button data-v="315" title="右下へ">↘</button><button data-v="270" title="下へ">↓</button><button data-v="225" title="左下へ">↙</button><button data-v="180" title="左へ">←</button><button data-v="135" title="左上へ">↖</button>
+      </div>
+      <div id="wipeRows"></div>
+      <div class="sub">動きの緩急</div>
+      <div class="seg" id="weaseSeg"><button data-v="io">イーズ</button><button data-v="out">減速</button><button data-v="in">加速</button><button data-v="lin">リニア</button></div>
+      <div class="hint" id="wipeHint"></div>
+    </section>
+
+    <section>
+      <h2><span><b>04</b>スピード（緩急）</span></h2>
       <div class="seg" id="speedPreset">
         <button data-p="smooth">なめらか</button><button data-p="std">標準</button><button data-p="snap">キレ強め</button><button data-p="linear">一定速</button>
       </div>
       <div id="speedRows"></div>
-      <div class="hint">下のタイムラインの帯がスピードカーブです。山が加速、◆が色の反転。J / K で前後の加速へ移動します。</div>
+      <div class="hint">タイルの中身が流れる速さ。下の帯がスピードカーブで、山が加速、◆が色の反転。時間はトランジションの頭から数えます。</div>
     </section>
 
-    <section id="secColor">
-      <h2><span><b>02</b>カラー</span></h2>
+    <section>
+      <h2><span><b>05</b>カラー</span></h2>
       <div class="prow"><span>地の色</span><input type="color" id="bgC"><input type="text" id="bgT" spellcheck="false" maxlength="7"></div>
       <div class="prow"><span>ロゴの色</span><input type="color" id="fgC"><input type="text" id="fgT" spellcheck="false" maxlength="7"></div>
       <div class="chips" id="chips"></div>
       <div class="btnrow"><button class="btn" id="swap">地とロゴを入れ替え</button></div>
     </section>
 
-    <section id="secInv">
-      <h2><span><b>03</b>カラー反転</span></h2>
+    <section>
+      <h2><span><b>06</b>カラー反転</span></h2>
       <div class="seg" id="invSeg"><button data-v="off">オフ</button><button data-v="each">加速ごと</button><button data-v="once">1回目だけ</button></div>
       <div id="invRows"></div>
       <div class="prow"><span>反転から始める</span><input type="checkbox" id="invStart"></div>
     </section>
 
-    <section id="secAngle">
-      <h2><span><b>04</b>角度・配置</span></h2>
+    <section>
+      <h2><span><b>07</b>角度・配置</span></h2>
       <div id="angleRows"></div>
       <div class="prow"><span>流れる向き</span><div class="seg" id="dirSeg" style="flex:1;margin:0"><button data-v="1">上へ</button><button data-v="-1">下へ</button></div></div>
       <div class="btnrow"><button class="btn" id="angleReset">Figmaの配置（15°・100%）に戻す</button></div>
     </section>
 
-    <section id="secBlur">
-      <h2><span><b>05</b>モーションブラー</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="blurOn" style="accent-color:var(--accent)">オン</label></h2>
+    <section>
+      <h2><span><b>08</b>モーションブラー</span><label style="display:flex;gap:6px;align-items:center;letter-spacing:.04em;color:var(--faint)"><input type="checkbox" id="blurOn" style="accent-color:var(--accent)">オン</label></h2>
       <div id="blurRows"></div>
       <div class="hint">AEのシャッター角と同じ考え方。180°で1コマの半分だけ残像が伸びます。速いところだけにかかります。</div>
     </section>
 
-    <section id="secExport">
-      <h2><span><b>06</b>書き出し</span></h2>
+    <section>
+      <h2><span><b>09</b>書き出し</span></h2>
+      <div class="prow"><span>出力</span><div class="seg" id="outSeg" style="flex:1;margin:0"><button data-v="scene">シーンと合成</button><button data-v="tiles">タイルだけ（透過）</button></div></div>
+      <div class="prow"><span>範囲</span><div class="seg" id="rangeSeg" style="flex:1;margin:0"><button data-v="all">全体</button><button data-v="trans">トランジションのみ</button></div></div>
       <div class="prow"><span>サイズ</span><select id="size">
         <option value="1920x1080">1920 × 1080（16:9）</option>
         <option value="3840x2160">3840 × 2160（4K）</option>
@@ -177,20 +236,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
         <option value="1080x1920">1080 × 1920（9:16）</option>
       </select></div>
       <div class="prow"><span>フレームレート</span><div class="seg" id="fpsSeg" style="flex:1;margin:0"><button data-v="24">24</button><button data-v="30">30</button><button data-v="60">60</button></div></div>
-      <div id="exportRows"></div>
-      <div class="prow"><span>背景を透過</span><input type="checkbox" id="alpha"><span class="hint" style="margin:0;flex:1">地の色を抜く（PNG・連番・MOV）</span></div>
+      <div class="prow"><span>タイルの地を抜く</span><input type="checkbox" id="alpha"><span class="note">ロゴだけ残して地の色を透過</span></div>
       <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
       <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn primary" id="zip">連番PNG（ZIP）</button></div>
       <div class="btnrow"><button class="btn" id="mp4">MP4</button><button class="btn" id="mov">ロスレスMOV</button></div>
-      <div class="hint" id="exHint">尺の分を1コマずつ描いて書き出すのでコマ落ちしません。連番PNGはロスレス・透過対応で、AEには「読み込み → PNGシーケンス」で取り込めます。MP4は透過なし。</div>
+      <div class="hint" id="exHint">1コマずつ描いて書き出すのでコマ落ちしません。「タイルだけ（透過）」＋連番PNGかMOVなら、AEで素材の上に重ねるだけでつながります（連番は「読み込み → PNGシーケンス」）。MP4は透過なし。</div>
     </section>
 
     <section>
-      <h2><span><b>07</b>設定</span></h2>
+      <h2><span><b>10</b>設定</span></h2>
       <div class="btnrow"><button class="btn" id="cfgSave">設定をファイルに保存</button><button class="btn" id="cfgLoad">ファイルから読み込む</button></div>
       <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
       <input type="file" id="cfgFile" accept=".json,application/json" hidden>
-      <div class="hint">設定はこのブラウザに自動で残ります。別のPCに持っていくときは .json に保存してください。</div>
+      <div class="hint">設定はこのブラウザに自動で残ります（読み込んだ画像・動画は残りません）。別のPCに持っていくときは .json に保存してください。</div>
     </section>
   </aside>
 </div>
@@ -202,12 +260,14 @@ const $ = id => document.getElementById(id);
 
 /* ============ settings ============ */
 const DEFAULTS = {
-  cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.6, ease:5,
+  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.7, wOut:0.7,
+  edge:"block", wdir:135, soft:6, jitter:25, wease:"io",
+  cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.55, ease:5,
   bg:"#ff2b12", fg:"#000000",
   inv:"each", invPhase:50, invStart:false,
   angle:15, scale:100, start:0, dir:1,
   blur:true, shutter:180,
-  size:"1920x1080", fps:30, len:4, alpha:false, q:0.5,
+  out:"scene", range:"all", size:"1920x1080", fps:30, alpha:false, q:0.5,
 };
 const SPEED_PRESETS = {
   smooth:{cruise:40, dist:1.5, dur:1.2, ease:3},
@@ -218,23 +278,45 @@ const SPEED_PRESETS = {
 const COLOR_PRESETS = [
   ["#ff2b12","#000000"],["#000000","#ff2b12"],["#ff0000","#000000"],["#ff5a2a","#000000"],["#ffffff","#000000"],["#000000","#ffffff"],
 ];
-const STORE = "u19-tile-scroll";
+const STORE = "u19-tile-scroll-v2";
 let S = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
 let saveT = 0;
 const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} }, 250); };
 
-/* ============ speed curve (analytic, so any frame can be rendered exactly) ============ */
-const BLOCK = 212;               // one block (text or logo) along the column, Figma px
+/* ============ time model ============
+   0 ── A ──▶ holdA ── transition (trans) ──▶ ── B ──▶ total
+   inside the transition: band front enters over wIn, band back leaves over the last wOut */
+const total = () => S.holdA + S.trans + S.holdB;
+const wInD  = () => Math.min(S.wIn,  S.trans);
+const wOutD = () => Math.min(S.wOut, S.trans);
+const tileClock = t => t - S.holdA;
+const cutTime = () => S.holdA + (wInD() + (S.trans - wOutD())) / 2;   // the moment the band covers most
+const EASES = {
+  io:  u => u<.5 ? 4*u*u*u : 1 - Math.pow(-2*u+2, 3)/2,
+  out: u => 1 - Math.pow(1-u, 3),
+  in:  u => u*u*u,
+  lin: u => u,
+};
+const clamp01 = x => Math.min(1, Math.max(0, x));
+function wipeProgress(t){
+  const tc = tileClock(t), e = EASES[S.wease] || EASES.io;
+  const a = e(clamp01(tc / wInD()));
+  const b = e(clamp01((tc - (S.trans - wOutD())) / wOutD()));
+  return [a, b];
+}
+
+/* ============ speed curve (analytic, any frame can be rendered exactly) ============ */
+const BLOCK = 212;
 const E  = (u,n) => u<=0 ? 0 : u>=1 ? 1 : (u<.5 ? .5*Math.pow(2*u,n) : 1-.5*Math.pow(2*(1-u),n));
 const dE = (u,n) => (u<=0||u>=1) ? 0 : (u<.5 ? n*Math.pow(2*u,n-1) : n*Math.pow(2*(1-u),n-1));
 const iv = () => Math.max(S.interval, S.dur);
-function dashAt(t){ if (t < S.offset) return {k:-1,u:-1}; const k = Math.floor((t - S.offset)/iv()); return {k, u:(t - S.offset - k*iv())/S.dur}; }
-function posAt(t){ const {k,u} = dashAt(t); const n = k<0 ? 0 : k + E(u,S.ease); return S.cruise*t + S.dist*BLOCK*n; }
-function velAt(t){ const {k,u} = dashAt(t); return S.cruise + (k<0 ? 0 : S.dist*BLOCK/S.dur*dE(u,S.ease)); }
-function invCenters(){ const out=[]; if (S.inv==="off") return out; for (let k=0;;k++){ const c = S.offset + k*iv() + S.dur*S.invPhase/100; if (c > S.len) break; out.push(c); if (S.inv==="once") break; } return out; }
-function invAt(t){ let n = 0; if (S.inv!=="off"){ const c0 = S.offset + S.dur*S.invPhase/100; if (t >= c0) n = S.inv==="once" ? 1 : Math.floor((t - c0)/iv()) + 1; } return ((S.invStart?1:0) + n) % 2; }
-function dashStarts(){ const out=[]; for (let k=0;;k++){ const s = S.offset + k*iv(); if (s > S.len) break; out.push(s); } return out; }
+function dashAt(tc){ if (tc < S.offset) return {k:-1,u:-1}; const k = Math.floor((tc - S.offset)/iv()); return {k, u:(tc - S.offset - k*iv())/S.dur}; }
+function posAt(tc){ const {k,u} = dashAt(tc); const n = k<0 ? 0 : k + E(u,S.ease); return S.cruise*tc + S.dist*BLOCK*n; }
+function velAt(tc){ const {k,u} = dashAt(tc); return S.cruise + (k<0 ? 0 : S.dist*BLOCK/S.dur*dE(u,S.ease)); }
+function invCenters(){ const out=[]; if (S.inv==="off") return out; for (let k=0;;k++){ const c = S.offset + k*iv() + S.dur*S.invPhase/100; if (c > S.trans) break; out.push(c); if (S.inv==="once") break; } return out; }
+function invAt(tc){ let n = 0; if (S.inv!=="off"){ const c0 = S.offset + S.dur*S.invPhase/100; if (tc >= c0) n = S.inv==="once" ? 1 : Math.floor((tc - c0)/iv()) + 1; } return ((S.invStart?1:0) + n) % 2; }
+function dashStarts(){ const out=[]; for (let k=0;;k++){ const s = S.offset + k*iv(); if (s > S.trans) break; out.push(s); } return out; }
 
 /* ============ tile atlas, measured from Figma frame "HUD" (985:5999) ============ */
 const AS = 3, PU = 951, PV = 424, CELL = 445, ORIGIN = [-552, -164];
@@ -276,6 +358,69 @@ async function buildAtlas(){
   return c;
 }
 
+/* ============ scenes (A / B) ============ */
+const scenes = { A:{ kind:'sample', el:null, name:'サンプル' }, B:{ kind:'sample', el:null, name:'サンプル' } };
+const sceneCv = { A:document.createElement('canvas'), B:document.createElement('canvas') };
+let sceneDirty = true;
+function drawSample(which, g, w, h){
+  const A = which === 'A';
+  const gr = g.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, A ? '#16324a' : '#2a1036'); gr.addColorStop(1, A ? '#05090f' : '#0c0610');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.strokeStyle = A ? 'rgba(120,200,255,.14)' : 'rgba(255,140,220,.14)'; g.lineWidth = Math.max(1, w/960);
+  const step = w/16; for (let x = 0; x <= w; x += step){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (let y = 0; y <= h; y += step){ g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.fillStyle = '#fff'; g.font = `700 ${Math.round(h*0.12)}px "Unbounded", "Arial Black", sans-serif`; g.textBaseline = 'alphabetic';
+  g.fillText(A ? 'SCENE A' : 'SCENE B', w*0.06, h*0.2);
+  g.font = `${Math.round(h*0.03)}px ui-monospace, Menlo, monospace`; g.fillStyle = 'rgba(255,255,255,.6)';
+  g.fillText(A ? 'BEFORE · ROUND 03' : 'AFTER · FINAL', w*0.06, h*0.27);
+}
+function drawScene(which, g, w, h){
+  const s = scenes[which];
+  if (s.kind === 'sample' || !s.el){ drawSample(which, g, w, h); return; }
+  const el = s.el, iw = el.videoWidth || el.naturalWidth || el.width, ih = el.videoHeight || el.naturalHeight || el.height;
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+  if (!iw || !ih) return;
+  const k = Math.max(w/iw, h/ih), dw = iw*k, dh = ih*k;
+  g.drawImage(el, (w-dw)/2, (h-dh)/2, dw, dh);
+}
+function sceneTime(which, t){ return which === 'A' ? t : Math.max(0, t - (S.holdA + S.trans - wOutD())); }
+function drawThumbs(){ for (const w of ['A','B']){ const c = $('thumb'+w), g = c.getContext('2d'); drawScene(w, g, c.width, c.height); $('name'+w).textContent = scenes[w].name; } }
+function loadScene(which, file){
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const isVid = (file.type || '').startsWith('video') || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+  if (isVid){
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
+    v.addEventListener('loadeddata', () => { scenes[which] = { kind:'video', el:v, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に動画を読み込みました`); }, { once:true });
+    v.addEventListener('seeked', () => { sceneDirty = dirty = true; });
+    v.addEventListener('error', () => toast('この動画は読み込めませんでした（MP4 / WebM を試してください）'), { once:true });
+    v.src = url;
+  } else {
+    const i = new Image();
+    i.onload = () => { scenes[which] = { kind:'image', el:i, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に画像を読み込みました`); };
+    i.onerror = () => toast('この画像は読み込めませんでした');
+    i.src = url;
+  }
+}
+function syncVideos(t, exact){
+  for (const w of ['A','B']){
+    const s = scenes[w]; if (s.kind !== 'video') continue;
+    const v = s.el, st = Math.min(Math.max(0, sceneTime(w, t)), Math.max(0, v.duration - 1e-3));
+    if (!exact && playing){ if (v.paused) v.play().catch(()=>{}); if (Math.abs(v.currentTime - st) > 0.25) v.currentTime = st; }
+    else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - st) > 0.5/S.fps) v.currentTime = st; }
+  }
+}
+function seekExact(v, t){
+  return new Promise(res => {
+    const target = Math.min(Math.max(0, t), Math.max(0, v.duration - 1e-3));
+    if (Math.abs(v.currentTime - target) < 1e-4 && v.readyState >= 2){ res(); return; }
+    let done = false; const fin = () => { if (!done){ done = true; res(); } };
+    v.addEventListener('seeked', () => { if ('requestVideoFrameCallback' in v){ let ok = false; v.requestVideoFrameCallback(() => { ok = true; fin(); }); setTimeout(() => { if (!ok) fin(); }, 120); } else fin(); }, { once:true });
+    setTimeout(fin, 3000); v.currentTime = target;
+  });
+}
+
 /* ============ WebGL ============ */
 const view = $("view");
 const gl = view.getContext('webgl2', { antialias:false, alpha:true, premultipliedAlpha:true, preserveDrawingBuffer:true });
@@ -283,17 +428,29 @@ const VS = `#version 300 es
 in vec2 a; void main(){ gl_Position = vec4(a,0.,1.); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform sampler2D uTex;
-uniform vec2 uRes, uCenterPx, uCenterFig, uBase, uRot;
+uniform sampler2D uTex, uA, uB;
+uniform vec2 uRes, uCenterPx, uBase, uRot;
 uniform float uPxPerFig, uScroll, uBlur, uInv, uAlpha;
 uniform int uTaps;
 uniform vec3 uBg, uFg;
+uniform vec2 uDir, uProj;                 // wipe direction (screen, y down), projection min & 1/extent
+uniform float uFrontIn, uFrontOut, uSoft, uJitter, uUnderB;
+uniform int uEdge, uOut;                  // edge: 0 line, 1 block, 2 column · out: 0 composite, 1 tiles only
 out vec4 o;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 toScreen(vec2 R){                    // inverse of the tile mapping
+  vec2 q = R - uBase - vec2(0., uScroll);
+  vec2 f = vec2(q.x*uRot.x + q.y*uRot.y, -q.x*uRot.y + q.y*uRot.x);
+  return f * uPxPerFig + uCenterPx;
+}
+float sOf(vec2 p){ return (dot(p, uDir) - uProj.x) * uProj.y; }
 void main(){
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
-  vec2 f = (p - uCenterPx) / uPxPerFig;                       // Figma px, relative to frame centre
+  vec2 f = (p - uCenterPx) / uPxPerFig;
   vec2 R = vec2(f.x*uRot.x - f.y*uRot.y, f.x*uRot.y + f.y*uRot.x) + uBase + vec2(0., uScroll);
   const vec2 period = vec2(951., 424.);
+
+  /* tiles */
   float m = 0.;
   if (uTaps <= 1) m = texture(uTex, R / period).r;
   else {
@@ -305,65 +462,127 @@ void main(){
     m /= float(uTaps);
   }
   vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
-  // transparent: what stays visible is always drawn in the logo colour (no fringe from the cut-out colour)
-  vec3 col = mix(mix(A, B, m), uFg, uAlpha);
-  float a = mix(1., mix(m, 1.-m, uInv), uAlpha);
-  o = vec4(col * a, a);
+  vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
+  float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
+
+  /* wipe position: per pixel, per block, or per column */
+  float s;
+  if (uEdge == 0) s = sOf(p);
+  else {
+    float c = floor(R.x / 475.5);
+    float off = mod(c, 2.) > .5 ? -94. : 0.;
+    float r = floor((R.y - off) / 212.);
+    vec2 cc = vec2(c*475.5 + 222.5, off + r*212. + 100.);
+    if (uEdge == 2){ cc.y = R.y; r = 0.; }
+    s = sOf(toScreen(cc)) + (hash(vec2(c, r)) - .5) * uJitter;
+  }
+  float cIn  = 1. - smoothstep(uFrontIn  - uSoft, uFrontIn,  s);   // 1 = band has arrived
+  float cOut = 1. - smoothstep(uFrontOut - uSoft, uFrontOut, s);   // 1 = band has left (B)
+  float wT = max(cIn - cOut, 0.), wA = 1. - cIn, wB = min(cOut, cIn);
+
+  if (uOut == 1){ o = vec4(tcol * ta * wT, ta * wT); return; }
+  vec2 uv = p / uRes;
+  vec3 sa = texture(uA, uv).rgb, sb = texture(uB, uv).rgb;
+  vec3 under = mix(sa, sb, uUnderB);
+  vec3 col = (tcol * ta + under * (1. - ta)) * wT + sa * wA + sb * wB;
+  o = vec4(col, 1.);
 }`;
-let prog, U = {};
+let U = {}, texA, texB;
 function compile(){
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
-  prog = gl.createProgram();
+  const prog = gl.createProgram();
   gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-  gl.linkProgram(prog); gl.useProgram(prog);
+  gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  ['uTex','uRes','uCenterPx','uCenterFig','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  ['uTex','uA','uB','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
 }
-function upload(img){
-  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t);
+function makeTex(unit, mip){
+  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const wrap = mip ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,255]));
+  return t;
+}
+function uploadAtlas(img){
+  makeTex(0, true);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); gl.generateMipmap(gl.TEXTURE_2D);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
   const an = gl.getExtension('EXT_texture_filter_anisotropic');
   if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
-  gl.uniform1i(U.uTex, 0);
+  texA = makeTex(1, false); texB = makeTex(2, false);
+  gl.uniform1i(U.uTex, 0); gl.uniform1i(U.uA, 1); gl.uniform1i(U.uB, 2);
+}
+function uploadScenes(W, H){
+  for (const [w, unit, tex] of [['A',1,texA],['B',2,texB]]){
+    const c = sceneCv[w]; if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+    drawScene(w, c.getContext('2d'), W, H);
+    gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+  }
 }
 const hex3 = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
 const outSize = () => S.size.split('x').map(Number);
-let forceQ = null;
+let forceQ = null, lastSceneKey = '';
 function render(t, q){
   const [OW, OH] = outSize(); const qq = q ?? forceQ ?? S.q;
   const W = Math.round(OW*qq), H = Math.round(OH*qq);
-  if (view.width !== W || view.height !== H){ view.width = W; view.height = H; }
+  if (view.width !== W || view.height !== H){ view.width = W; view.height = H; sceneDirty = true; }
   gl.viewport(0, 0, W, H);
-  // 1920 Figma px across the long edge at 100%, same density as the HUD frame
   const k0 = Math.max(W, H) / 1920, k = k0 * S.scale/100;
-  const cf = [W/2/k0, H/2/k0];                                  // frame centre in Figma px
+  const cf = [W/2/k0, H/2/k0];
   const c15 = Math.cos(15*Math.PI/180), s15 = Math.sin(15*Math.PI/180);
   const base = [cf[0]*c15 - cf[1]*s15 - ORIGIN[0], cf[0]*s15 + cf[1]*c15 - ORIGIN[1]];
-  const a = S.angle*Math.PI/180;
-  const fps = S.fps, v = velAt(t);
-  const blurLen = S.blur ? v * (S.shutter/360) / fps : 0;
+  const a = S.angle*Math.PI/180, tc = tileClock(t);
+  const v = velAt(tc), blurLen = S.blur ? v * (S.shutter/360) / S.fps : 0;
   const taps = blurLen < 0.6 ? 1 : Math.min(48, Math.max(6, Math.ceil(blurLen * k * 0.9)));
-  gl.uniform2f(U.uRes, W, H);
-  gl.uniform2f(U.uCenterPx, W/2, H/2);
-  gl.uniform2f(U.uBase, base[0], base[1]);
-  gl.uniform2f(U.uRot, Math.cos(a), Math.sin(a));
-  gl.uniform1f(U.uPxPerFig, k);
-  gl.uniform1f(U.uScroll, S.dir * (posAt(t) + S.start*BLOCK));
-  gl.uniform1f(U.uBlur, blurLen);
-  gl.uniform1i(U.uTaps, taps);
-  gl.uniform1f(U.uInv, invAt(t));
-  gl.uniform1f(U.uAlpha, S.alpha ? 1 : 0);
+  // wipe geometry
+  const wa = S.wdir*Math.PI/180, dir = [Math.cos(wa), -Math.sin(wa)];
+  const pr = [[0,0],[W,0],[0,H],[W,H]].map(([x,y]) => x*dir[0] + y*dir[1]);
+  const pmin = Math.min(...pr), ext = Math.max(...pr) - pmin;
+  const soft = S.edge === 'line' ? Math.max(0.002, S.soft/100) : 0.004;
+  const jit = S.edge === 'line' ? 0 : S.jitter/100;
+  const cellR = S.edge === 'line' ? 0 : 260*k/ext;                // half a block, in wipe units
+  const margin = soft + jit/2 + cellR;
+  const [pa, pb] = wipeProgress(t);
+  const front = u => -margin + u*(1 + 2*margin);
+  gl.uniform2f(U.uRes, W, H); gl.uniform2f(U.uCenterPx, W/2, H/2);
+  gl.uniform2f(U.uBase, base[0], base[1]); gl.uniform2f(U.uRot, Math.cos(a), Math.sin(a));
+  gl.uniform1f(U.uPxPerFig, k); gl.uniform1f(U.uScroll, S.dir * (posAt(tc) + S.start*BLOCK));
+  gl.uniform1f(U.uBlur, blurLen); gl.uniform1i(U.uTaps, taps);
+  gl.uniform1f(U.uInv, invAt(tc)); gl.uniform1f(U.uAlpha, S.alpha ? 1 : 0);
   gl.uniform3fv(U.uBg, hex3(S.bg)); gl.uniform3fv(U.uFg, hex3(S.fg));
+  gl.uniform2f(U.uDir, dir[0], dir[1]); gl.uniform2f(U.uProj, pmin, 1/ext);
+  gl.uniform1f(U.uFrontIn, front(pa)); gl.uniform1f(U.uFrontOut, front(pb));
+  gl.uniform1f(U.uSoft, soft); gl.uniform1f(U.uJitter, jit);
+  gl.uniform1f(U.uUnderB, t >= cutTime() ? 1 : 0);
+  gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : 2);
+  gl.uniform1i(U.uOut, S.out === 'tiles' ? 1 : 0);
+  if (S.out !== 'tiles'){
+    const hasVid = scenes.A.kind === 'video' || scenes.B.kind === 'video';
+    const key = `${W}x${H}`;
+    if (sceneDirty || hasVid || key !== lastSceneKey){ uploadScenes(W, H); sceneDirty = false; lastSceneKey = key; }
+  }
   gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
 /* ============ UI builders ============ */
 const ROWS = {
+  timeRows: [
+    ["holdA","Aの長さ",0,5,0.05, v=>`${v.toFixed(2)}s`],
+    ["trans","トランジション",0.4,8,0.05, v=>`${v.toFixed(2)}s`],
+    ["holdB","Bの長さ",0,5,0.05, v=>`${v.toFixed(2)}s`],
+    ["wIn","帯が入る長さ",0.1,4,0.05, v=>`${v.toFixed(2)}s`],
+    ["wOut","帯が抜ける長さ",0.1,4,0.05, v=>`${v.toFixed(2)}s`],
+  ],
+  wipeRows: [
+    ["wdir","角度",0,359,1, v=>`${v}°`],
+    ["jitter","ばらつき",0,100,1, v=>`${v}%`],
+    ["soft","ぼかし",0,40,0.5, v=>`${v}%`],
+  ],
   speedRows: [
     ["cruise","巡航スピード",0,400,5, v=>`${v}px/s`],
     ["dist","加速で進む量",0,8,0.25, v=>`${v}ブロック`],
@@ -379,7 +598,6 @@ const ROWS = {
     ["start","柄の開始位置",0,2,0.01, v=>v.toFixed(2)],
   ],
   blurRows: [["shutter","シャッター角",0,360,5, v=>`${v}°`]],
-  exportRows: [["len","尺",0.5,20,0.1, v=>`${v.toFixed(1)}s`]],
 };
 const sliders = {};
 function buildRows(){
@@ -390,14 +608,15 @@ function buildRows(){
       row.innerHTML = `<span>${label}</span><input type="range" id="r_${key}" min="${min}" max="${max}" step="${step}" aria-label="${label}"><span class="pv" id="v_${key}" title="クリックで数値入力"></span>`;
       box.appendChild(row);
       const r = row.querySelector('input'), pv = row.querySelector('.pv');
-      sliders[key] = { r, pv, fmt };
+      sliders[key] = { r, pv, fmt, row };
       r.addEventListener('input', () => { S[key] = parseFloat(r.value); pv.textContent = fmt(S[key]); changed(key); });
-      r.addEventListener('dblclick', () => { S[key] = DEFAULTS[key]; syncUI(); changed(key); });
+      r.addEventListener('dblclick', () => { S[key] = DEFAULTS[key]; changed(key); });
       pv.addEventListener('click', () => {
         const inp = document.createElement('input'); inp.type = 'text'; inp.value = S[key];
         inp.style.cssText = 'width:52px;flex:0 0 52px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:10px var(--mono);padding:1px 3px;text-align:right';
         pv.replaceWith(inp); inp.focus(); inp.select();
-        const done = ok => { if (ok){ const n = parseFloat(inp.value); if (!isNaN(n)){ S[key] = Math.min(max, Math.max(min, n)); changed(key); } } inp.replaceWith(pv); syncUI(); };
+        let closed = false;
+        const done = ok => { if (closed) return; closed = true; if (ok){ const n = parseFloat(inp.value); if (!isNaN(n)){ S[key] = Math.min(max, Math.max(min, n)); changed(key); } } inp.replaceWith(pv); syncUI(); };
         inp.addEventListener('keydown', e => { if (e.key==='Enter') done(true); if (e.key==='Escape') done(false); e.stopPropagation(); });
         inp.addEventListener('blur', () => done(true), { once:true });
       });
@@ -405,24 +624,32 @@ function buildRows(){
   }
 }
 function segBind(id, key, parse){
-  const el = $(id);
-  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S[key] = parse(b.dataset.v); syncUI(); changed(key); });
+  $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S[key] = parse(b.dataset.v); changed(key); });
 }
 function syncSeg(id, val){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(val))); }
+const WIPE_HINT = {
+  block:'タイルの区切りごとに、帯の進む順で切り替わります。ばらつきで順番を少し崩せます。',
+  column:'傾いた列ごとに切り替わります。ばらつきで列ごとのタイミングをずらせます。',
+  line:'まっすぐなワイプ。ぼかしで境目を柔らかくできます。',
+};
 function syncUI(){
   for (const [k, s] of Object.entries(sliders)){ s.r.value = S[k]; s.pv.textContent = s.fmt(S[k]); }
   syncSeg('invSeg', S.inv); syncSeg('dirSeg', S.dir); syncSeg('fpsSeg', S.fps); syncSeg('qSeg', S.q);
+  syncSeg('edgeSeg', S.edge); syncSeg('wdirSeg', S.wdir); syncSeg('weaseSeg', S.wease); syncSeg('outSeg', S.out); syncSeg('rangeSeg', S.range);
   $('speedPreset').querySelectorAll('button').forEach(b => { const p = SPEED_PRESETS[b.dataset.p]; b.classList.toggle('on', Object.keys(p).every(k => S[k] === p[k])); });
   $('bgC').value = S.bg; $('bgT').value = S.bg.toUpperCase(); $('fgC').value = S.fg; $('fgT').value = S.fg.toUpperCase();
   $('chips').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.bg === S.bg && c.dataset.fg === S.fg));
   $('invStart').checked = S.invStart; $('blurOn').checked = S.blur; $('alpha').checked = S.alpha; $('size').value = S.size;
   sliders.invPhase.r.disabled = S.inv === 'off';
-  view.classList.toggle('alpha', S.alpha);
-  $('tcEnd').textContent = '/ ' + tc(S.len);
-  const [w,h] = outSize(); $('meta').textContent = `${w}×${h} · ${S.fps}fps · ${S.len.toFixed(1)}s`;
+  sliders.soft.row.classList.toggle('hide', S.edge !== 'line');
+  sliders.jitter.row.classList.toggle('hide', S.edge === 'line');
+  $('wipeHint').textContent = WIPE_HINT[S.edge];
+  view.classList.toggle('alpha', S.out === 'tiles');
+  $('tcEnd').textContent = '/ ' + tc(total());
+  const [w,h] = outSize(); $('meta').textContent = `${w}×${h} · ${S.fps}fps · ${total().toFixed(2)}s`;
 }
 function changed(key){
-  if (key === 'len' && playhead > S.len) playhead = 0;
+  if (playhead > total()) playhead = 0;
   syncUI(); drawTimeline(); persist(); dirty = true;
 }
 
@@ -443,78 +670,111 @@ function buildColor(){
   $('swap').addEventListener('click', () => { [S.bg, S.fg] = [S.fg, S.bg]; changed('bg'); });
 }
 
+/* scenes UI */
+function buildScenes(){
+  for (const w of ['A','B']){
+    $('file'+w).addEventListener('change', e => { loadScene(w, e.target.files[0]); e.target.value = ''; });
+    const d = $('drop'+w);
+    d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+    d.addEventListener('dragleave', () => d.classList.remove('over'));
+    d.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); d.classList.remove('over'); loadScene(w, e.dataTransfer.files[0]); });
+  }
+  const st = $('stage'), ov = $('dropOv');
+  st.addEventListener('dragover', e => { e.preventDefault(); ov.classList.add('on'); });
+  st.addEventListener('dragleave', e => { if (!st.contains(e.relatedTarget)) ov.classList.remove('on'); });
+  st.addEventListener('drop', e => { e.preventDefault(); ov.classList.remove('on'); const r = st.getBoundingClientRect(); loadScene(e.clientX < r.left + r.width/2 ? 'A' : 'B', e.dataTransfer.files[0]); });
+  $('resetScenes').addEventListener('click', () => { for (const w of ['A','B']){ if (scenes[w].kind === 'video') scenes[w].el.pause(); scenes[w] = { kind:'sample', el:null, name:'サンプル' }; } drawThumbs(); sceneDirty = dirty = true; });
+}
+
 /* ============ timeline ============ */
 let playhead = 0, playing = false, looping = true, dirty = true;
 const tc = t => { const f = Math.round(t*S.fps), fr = f % S.fps, s = Math.floor(f/S.fps); return `0:${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}:${String(fr).padStart(2,'0')}`; };
 function sizeCanvas(cv){ const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio||1, 2); const w = Math.max(1, Math.round(r.width*d)), h = Math.max(1, Math.round(r.height*d)); if (cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; } return [w,h,d]; }
+const FONT = () => getComputedStyle(document.body).fontFamily;
 function drawTimeline(){
-  const ruler = $('ruler'), graph = $('graph');
-  let [w,h,d] = sizeCanvas(ruler); let g = ruler.getContext('2d');
-  g.clearRect(0,0,w,h); g.font = `${9*d}px ${getComputedStyle(document.body).fontFamily}`; g.textBaseline = 'top';
-  const L = S.len, step = L > 12 ? 2 : 1;
+  const L = total(), x = (t, w) => t/L*w;
+  // ruler
+  let [w,h,d] = sizeCanvas($('ruler')); let g = $('ruler').getContext('2d');
+  g.clearRect(0,0,w,h); g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'top';
+  const step = L > 12 ? 2 : L > 5 ? 1 : 0.5;
   for (let s = 0; s <= L + 1e-6; s += step){
-    const x = Math.round(s/L*(w-1)) + .5;
-    g.fillStyle = '#5a5a64'; g.fillRect(x-.5, h-7*d, 1, 7*d);
-    g.fillStyle = '#8a8a96'; if (x < w - 22*d) g.fillText(String(s).padStart(2,'0')+'s', x+3*d, 1*d);
+    const X = Math.round(x(s,w-1)) + .5;
+    g.fillStyle = '#5a5a64'; g.fillRect(X-.5, h-7*d, 1, 7*d);
+    g.fillStyle = '#8a8a96'; if (X < w - 26*d) g.fillText(s.toFixed(step < 1 ? 1 : 0)+'s', X+3*d, 1*d);
   }
-  const sub = S.fps >= 30 ? S.fps/6 : S.fps/4;
-  g.fillStyle = '#3a3a42';
-  for (let f = 0; f <= L*S.fps; f += sub){ const x = Math.round(f/S.fps/L*(w-1)); g.fillRect(x, h-3*d, 1, 3*d); }
+  const sub = S.fps >= 30 ? S.fps/6 : S.fps/4; g.fillStyle = '#3a3a42';
+  for (let f = 0; f <= L*S.fps; f += sub){ g.fillRect(Math.round(f/S.fps/L*(w-1)), h-3*d, 1, 3*d); }
 
-  [w,h,d] = sizeCanvas(graph); g = graph.getContext('2d'); g.clearRect(0,0,w,h);
-  // dash spans
-  g.fillStyle = 'rgba(255,90,31,.08)';
-  for (const s of dashStarts()){ g.fillRect(s/L*w, 0, S.dur/L*w, h); }
-  // speed curve
-  const n = Math.min(800, Math.round(w)); let vmax = 1;
-  const vs = []; for (let i=0;i<=n;i++){ const v = velAt(i/n*L); vs.push(v); if (v > vmax) vmax = v; }
-  const y = v => h - 3*d - v/vmax*(h - 8*d);
-  g.beginPath(); g.moveTo(0, h);
-  vs.forEach((v,i) => g.lineTo(i/n*w, y(v))); g.lineTo(w, h); g.closePath();
+  // phase strip: A | 入る | タイル | 抜ける | B
+  [w,h,d] = sizeCanvas($('phase')); g = $('phase').getContext('2d'); g.clearRect(0,0,w,h);
+  const t0 = S.holdA, t1 = t0 + wInD(), t3 = t0 + S.trans, t2 = t3 - wOutD();
+  const seg = (a, b, fill, label, col) => { if (b <= a) return; g.fillStyle = fill; g.fillRect(x(a,w), 0, x(b,w)-x(a,w), h); if (label && x(b,w)-x(a,w) > 40*d){ g.fillStyle = col; g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'middle'; g.fillText(label, x(a,w)+5*d, h/2); } };
+  seg(0, t0, '#121216', 'A', '#6a6a74');
+  const grIn = g.createLinearGradient(x(t0,w),0,x(t1,w),0); grIn.addColorStop(0,'#2a1410'); grIn.addColorStop(1, S.bg);
+  seg(t0, t1, grIn, '帯が入る', '#fff');
+  seg(t1, t2, S.bg, 'タイル', S.fg);
+  const grOut = g.createLinearGradient(x(t2,w),0,x(t3,w),0); grOut.addColorStop(0, S.bg); grOut.addColorStop(1,'#1a1220');
+  seg(Math.max(t2, t0), t3, grOut, '帯が抜ける', '#fff');
+  seg(t3, L, '#121216', 'B', '#6a6a74');
+  if (t2 < t1){ g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x(t2,w), 0, x(t1,w)-x(t2,w), h); }
+  const cx = x(cutTime(), w); g.fillStyle = '#e6e6ef'; g.fillRect(cx-.5*d, 0, 1.5*d, h);
+
+  // speed graph (tile clock), only meaningful inside the transition
+  [w,h,d] = sizeCanvas($('graph')); g = $('graph').getContext('2d'); g.clearRect(0,0,w,h);
+  g.fillStyle = 'rgba(255,90,31,.07)';
+  for (const s of dashStarts()) g.fillRect(x(t0+s,w), 0, S.dur/L*w, h);
+  const n = Math.min(800, Math.round(w)); let vmax = 1; const vs = [];
+  for (let i=0;i<=n;i++){ const tt = i/n*L, v = velAt(tileClock(tt)); vs.push(v); if (tt >= t0 && tt <= t3 && v > vmax) vmax = v; }
+  const Y = v => h - 3*d - Math.min(1, v/vmax)*(h - 8*d);
+  g.save(); g.beginPath(); g.rect(x(t0,w), 0, x(t3,w)-x(t0,w), h); g.clip();
+  g.beginPath(); g.moveTo(0, h); vs.forEach((v,i) => g.lineTo(i/n*w, Y(v))); g.lineTo(w, h); g.closePath();
   g.fillStyle = 'rgba(255,90,31,.18)'; g.fill();
-  g.beginPath(); vs.forEach((v,i) => i ? g.lineTo(i/n*w, y(v)) : g.moveTo(0, y(v)));
-  g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.4*d; g.stroke();
-  // inversion diamonds
+  g.beginPath(); vs.forEach((v,i) => i ? g.lineTo(i/n*w, Y(v)) : g.moveTo(0, Y(v)));
+  g.strokeStyle = '#ff5a1f'; g.lineWidth = 1.4*d; g.stroke(); g.restore();
   for (const c of invCenters()){
-    const x = c/L*w, cy = 7*d, r = 4.5*d;
-    g.beginPath(); g.moveTo(x, cy-r); g.lineTo(x+r, cy); g.lineTo(x, cy+r); g.lineTo(x-r, cy); g.closePath();
+    const X = x(t0+c, w), cy = 7*d, r = 4.5*d;
+    g.beginPath(); g.moveTo(X, cy-r); g.lineTo(X+r, cy); g.lineTo(X, cy+r); g.lineTo(X-r, cy); g.closePath();
     g.fillStyle = '#c9c9d4'; g.fill(); g.strokeStyle = '#0a0a0b'; g.lineWidth = 1.2*d; g.stroke();
   }
-  g.fillStyle = '#6a6a74'; g.font = `${9*d}px ${getComputedStyle(document.body).fontFamily}`; g.textBaseline = 'bottom';
+  g.fillStyle = '#6a6a74'; g.font = `${9*d}px ${FONT()}`; g.textBaseline = 'bottom';
   g.fillText(`max ${Math.round(vmax)}px/s`, w - 92*d, h - 2*d);
   syncBar();
 }
 function syncBar(){
-  $('cti').style.left = (playhead / S.len * $('tl').clientWidth) + 'px';
+  $('cti').style.left = (playhead / total() * $('tl').clientWidth) + 'px';
   $('tlabel').textContent = tc(playhead);
   $('play').textContent = playing ? '❚❚' : '▶';
 }
-function seekTo(t){ const fr = 1/S.fps; playhead = Math.min(S.len, Math.max(0, Math.round(t/fr)*fr)); dirty = true; syncBar(); }
+function seekTo(t){ const fr = 1/S.fps; playhead = Math.min(total(), Math.max(0, Math.round(t/fr)*fr)); dirty = true; syncBar(); }
 function stepFrames(n){ playing = false; seekTo(playhead + n/S.fps); }
-function jumpDash(dir){
-  const pts = dashStarts().concat(invCenters()).sort((a,b)=>a-b), eps = 1/(S.fps*2);
+function marks(){ const t0 = S.holdA; return [0, t0, t0+wInD(), cutTime(), t0+S.trans-wOutD(), t0+S.trans, total()].concat(dashStarts().map(s=>t0+s), invCenters().map(c=>t0+c)).sort((a,b)=>a-b); }
+function jump(dir){
+  const pts = marks(), eps = 1/(S.fps*2);
   const t = dir > 0 ? pts.find(p => p > playhead + eps) : [...pts].reverse().find(p => p < playhead - eps);
-  playing = false; seekTo(t ?? (dir > 0 ? S.len : 0));
+  playing = false; seekTo(t ?? (dir > 0 ? total() : 0));
 }
 function bindTimeline(){
   const tl = $('tl');
-  const at = e => { const r = tl.getBoundingClientRect(); return (e.clientX - r.left) / r.width * S.len; };
+  const at = e => { const r = tl.getBoundingClientRect(); return (e.clientX - r.left) / r.width * total(); };
   tl.addEventListener('pointerdown', e => {
-    tl.setPointerCapture(e.pointerId); const was = playing; playing = false; seekTo(at(e));
-    const mv = ev => seekTo(at(ev));
-    const up = () => { tl.removeEventListener('pointermove', mv); tl.removeEventListener('pointerup', up); playing = was && false; };
+    if (recording) return;
+    tl.setPointerCapture(e.pointerId); playing = false; seekTo(at(e));
+    const mv = ev => seekTo(ev.shiftKey && Math.abs(at(ev) - cutTime()) < .15 ? cutTime() : at(ev));
+    const up = () => { tl.removeEventListener('pointermove', mv); tl.removeEventListener('pointerup', up); };
     tl.addEventListener('pointermove', mv); tl.addEventListener('pointerup', up);
   });
   $('play').addEventListener('click', togglePlay);
-  $('kPrev').addEventListener('click', () => jumpDash(-1));
-  $('kNext').addEventListener('click', () => jumpDash(1));
-  $('kLoop').addEventListener('click', () => { looping = !looping; $('kLoop').classList.toggle('on', looping); });
+  $('kPrev').addEventListener('click', () => jump(-1));
+  $('kNext').addEventListener('click', () => jump(1));
+  $('kCut').addEventListener('click', () => { playing = false; seekTo(cutTime()); });
+  $('kLoop').addEventListener('click', toggleLoop);
   addEventListener('resize', () => { drawTimeline(); dirty = true; });
 }
-function togglePlay(){ if (recording) return; if (!playing && playhead >= S.len - 1e-6) playhead = 0; playing = !playing; syncBar(); }
+function toggleLoop(){ looping = !looping; $('kLoop').classList.toggle('on', looping); }
+function togglePlay(){ if (recording) return; if (!playing && playhead >= total() - 1e-6) playhead = 0; playing = !playing; syncBar(); }
 
 /* keyboard (AE-like) */
-const typing = () => { const el = document.activeElement; if (!el) return false; if (/TEXTAREA|SELECT/.test(el.tagName)) return true; return el.tagName === 'INPUT' && !['range','checkbox','button','color'].includes(el.type); };
+const typing = () => { const el = document.activeElement; if (!el) return false; if (/TEXTAREA|SELECT/.test(el.tagName)) return true; return el.tagName === 'INPUT' && !['range','checkbox','button','color','file'].includes(el.type); };
 addEventListener('keydown', e => {
   if (typing()) return;
   const mod = e.metaKey || e.ctrlKey;
@@ -522,12 +782,14 @@ addEventListener('keydown', e => {
   if (mod) return;
   switch (e.code){
     case 'Space': e.preventDefault(); togglePlay(); break;
-    case 'KeyJ': e.preventDefault(); jumpDash(-1); break;
-    case 'KeyK': e.preventDefault(); jumpDash(1); break;
+    case 'KeyJ': e.preventDefault(); jump(-1); break;
+    case 'KeyK': e.preventDefault(); jump(1); break;
+    case 'KeyC': e.preventDefault(); playing = false; seekTo(cutTime()); break;
+    case 'KeyL': e.preventDefault(); toggleLoop(); break;
     case 'PageUp': e.preventDefault(); stepFrames(e.shiftKey?-10:-1); break;
     case 'PageDown': e.preventDefault(); stepFrames(e.shiftKey?10:1); break;
     case 'Home': e.preventDefault(); playing = false; seekTo(0); break;
-    case 'End': e.preventDefault(); playing = false; seekTo(S.len); break;
+    case 'End': e.preventDefault(); playing = false; seekTo(total()); break;
   }
 });
 
@@ -563,7 +825,7 @@ function joinBytes(...parts){ const arrays = parts.map(p => typeof p === 'string
 function be32(...v){ const out = new Uint8Array(v.length*4), dv = new DataView(out.buffer); v.forEach((n,i)=>dv.setUint32(i*4,n)); return out; }
 function be16(...v){ const out = new Uint8Array(v.length*2), dv = new DataView(out.buffer); v.forEach((n,i)=>dv.setUint16(i*2,n)); return out; }
 function atom(type, ...parts){ const data = joinBytes(...parts); return joinBytes(be32(data.length+8), type, data); }
-// lossless PNG-in-MOV (same writer as Thermal Flow / Heatmap Blur)
+// lossless PNG-in-MOV (same writer as Thermal Flow / Heatmap Blur / Flame Transition)
 function makeLosslessMov(frames, w, h, fps){
   const count = frames.length, matrix = be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000), ftyp = atom('ftyp','qt  ',be32(0),'qt  '), mdatSize = frames.reduce((n,f)=>n+f.length,8);
   const mvhd = atom('mvhd',be32(0,0,0,fps,count,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2));
@@ -636,31 +898,36 @@ function makeMp4(samples, desc, w, h, fps){
 /* ============ export ============ */
 let recording = null;
 const exportBtns = ['png','zip','mp4','mov'];
-function lockExport(activeId, on){ exportBtns.forEach(id => { if (id !== activeId) $(id).disabled = on; }); $(activeId).classList.toggle('rec', on); }
 const labels = { zip:'連番PNG（ZIP）', mp4:'MP4', mov:'ロスレスMOV' };
+function lockExport(activeId, on){ exportBtns.forEach(id => { if (id !== activeId) $(id).disabled = on; }); $(activeId).classList.toggle('rec', on); }
+const exportSpan = () => S.range === 'trans' ? [S.holdA, S.holdA + S.trans] : [0, total()];
+async function prepareFrame(t){
+  if (S.out !== 'tiles') for (const w of ['A','B']){ const s = scenes[w]; if (s.kind === 'video'){ s.el.pause(); await seekExact(s.el, sceneTime(w, t)); sceneDirty = true; } }
+  render(t, 1);
+}
 async function runFrames(id, perFrame){
   if (recording){ recording.stop = true; return null; }
-  const fps = S.fps, N = Math.max(1, Math.round(S.len*fps));
+  const fps = S.fps, [t0, t1] = exportSpan(), N = Math.max(1, Math.round((t1 - t0)*fps));
   const session = { stop:false, wasPlaying:playing, head:playhead }; recording = session; playing = false; forceQ = 1;
   lockExport(id, true);
   let ok = true;
   try {
     for (let i=0;i<N;i++){
       if (session.stop){ ok = false; break; }
-      playhead = i/fps; render(playhead, 1); syncBar();
+      playhead = t0 + i/fps; await prepareFrame(playhead); syncBar();
       await perFrame(i, N);
       $(id).textContent = `■ 中止 ${i+1}/${N}`;
       if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
     }
   } catch(err){ ok = false; toast('書き出しに失敗しました：' + (err && err.message || err)); }
-  recording = null; forceQ = null; playing = session.wasPlaying; playhead = session.head; dirty = true;
+  recording = null; forceQ = null; playing = session.wasPlaying; playhead = session.head; dirty = sceneDirty = true;
   lockExport(id, false); $(id).textContent = labels[id]; syncBar();
   if (session.stop) toast('書き出しを中止しました');
   return ok && !session.stop;
 }
-const baseName = () => `u19-tile-scroll-${stamp()}`;
+const baseName = () => `u19-tile-scroll-${S.out === 'tiles' ? 'tiles-' : ''}${stamp()}`;
 $('png').addEventListener('click', async () => {
-  forceQ = 1; render(playhead, 1); const b = await canvasPNG(); forceQ = null; dirty = true;
+  forceQ = 1; await prepareFrame(playhead); const b = await canvasPNG(); forceQ = null; dirty = sceneDirty = true;
   saveFile(b, `${baseName()}_${tc(playhead).replace(/:/g,'-')}.png`);
 });
 $('zip').addEventListener('click', async () => {
@@ -688,14 +955,12 @@ $('mp4').addEventListener('click', async () => {
   const samples = []; let desc = null, encErr = null;
   const encoder = new VideoEncoder({ output:(chunk, meta) => { if (!desc && meta && meta.decoderConfig && meta.decoderConfig.description) desc = new Uint8Array(meta.decoderConfig.description); const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({ data:b, key:chunk.type==='key', ts:chunk.timestamp }); }, error:e => { encErr = e; } });
   encoder.configure(cfg);
-  const wasAlpha = S.alpha; S.alpha = false;
   const ok = await runFrames('mp4', async (i) => {
     if (encErr) throw encErr;
     const frame = new VideoFrame(view, { timestamp:Math.round(i*1e6/fps), duration:Math.round(1e6/fps), alpha:'discard' });
     encoder.encode(frame, { keyFrame: i % (fps*2) === 0 }); frame.close();
     while (encoder.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2));
   });
-  S.alpha = wasAlpha; dirty = true;
   try { await encoder.flush(); encoder.close(); } catch(e){ encErr = encErr || e; }
   if (!ok) return;
   if (encErr || !desc || !samples.length){ toast('MP4の書き出しに失敗しました' + (encErr ? '：' + encErr.message : '')); return; }
@@ -707,7 +972,7 @@ $('cfgSave').addEventListener('click', () => saveFile(new Blob([JSON.stringify(S
 $('cfgLoad').addEventListener('click', () => $('cfgFile').click());
 $('cfgFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const obj = JSON.parse(await f.text()); S = Object.assign({}, DEFAULTS, obj); syncUI(); changed('all'); toast('設定を読み込みました'); }
+  try { const obj = JSON.parse(await f.text()); S = Object.assign({}, DEFAULTS, obj); changed('all'); toast('設定を読み込みました'); }
   catch(err){ toast('読み込めませんでした：JSONの形式を確認してください'); }
   e.target.value = '';
 });
@@ -716,8 +981,10 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); ch
 /* ============ boot ============ */
 (async function boot(){
   if (!gl){ toast('WebGL2 が使えないブラウザです'); return; }
-  buildRows(); buildColor();
+  buildRows(); buildColor(); buildScenes();
   segBind('invSeg','inv', v => v); segBind('dirSeg','dir', Number); segBind('fpsSeg','fps', Number); segBind('qSeg','q', Number);
+  segBind('edgeSeg','edge', v => v); segBind('wdirSeg','wdir', Number); segBind('weaseSeg','wease', v => v);
+  segBind('outSeg','out', v => v); segBind('rangeSeg','range', v => v);
   $('speedPreset').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; Object.assign(S, SPEED_PRESETS[b.dataset.p]); changed('preset'); });
   $('invStart').addEventListener('change', e => { S.invStart = e.target.checked; changed('invStart'); });
   $('blurOn').addEventListener('change', e => { S.blur = e.target.checked; changed('blur'); });
@@ -726,22 +993,27 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); ch
   $('angleReset').addEventListener('click', () => { S.angle = 15; S.scale = 100; S.start = 0; changed('angle'); });
   if (inClaude){ $('mov').classList.add('hide'); $('exHint').textContent += ' ロスレスMOVはMOTION LAB版で使えます。'; }
   bindTimeline(); syncUI();
-  compile(); upload(await buildAtlas());
-  drawTimeline();
+  compile(); uploadAtlas(await buildAtlas());
+  drawThumbs(); drawTimeline();
+  document.fonts && document.fonts.ready.then(() => { drawThumbs(); sceneDirty = dirty = true; });
   let last = performance.now();
   function loop(now){
     const dt = Math.min(.1, (now - last)/1000); last = now;
     if (playing && !recording){
       playhead += dt;
-      if (playhead >= S.len){ if (looping) playhead %= S.len; else { playhead = S.len; playing = false; } }
+      if (playhead >= total()){ if (looping) playhead %= total(); else { playhead = total(); playing = false; } }
       dirty = true; syncBar();
     }
-    if (dirty && !recording){ render(playhead); dirty = false; }
+    if (!recording){
+      const vids = scenes.A.kind === 'video' || scenes.B.kind === 'video';
+      if (vids && S.out !== 'tiles') syncVideos(playhead, false);
+      if (dirty || (vids && playing)){ render(playhead); dirty = false; }
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
   playing = true; syncBar();
-  window.U19TS = { get state(){ return S; }, seek:t => { playing = false; seekTo(t); }, render:(t,q) => render(t,q), posAt, velAt, invAt, makeZip };
+  window.U19TS = { get state(){ return S; }, seek:t => { playing = false; seekTo(t); }, render:(t,q) => render(t,q), cutTime, total, wipeProgress };
 })().catch(err => toast('起動できませんでした：' + (err && err.message || err)));
 </script>
 </body>
