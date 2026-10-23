@@ -1,0 +1,398 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<a href="../../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<title>U19 ECS HUD Sequence</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap">
+<style>
+  /* Layout: Figma frame 939:2047 (1920×1080) placed 1:1 on a stage, scaled to fit the viewport. */
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+  }
+  #vp { position: relative; width: 100%; height: 100%; overflow: hidden; cursor: pointer; }
+  #stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    transform-origin: 50% 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    background: var(--bg);
+  }
+  .a { position: absolute; display: block; }
+  .t {
+    font-family: var(--font); font-weight: 500; font-style: normal;
+    font-size: 14px; line-height: 1; white-space: nowrap; color: var(--fg);
+    margin: 0;
+  }
+  .ctr { translate: -50% 0; }
+  svg { overflow: visible; }
+
+  #cta {
+    left: 1699px; top: 559px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 6px 5px;
+    border: 1px solid var(--fg); border-radius: 2px;
+    background: transparent; color: var(--fg);
+    font-family: var(--font); font-weight: 500; font-size: 12px; line-height: 1;
+    text-transform: uppercase; white-space: nowrap;
+    cursor: pointer;
+  }
+  #cta span { color: inherit; }
+  #cta:hover { background: var(--fg); color: var(--bg); }
+  #cta:focus-visible { outline: 1px solid var(--fg); outline-offset: 3px; }
+</style>
+
+<div id="vp" aria-label="U19 ECS HUD">
+  <div id="stage">
+    <!-- Scene 2 footage window: mask 78,80 1765×920 r20 / image 76,42 1770×996 -->
+    <div id="win" class="a" style="left:78px;top:80px;width:1765px;height:920px;border-radius:20px;overflow:hidden;visibility:hidden">
+      <video id="clip" muted playsinline preload="auto" style="position:absolute;left:-2px;top:-38px;width:1770px;height:996px;object-fit:cover"><source src="u19-window.mp4" type="video/mp4"><source src="u19-window.webm" type="video/webm"></video>
+    </div>
+    <!-- Corner brackets -->
+    <svg id="cTL" class="a" style="left:24px;top:488px" width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M20 0L20 20L-1.35106e-06 20" stroke="white"/></svg>
+    <svg id="cTR" class="a" style="left:1876px;top:488px" width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M20.5 20L0.5 20L0.500001 -2.22529e-06" stroke="white"/></svg>
+    <svg id="cBL" class="a" style="left:24px;top:563px" width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M0 0.5L20 0.5L20 20.5" stroke="white"/></svg>
+    <svg id="cBR" class="a" style="left:1876px;top:563px" width="21" height="21" viewBox="0 0 21 21" fill="none"><path d="M0.5 20.5L0.499999 0.5L20.5 0.499999" stroke="white"/></svg>
+
+    <!-- Cross marks -->
+    <svg id="pL" class="a" style="left:33px;top:530px" width="11" height="11" viewBox="0 0 11 11" fill="none"><line y1="5.5" x2="11" y2="5.5" stroke="white"/><line x1="5.5" y1="2.18557e-08" x2="5.5" y2="11" stroke="white"/></svg>
+    <svg id="pR" class="a" style="left:1876px;top:529px" width="11" height="11" viewBox="0 0 11 11" fill="none"><line y1="5.5" x2="11" y2="5.5" stroke="white"/><line x1="5.5" y1="2.18557e-08" x2="5.5" y2="11" stroke="white"/></svg>
+
+    <!-- Scene 2 side chevrons -->
+    <svg id="sLd" class="a" style="left:34.125px;top:370px;opacity:0" width="9" height="25" viewBox="0 0 9 25" fill="none"><path d="M1.25 20L4.375 23.125L7.5 20L8.75 20.625L4.375 25L2.75478e-06 20.625L1.25 20Z" fill="white"/><path d="M1.25 15L4.375 18.125L7.5 15L8.75 15.625L4.375 20L2.75478e-06 15.625L1.25 15Z" fill="white"/><path d="M1.25 10L4.375 13.125L7.5 10L8.75 10.625L4.375 15L2.75478e-06 10.625L1.25 10Z" fill="white"/><path d="M1.25 5L4.375 8.125L7.5 5L8.75 5.625L4.375 10L2.75478e-06 5.625L1.25 5Z" fill="white"/><path d="M1.25 9.89751e-07L4.375 3.125L7.5 2.11376e-06L8.75 0.625002L4.375 5L2.75478e-06 0.625001L1.25 9.89751e-07Z" fill="white"/></svg>
+    <svg id="sLu" class="a" style="left:34.125px;top:686px;opacity:0" width="9" height="25" viewBox="0 0 9 25" fill="none"><path d="M7.5 5L4.375 1.875L1.25 5L5.31215e-08 4.375L4.375 5.60272e-07L8.75 4.375L7.5 5Z" fill="white"/><path d="M7.5 10L4.375 6.875L1.25 10L5.31215e-08 9.375L4.375 5L8.75 9.375L7.5 10Z" fill="white"/><path d="M7.5 15L4.375 11.875L1.25 15L5.31215e-08 14.375L4.375 10L8.75 14.375L7.5 15Z" fill="white"/><path d="M7.5 20L4.375 16.875L1.25 20L5.31215e-08 19.375L4.375 15L8.75 19.375L7.5 20Z" fill="white"/><path d="M7.5 25L4.375 21.875L1.25 25L5.31215e-08 24.375L4.375 20L8.75 24.375L7.5 25Z" fill="white"/></svg>
+    <svg id="sRd" class="a" style="left:1877.125px;top:370px;opacity:0" width="9" height="25" viewBox="0 0 9 25" fill="none"><path d="M1.25 20L4.375 23.125L7.5 20L8.75 20.625L4.375 25L2.75478e-06 20.625L1.25 20Z" fill="white"/><path d="M1.25 15L4.375 18.125L7.5 15L8.75 15.625L4.375 20L2.75478e-06 15.625L1.25 15Z" fill="white"/><path d="M1.25 10L4.375 13.125L7.5 10L8.75 10.625L4.375 15L2.75478e-06 10.625L1.25 10Z" fill="white"/><path d="M1.25 5L4.375 8.125L7.5 5L8.75 5.625L4.375 10L2.75478e-06 5.625L1.25 5Z" fill="white"/><path d="M1.25 9.89751e-07L4.375 3.125L7.5 2.11376e-06L8.75 0.625002L4.375 5L2.75478e-06 0.625001L1.25 9.89751e-07Z" fill="white"/></svg>
+    <svg id="sRu" class="a" style="left:1877.125px;top:686px;opacity:0" width="9" height="25" viewBox="0 0 9 25" fill="none"><path d="M7.5 5L4.375 1.875L1.25 5L5.31215e-08 4.375L4.375 5.60272e-07L8.75 4.375L7.5 5Z" fill="white"/><path d="M7.5 10L4.375 6.875L1.25 10L5.31215e-08 9.375L4.375 5L8.75 9.375L7.5 10Z" fill="white"/><path d="M7.5 15L4.375 11.875L1.25 15L5.31215e-08 14.375L4.375 10L8.75 14.375L7.5 15Z" fill="white"/><path d="M7.5 20L4.375 16.875L1.25 20L5.31215e-08 19.375L4.375 15L8.75 19.375L7.5 20Z" fill="white"/><path d="M7.5 25L4.375 21.875L1.25 25L5.31215e-08 24.375L4.375 20L8.75 24.375L7.5 25Z" fill="white"/></svg>
+
+    <!-- Row 1 -->
+    <p id="tc" class="a t" style="left:80px;top:488px">TC 00:04:12:08</p>
+    <p id="n20" class="a t ctr" style="left:804px;top:488px">20</p>
+    <p id="n26" class="a t ctr" style="left:1116px;top:488px">26</p>
+    <svg id="scale" class="a" style="left:873px;top:488px" width="174" height="28" viewBox="0 0 174 28" fill="none">
+      <path class="tick" d="M146 11L144 11L144 -8.74229e-08L146 0L146 11Z" fill="white"/>
+      <path class="tick" d="M30 11L28 11L28 -8.74229e-08L30 0L30 11Z" fill="white"/>
+      <path class="tick" d="M174 11L172 11L172 -8.74229e-08L174 0L174 11Z" fill="white"/>
+      <path class="tick" d="M164 8L162 8L162 3L164 3L164 8Z" fill="white"/>
+      <path class="tick" d="M88 8L86 8L86 3L88 3L88 8Z" fill="white"/>
+      <path class="tick" d="M68 8L66 8L66 3L68 3L68 8Z" fill="white"/>
+      <path class="tick" d="M48 8L46 8L46 3L48 3L48 8Z" fill="white"/>
+      <path class="tick" d="M108 8L106 8L106 3L108 3L108 8Z" fill="white"/>
+      <path class="tick" d="M128 8L126 8L126 3L128 3L128 8Z" fill="white"/>
+      <path class="tick" d="M98 11L96 11L96 -8.74229e-08L98 0L98 11Z" fill="white"/>
+      <path class="tick" d="M118 11L116 11L116 -8.74229e-08L118 0L118 11Z" fill="white"/>
+      <path class="tick" d="M78 11L76 11L76 -8.74229e-08L78 0L78 11Z" fill="white"/>
+      <path class="tick" d="M58 11L56 11L56 -8.74229e-08L58 0L58 11Z" fill="white"/>
+      <path class="tick" d="M2 11L-4.80826e-07 11L0 -8.74229e-08L2 0L2 11Z" fill="white"/>
+      <path class="tick" d="M12 8L10 8L10 3L12 3L12 8Z" fill="white"/>
+      <path id="chev" d="M92 28L87 23L82 28L80 27L87 20L94 27L92 28Z" fill="white"/>
+    </svg>
+    <svg id="dot" class="a" style="left:1678px;top:492px" width="5" height="5" viewBox="0 0 5 5" fill="none"><circle cx="2.5" cy="2.5" r="2.5" fill="white"/></svg>
+    <p id="ana" class="a t" style="left:1693px;top:488px">ANALYSIS MODE : ON</p>
+
+    <!-- Row 2 -->
+    <p id="sys" class="a t" style="left:80px;top:569px">SYSTEM : ONLINE</p>
+    <p id="xy" class="a t" style="left:243px;top:569px">X : 0248 / Y : 0912</p>
+    <svg id="g14" class="a" style="left:792px;top:559px" width="42" height="26" viewBox="0 0 42 26" fill="none">
+      <path d="M10.3438 0.5L0.728516 25.5H11.6562L21.2715 0.5H10.3438Z" stroke="white"/>
+      <path d="M30.3438 0.5L20.7285 25.5H31.6562L41.2715 0.5H30.3438Z" stroke="white"/>
+    </svg>
+    <p id="u19" class="a t" style="left:894px;top:569px">U19</p>
+    <svg id="logo" class="a" style="left:948px;top:553px" width="23" height="40" viewBox="0 0 23 40" fill="none">
+      <path d="M17.9707 30.8348C17.5939 32.8953 15.6974 34.6814 13.1812 35.4798C14.4016 34.1532 15.0882 32.7581 14.4644 31.2631C13.8971 29.9033 12.2518 29.0113 10.6002 28.8595C8.65345 28.6787 6.76112 29.3253 5.82123 30.6123C4.91274 31.8536 5.00485 33.2633 6.16453 34.4194C3.22764 33.7395 -0.0965061 31.5896 0.0165317 29.2213C0.470776 29.8721 0.895713 30.5624 1.91515 30.735C-1.35667 28.1589 -0.173959 24.4142 3.47883 22.2726C3.07692 23.412 2.99947 24.541 4.25335 25.1502C5.42978 25.7199 7.0144 25.5869 8.30806 25.0421C9.36936 24.5951 10.1502 23.6116 10.3386 22.5075C10.6798 20.5177 9.4175 18.53 6.88881 17.8522C6.46177 17.7378 5.72703 17.8147 5.34396 18.0081C5.01113 18.1744 4.79342 18.6423 4.69294 19.0207C2.19774 15.7542 4.75993 13.1448 7.49795 10.5042L10.4683 7.63905C11.6971 6.45389 12.256 4.98389 12.2581 3.46398C12.2602 2.12288 11.3391 1.1602 10.3595 0C13.5287 1.52823 15.2934 4.32062 14.7952 7.11924C14.3158 9.80767 11.2387 11.837 11.1884 14.3258C11.6929 12.9223 12.9656 11.6478 15.0882 11.5355C13.0368 12.5876 12.0299 14.2468 12.7082 16.0516C13.0703 17.0163 13.7548 17.9291 14.6842 18.6423L17.1794 20.5593C18.2135 21.3536 18.7599 22.3495 18.741 23.4972L18.7033 25.7282C18.6887 26.6015 19.48 27.3687 20.5706 27.5039C21.163 27.5767 21.5628 27.3604 21.8328 26.8988C24.2694 28.9594 22.5194 32.6728 19.9844 34.8435C17.1522 37.27 13.5622 39.0602 9.39239 40L13.6941 37.8085C16.3233 36.4695 19.1848 33.1906 17.9749 30.8348H17.9707Z" fill="white"/>
+    </svg>
+    <p id="ecs" class="a t" style="left:999px;top:569px">ECS</p>
+    <svg id="g15" class="a" style="left:1087px;top:559px" width="42" height="26" viewBox="0 0 42 26" fill="none">
+      <path d="M31.6562 0.5L36.5332 13.1797L41.2715 25.5H30.3438L20.7285 0.5H31.6562Z" stroke="white"/>
+      <path d="M11.6562 0.5L21.2715 25.5H10.3438L0.728516 0.5H11.6562Z" stroke="white"/>
+    </svg>
+    <button id="cta" class="a" type="button"><span id="ctaTxt">UNLOCK THE FUTURE</span></button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const vp = $('#vp'), stage = $('#stage');
+
+  /* ---------- fit 1920×1080 stage into the viewport ---------- */
+  function fit() {
+    const s = Math.min(vp.clientWidth / 1920, vp.clientHeight / 1080);
+    stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+  fit();
+  addEventListener('resize', fit);
+
+  if (!window.gsap) return; // no library → the static design stays visible
+
+  /* ---------- text decoder (keeps final layout while typing) ---------- */
+  const UP = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', DG = '0123456789', SYM = '/\\<>_-=+#';
+  const rnd = (c) => {
+    if (/[0-9]/.test(c)) return DG[(Math.random() * 10) | 0];
+    if (/[A-Z]/.test(c)) return Math.random() < 0.22 ? SYM[(Math.random() * SYM.length) | 0] : UP[(Math.random() * 26) | 0];
+    return c;
+  };
+  class Txt {
+    constructor(el) { this.el = el; this.str = el.textContent; this.f = [...this.str]; this.spans = null; this.k = 0; }
+    build() {
+      this.el.textContent = '';
+      this.spans = this.f.map((c) => { const s = document.createElement('span'); s.textContent = c; this.el.appendChild(s); return s; });
+    }
+    plain() { this.el.textContent = this.str; this.spans = null; }
+    // mode 'type': characters appear left→right behind a scrambled head
+    // mode 'decode': every character shows, random ones settle left→right
+    render(p, mode = 'type', tail = 3) {
+      if (p >= 1) { if (this.spans) this.plain(); return; }
+      if (!this.spans) this.build();
+      const n = this.f.length, flip = (this.k++ % 2) === 0;
+      const head = mode === 'type' ? p * (n + tail) : p * n;
+      this.spans.forEach((s, i) => {
+        const c = this.f[i];
+        if (mode === 'type') {
+          if (i < head - tail) { s.textContent = c; s.style.visibility = 'visible'; }
+          else if (i < head) { if (flip || s.style.visibility !== 'visible') s.textContent = rnd(c); s.style.visibility = 'visible'; }
+          else s.style.visibility = 'hidden';
+        } else {
+          s.style.visibility = 'visible';
+          if (i < head) s.textContent = c; else if (flip) s.textContent = rnd(c);
+        }
+      });
+    }
+  }
+  const T = {};
+  ['tc', 'sys', 'xy', 'n20', 'n26', 'u19', 'ecs', 'ana', 'ctaTxt'].forEach((id) => (T[id] = new Txt(document.getElementById(id))));
+
+  /* ---------- elements ---------- */
+  const cTL = $('#cTL'), cTR = $('#cTR'), cBL = $('#cBL'), cBR = $('#cBR'), pL = $('#pL'), pR = $('#pR');
+  const ticks = [...document.querySelectorAll('#scale .tick')];
+  const chev = $('#chev'), dot = $('#dot'), logo = $('#logo'), cta = $('#cta');
+  const g14 = $('#g14'), g15 = $('#g15');
+  const slashPaths = [...g14.querySelectorAll('path'), ...[...g15.querySelectorAll('path')].reverse()];
+  const lens = slashPaths.map((p) => p.getTotalLength());
+  // ticks sorted from the scale's centre outward
+  const tickCx = (p) => { const b = p.getBBox(); return b.x + b.width / 2; };
+  const ticksOut = ticks.slice().sort((a, b) => Math.abs(tickCx(a) - 87) - Math.abs(tickCx(b) - 87));
+
+  /* start geometry: both clusters collapsed onto the screen centre */
+  const START = {
+    pL: { x: 921.5, y: -0.5, rotation: 45, scale: 1.8 },
+    pR: { x: -921.5, y: 0.5, rotation: 45, scale: 1.8 },
+    cTL: { x: 908, y: 19 }, cBL: { x: 908, y: -20 },
+    cTR: { x: -908.5, y: 19 }, cBR: { x: -908.5, y: -20 },
+  };
+
+  let tl = null, mt = null, idleTl = null, tcTimer = null;
+
+  /* ---------- scene 2: footage window ---------- */
+  const win = $('#win'), clip = $('#clip');
+  const sidesD = [$('#sLd'), $('#sRd')], sidesU = [$('#sLu'), $('#sRu')];
+  const pathsByY = (el, desc) => [...el.querySelectorAll('path')].sort((a, b) => (a.getBBox().y - b.getBBox().y) * (desc ? -1 : 1));
+  const TOP = ['#tc', '#n20', '#n26', '#scale', '#dot', '#ana', '#cTL', '#cTR'].map($);
+  const BOT = ['#sys', '#xy', '#g14', '#u19', '#logo', '#ecs', '#g15', '#cta', '#cBL', '#cBR'].map($);
+  const SC = { p: 0 };
+  let s2 = null;
+
+  // rows ride the window edges: window opens from y=540; top row 488→24, bottom row 569→1042
+  function applyP() {
+    const p = SC.p;
+    TOP.forEach((el) => gsap.set(el, { y: -464 * p }));
+    BOT.forEach((el) => gsap.set(el, { y: 473 * p }));
+    gsap.set(pL, { y: 5 * p }); gsap.set(pR, { y: 6 * p });
+    const ins = Math.min(459.5, 460 * (1 - p));
+    win.style.clipPath = `inset(${ins}px 0px ${ins}px 0px round 20px)`;
+  }
+
+  function buildScene2() {
+    const s = gsap.timeline();
+    const upd = () => applyP();
+
+    // the clip starts as a thin line opens between the two rows
+    s.set(win, { visibility: 'visible', opacity: 0 }, 0);
+    s.call(() => { try { clip.currentTime = 0; const pr = clip.play(); if (pr) pr.catch(() => {}); } catch (e) {} }, null, 0);
+    s.to(SC, { p: 0.004, duration: 0.001, onUpdate: upd }, 0);
+    s.to(win, { opacity: 1, duration: 0.12, ease: 'power1.out' }, 0);
+
+    // the window opens in one smooth move straight away; rows and brackets ride its edges
+    s.to(SC, { p: 1, duration: 1.1, ease: 'expo.out', onUpdate: upd }, 0.02);
+
+    // side chevrons slide out of the cross marks
+    s.fromTo(sidesD, { y: 165, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'expo.out', immediateRender: false }, 0.45);
+    s.fromTo(sidesU, { y: -158, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'expo.out', immediateRender: false }, 0.45);
+    return s;
+  }
+
+  function textTween(t, at, dur, mode = 'type') {
+    const o = { p: 0 };
+    tl.to(o, { p: 1, duration: dur, ease: 'none', onStart: () => t.render(0, mode), onUpdate: () => t.render(o.p, mode) }, at);
+  }
+  function flicker(target, at, seq = [1, 0, 1, 0.3, 0, 1], step = 0.04) {
+    seq.forEach((v, i) => tl.set(target, { opacity: v }, at + i * step));
+  }
+  function glitchInto(timeline, el, at, frames = 6, amp = 8) {
+    for (let i = 0; i < frames; i++) {
+      const a = Math.random() * 70, b = Math.random() * (90 - a);
+      timeline.set(el, {
+        x: (Math.random() * 2 - 1) * amp,
+        opacity: Math.random() < 0.3 ? 0.25 : 1,
+        clipPath: `inset(${a}% 0% ${b}% 0%)`,
+      }, at + i * 0.035);
+    }
+    timeline.set(el, { x: 0, opacity: 1, clearProps: 'clipPath' }, at + frames * 0.035);
+  }
+
+  function reset() {
+    if (mt) mt.kill();
+    if (tl) tl.kill();
+    if (idleTl) idleTl.kill();
+    clearInterval(tcTimer);
+    gsap.killTweensOf([dot, chev, pL, pR, stage]);
+    Object.values(T).forEach((t) => { t.render(0, 'type'); t.k = 0; });
+    T.tc.str = 'TC 00:00:00:00'; T.tc.f = [...T.tc.str];
+    T.tc.render(0, 'type');
+
+    gsap.set(stage, { opacity: 1 });
+    gsap.set('#tc,#sys,#xy,#n20,#n26,#ana,#u19,#ecs,#scale', { x: 0, opacity: 1, clearProps: 'clipPath' });
+    if (s2) s2.kill();
+    SC.p = 0;
+    clip.pause(); try { clip.currentTime = 0; } catch (e) {}
+    applyP();
+    gsap.set(win, { visibility: 'hidden', opacity: 1 });
+    gsap.set([...sidesD, ...sidesU], { opacity: 0, y: 0 });
+    gsap.set([...sidesD, ...sidesU].flatMap((el) => [...el.querySelectorAll('path')]), { opacity: 1 });
+    Object.entries(START).forEach(([id, v]) => gsap.set('#' + id, { ...v, opacity: 0, transformOrigin: '50% 50%' }));
+    gsap.set(ticks, { scaleY: 0, opacity: 0, transformOrigin: '50% 50%' });
+    gsap.set(chev, { opacity: 0, x: -80 });
+    gsap.set(slashPaths, { opacity: 0, strokeDasharray: (i) => lens[i], strokeDashoffset: (i) => lens[i] });
+    gsap.set([g14, g15], { opacity: 1, x: 0 });
+    gsap.set([logo, dot], { opacity: 0, x: 0, scale: 1, transformOrigin: '50% 50%' });
+    gsap.set(cta, { clipPath: 'inset(0% 100% 0% 0%)', opacity: 1, x: 0, clearProps: 'backgroundColor,color' });
+  }
+
+  function boot() {
+    reset();
+    tl = gsap.timeline();
+
+    /* 1 — cross marks lock on at the centre */
+    flicker([pL, pR], 0.1, [1, 0, 1, 0, 0.6, 1], 0.035);
+    tl.to([pL, pR], { rotation: 0, scale: 1, duration: 0.42, ease: 'back.out(2.2)' }, 0.1);
+
+    /* 2 — brackets appear around them, then open vertically */
+    flicker([cTL, cTR, cBL, cBR], 0.42, [1, 0, 0.5, 0, 1], 0.035);
+    tl.to([cTL, cTR], { y: 0, duration: 0.3, ease: 'power3.out' }, 0.64);
+    tl.to([cBL, cBR], { y: 0, duration: 0.3, ease: 'power3.out' }, 0.64);
+    tl.to(pL, { x: 908, y: 0, duration: 0.3, ease: 'power3.out' }, 0.64);
+    tl.to(pR, { x: -908.5, y: 0, duration: 0.3, ease: 'power3.out' }, 0.64);
+
+    /* 3 — both bracket groups slide out to the edges as one piece */
+    tl.to([pL, pR, cTL, cBL, cTR, cBR], { x: 0, duration: 0.78, ease: 'expo.inOut' }, 0.95);
+
+    /* 4 — centre gauge */
+    ticksOut.forEach((p, i) => {
+      const at = 1.08 + i * 0.024;
+      tl.set(p, { opacity: 1 }, at).set(p, { opacity: 0.2 }, at + 0.03).set(p, { opacity: 1 }, at + 0.06);
+      tl.to(p, { scaleY: 1, duration: 0.22, ease: 'expo.out' }, at);
+    });
+    textTween(T.n20, 1.16, 0.5, 'decode');
+    textTween(T.n26, 1.2, 0.5, 'decode');
+    flicker(chev, 1.24, [1, 0, 1], 0.04);
+    tl.to(chev, { x: 80, duration: 0.45, ease: 'power2.inOut' }, 1.28);
+    tl.to(chev, { x: 0, duration: 0.55, ease: 'back.out(2)' }, 1.73);
+
+    /* 5 — slashes draw, emblem glitches in, labels type */
+    slashPaths.forEach((p, i) => {
+      const side = i < 2 ? i : i - 2;
+      tl.set(p, { opacity: 1 }, 1.18 + side * 0.08);
+      tl.to(p, { strokeDashoffset: 0, duration: 0.32, ease: 'power2.out' }, 1.18 + side * 0.08);
+    });
+    flicker([g14, g15], 1.56, [0.3, 1, 0.5, 1], 0.04);
+    glitchInto(tl, logo, 1.36, 8, 10);
+    tl.fromTo(logo, { scale: 1.25 }, { scale: 1, duration: 0.35, ease: 'expo.out' }, 1.36);
+    textTween(T.u19, 1.5, 0.22);
+    textTween(T.ecs, 1.56, 0.22);
+
+    /* 6 — left readouts */
+    textTween(T.tc, 1.6, 0.62, 'decode');
+    textTween(T.sys, 1.7, 0.42);
+    textTween(T.xy, 1.84, 0.62, 'decode');
+
+    /* 7 — right readouts and CTA */
+    flicker(dot, 1.6, [1, 0, 1, 0, 1, 0, 1], 0.06);
+    textTween(T.ana, 1.66, 0.48);
+    tl.to(cta, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.3, ease: 'steps(7)' }, 1.82);
+    textTween(T.ctaTxt, 1.98, 0.42);
+    tl.set(cta, { backgroundColor: '#fff', color: '#000' }, 2.46)
+      .set(cta, { backgroundColor: 'rgba(0,0,0,0)', color: '#fff' }, 2.52)
+      .set(cta, { backgroundColor: '#fff', color: '#000' }, 2.57)
+      .set(cta, { clearProps: 'backgroundColor,color,clipPath' }, 2.68);
+
+    /* 8 — whole HUD confirms */
+    flicker(stage, 2.78, [0.55, 1, 0.8, 1], 0.04);
+    tl.to({}, { duration: 0.1 }, 2.95);
+
+    s2 = buildScene2();
+    mt = gsap.timeline({ onComplete: startIdle });
+    mt.add(tl, 0).call(startTC, null, 3.05).add(s2, 3.4);
+  }
+
+  /* ---------- idle: running timecode, blinking dot, small glitches ---------- */
+  function startTC() {
+    clearInterval(tcTimer);
+    // timecode runs from 00:00:00:00 (30 fps)
+    let f = 0;
+    const pad = (n) => String(n).padStart(2, '0');
+    tcTimer = setInterval(() => {
+      f++;
+      const ff = f % 30, s = Math.floor(f / 30) % 60, m = Math.floor(f / 1800) % 60, h = Math.floor(f / 108000);
+      T.tc.el.textContent = `TC ${pad(h)}:${pad(m)}:${pad(s)}:${pad(ff)}`;
+    }, 1000 / 30);
+  }
+
+  function startIdle() {
+
+    const next = () => {
+      const g = gsap.timeline({ delay: 2.2 + Math.random() * 2.4, onComplete: next });
+      if (Math.random() < 0.65) {
+        const dx = (Math.random() * 2 - 1) * 26;
+        g.to(chev, { x: dx, duration: 0.6, ease: 'power2.inOut' }, 0)
+         .to(chev, { x: 0, duration: 0.8, ease: 'power3.inOut' }, 1.0);
+      } else {
+        g.to([pL, pR], { rotation: '+=90', duration: 0.6, ease: 'expo.inOut' }, 0);
+      }
+      idleTl = g;
+    };
+    next();
+  }
+
+  /* ---------- start / replay ---------- */
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function showFinal() {
+    SC.p = 1; applyP();
+    gsap.set(win, { visibility: 'visible' });
+    const toEnd = () => { try { clip.currentTime = Math.max(0, clip.duration - 0.05); } catch (e) {} };
+    clip.readyState >= 1 ? toEnd() : clip.addEventListener('loadedmetadata', toEnd, { once: true });
+    gsap.set([...sidesD, ...sidesU], { opacity: 1 });
+  }
+  function play() { if (!reduce) boot(); }
+  const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]) : Promise.resolve();
+  const clipReady = new Promise((r) => { if (clip.readyState >= 3) r(); else { clip.addEventListener('canplaythrough', r, { once: true }); clip.addEventListener('error', r, { once: true }); setTimeout(r, 4000); } });
+  Promise.all([fontsReady, clipReady]).then(() => (reduce ? showFinal() : play()));
+  vp.addEventListener('click', play);
+  addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') play(); });
+})();
+</script>
+
+</body></html>
