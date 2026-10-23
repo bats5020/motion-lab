@@ -236,7 +236,8 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="prow"><span>カーブ</span><input type="range" id="curve" min="0.3" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>横流れ</span><input type="range" id="aniso" min="1" max="4" step="0.05"><span class="pv"></span></div>
       <div class="prow" id="szRow"><span>文字サイズに合わせる</span><input type="range" id="szAdapt" min="0" max="1" step="0.05"><span class="pv"></span></div>
-      <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて1.8）。「文字サイズに合わせる」はレイアウトのときだけ：小さい文字ほどブラーを弱めて、消えないようにします（0＝一律、1＝文字の大きさに比例）。</div>
+      <div class="prow" id="mszRow"><span>文字サイズに合わせる</span><input type="range" id="mszAdapt" min="0" max="1" step="0.05"><span class="pv"></span></div>
+      <div class="hint">値は1080px基準。横流れを上げると横方向のモーションブラー風に伸びます（動画の見た目に合わせて1.8）。「文字サイズに合わせる」は小さい文字ほどブラーを弱めて、消えないようにします（0＝一律、1＝文字の大きさに比例）。レイアウトは文字の設定サイズから、画像・動画は絵の中の線の太さを自動で測って合わせます（いちばん太い部分が基準）。</div>
     </section>
 
     <section id="secMap">
@@ -382,7 +383,7 @@ const DEFAULTS = {
   vfx:"map", ivfx:"heat", layoutPreset:"u19-qualifier", layout:null, adobeKit:"yhz3hqi",
   fit:82, posy:0, cover:true, lo:0, hi:1, partial:false, pdir:"up", pth:0.55, pfe:0.04,
   sMode:"seq", sMethod:"split", sAmount:1.25, sSteps:3, sTrans:0.18, sKeep:true, sSeed:"11", goo:0,
-  minB:3, maxB:32, curve:1.8, aniso:1.8, szAdapt:1,
+  minB:3, maxB:32, curve:1.8, aniso:1.8, szAdapt:1, mszAdapt:0,
   seed:"1731", vals:[1,0,1,0], blend:2.3, spread:110,
   dur:3, keys:3, ease:"ease", rtype:"fire", len:6, kf:[],
   palette:"HEAT（動画）", stops:null, gain:1, gamma:1, phase:0, wrap:false,
@@ -870,6 +871,7 @@ const szmTex=gl.createTexture(), szCv=document.createElement("canvas");
   for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v); })();
 function buildSizeMap(W,H){
   gl.bindTexture(gl.TEXTURE_2D,szmTex);
+  if((S.src==="image"||S.src==="video")&&S.mszAdapt>0&&!mapOnly()) return buildFeatureSizeMap(W,H);
   if(S.src!=="layout"||S.szAdapt<=0){ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255])); return; }
   const k=4, w=Math.max(1,Math.round(W/k)), h=Math.max(1,Math.round(H/k)); szCv.width=w; szCv.height=h;
   const c=szCv.getContext("2d"), Lo=S.layout, sc=Math.min(W/Lo.w,H/Lo.h)/k, ox=(w-Lo.w*sc)/2, oy=(h-Lo.h*sc)/2;
@@ -884,6 +886,58 @@ function buildSizeMap(W,H){
   const blurred=document.createElement("canvas"); blurred.width=w; blurred.height=h; const b=blurred.getContext("2d");
   b.fillStyle="#fff"; b.fillRect(0,0,w,h); b.filter=`blur(${Math.max(1,h*.02).toFixed(1)}px)`; b.drawImage(szCv,0,0);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,blurred); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+}
+// 画像・動画用：絵の中の「線の太さ」を測って、細い部分ほどブラーを弱める地図を作る
+// （縮小したマスク → 内側の距離（チャンファー距離）→ 近くの最大値＝その線の半分の太さ → 外側へ最寄りの値を広げる）
+const fsz={cv:document.createElement("canvas"), out:document.createElement("canvas"), bl:document.createElement("canvas")};
+function buildFeatureSizeMap(W,H){
+  // 動画の再生中は毎コマ測らず、少し間引く（線の太さはコマごとにはほとんど変わらない）。書き出し・停止中は毎回測る
+  const now=performance.now(), key=W+"x"+H+"|"+S.mszAdapt+"|"+S.lo+"|"+S.hi+"|"+S.invert+"|"+S.cover+"|"+S.fit;
+  if(S.src==="video"&&playing&&!recording&&fsz.key===key&&now-fsz.at<250) return;
+  fsz.key=key; fsz.at=now;
+  const k=Math.max(1,Math.ceil(W/360)), w=Math.max(8,Math.round(W/k)), h=Math.max(8,Math.round(H/k)), N=w*h;
+  const cv=fsz.cv; cv.width=w; cv.height=h; const c=cv.getContext("2d",{willReadFrequently:true});
+  c.imageSmoothingQuality="high"; c.clearRect(0,0,w,h); c.drawImage(srcCv,0,0,w,h);
+  const px=c.getImageData(0,0,w,h).data, alphaMode=S.src==="image"&&userImageAlpha, lo=S.lo, hi=Math.max(S.lo+.01,S.hi);
+  const cov=new Float32Array(N);
+  for(let i=0;i<N;i++){ const j=i*4; let v=alphaMode?px[j+3]/255:(.2126*px[j]+.7152*px[j+1]+.0722*px[j+2])/255; if(S.invert) v=1-v; cov[i]=Math.min(1,Math.max(0,(v-lo)/(hi-lo))); }
+  // 1) 内側の距離（外へ出るまでのマス数）
+  const INF=1e9, d=new Float32Array(N), D2=1.4142;
+  for(let i=0;i<N;i++) d[i]=cov[i]>=.5?INF:0;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=y*w+x; if(!d[i]) continue; let m=d[i];
+    m=Math.min(m,(x>0?d[i-1]:0)+1,(y>0?d[i-w]:0)+1,(x>0&&y>0?d[i-w-1]:0)+D2,(x<w-1&&y>0?d[i-w+1]:0)+D2); d[i]=m; }
+  for(let y=h-1;y>=0;y--) for(let x=w-1;x>=0;x--){ const i=y*w+x; if(!d[i]) continue; let m=d[i];
+    m=Math.min(m,(x<w-1?d[i+1]:0)+1,(y<h-1?d[i+w]:0)+1,(x<w-1&&y<h-1?d[i+w+1]:0)+D2,(x>0&&y<h-1?d[i+w-1]:0)+D2); d[i]=m; }
+  // 2) 近くの最大値（線の中心の距離＝半分の太さ）を線全体に配る：縦横の最大値フィルター
+  const R=Math.max(2,Math.round(h*.025)), t1=new Float32Array(N), T=new Float32Array(N);
+  for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++){ let m=0; const a=Math.max(0,x-R), b=Math.min(w-1,x+R); for(let q=a;q<=b;q++) if(d[r+q]>m) m=d[r+q]; t1[r+x]=m; } }
+  for(let x=0;x<w;x++) for(let y=0;y<h;y++){ let m=0; const a=Math.max(0,y-R), b=Math.min(h-1,y+R); for(let q=a;q<=b;q++){ const v=t1[q*w+x]; if(v>m) m=v; } T[y*w+x]=m; }
+  // 3) 太さが分かるマス：線の内側＝最大値、マスより細い線（半分以下しか埋まらない）＝埋まり具合から
+  const val=new Float32Array(N), dist=new Float32Array(N), ws=[];
+  for(let i=0;i<N;i++){
+    if(cov[i]>=.5){ val[i]=Math.max(.5,T[i]); dist[i]=0; ws.push(val[i]); }
+    else if(cov[i]>.12){ // 太い線のふち（すぐ隣が内側）ならその線の太さ、そうでなければマスより細い線
+      const x=i%w, y=(i-x)/w; let m=0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=x+dx, yy=y+dy; if(xx<0||yy<0||xx>=w||yy>=h) continue; const j=yy*w+xx; if(cov[j]>=.5&&T[j]>m) m=T[j]; }
+      val[i]=m>0?Math.max(.5,m):cov[i]*.5; dist[i]=0; if(!(m>0)) ws.push(val[i]); }
+    else { val[i]=0; dist[i]=INF; }
+  }
+  const fill=v=>{ const g=Math.round(255*v); const o=fsz.bl; o.width=w; o.height=h; const x=o.getContext("2d"); x.fillStyle=`rgb(${g},${g},${g})`; x.fillRect(0,0,w,h);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,o); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false); };
+  if(!ws.length) return fill(1);
+  // 4) 外側（にじみの範囲）へは、いちばん近い線の太さを広げる
+  const relax=(i,j,c2)=>{ const nd=dist[j]+c2; if(nd<dist[i]){ dist[i]=nd; val[i]=val[j]; } };
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=y*w+x; if(dist[i]===0) continue;
+    if(x>0) relax(i,i-1,1); if(y>0){ relax(i,i-w,1); if(x>0) relax(i,i-w-1,D2); if(x<w-1) relax(i,i-w+1,D2); } }
+  for(let y=h-1;y>=0;y--) for(let x=w-1;x>=0;x--){ const i=y*w+x; if(dist[i]===0) continue;
+    if(x<w-1) relax(i,i+1,1); if(y<h-1){ relax(i,i+w,1); if(x<w-1) relax(i,i+w+1,D2); if(x>0) relax(i,i+w-1,D2); } }
+  // 5) 基準＝太い部分（上位5%）。太さの比をそのままブラーの倍率に
+  const wsa=Float32Array.from(ws).sort(); const ref=Math.max(.5,wsa[Math.min(wsa.length-1,Math.floor(wsa.length*.95))]);
+  const out=fsz.out; out.width=w; out.height=h; const oc=out.getContext("2d"); const im=oc.createImageData(w,h), o=im.data;
+  for(let i=0;i<N;i++){ const f=Math.min(1,Math.max(.06,val[i]/ref)), v=1-S.mszAdapt*(1-f), g=Math.round(255*v); o[i*4]=o[i*4+1]=o[i*4+2]=g; o[i*4+3]=255; }
+  oc.putImageData(im,0,0);
+  const bl=fsz.bl; bl.width=w; bl.height=h; const b=bl.getContext("2d"); b.fillStyle="#fff"; b.fillRect(0,0,w,h); b.filter=`blur(${Math.max(1,h*.015).toFixed(1)}px)`; b.drawImage(out,0,0);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,bl); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
 }
 function rebuildLevels(){
   const W=RW,H=RH;
@@ -1269,9 +1323,9 @@ function loop(now){
 const $=id=>document.getElementById(id);
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const fmt={weight:v=>v, stretch:v=>v+"%", track:v=>v, lead:v=>v+"%", skew:v=>v+"°", pdens:v=>v, pthick:v=>v+"%", pangle:v=>v+"°", fit:v=>v+"%", posy:v=>v, lo:v=>(+v).toFixed(2), hi:v=>(+v).toFixed(2), pth:v=>Math.round(v*100)+"%", pfe:v=>(+v).toFixed(3),
-  minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), szAdapt:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
+  minB:v=>(+v).toFixed(1), maxB:v=>(+v).toFixed(1), curve:v=>(+v).toFixed(2), aniso:v=>(+v).toFixed(2), szAdapt:v=>(+v).toFixed(2), mszAdapt:v=>(+v).toFixed(2), blend:v=>(+v).toFixed(2), spread:v=>v+"%",
   dur:v=>(+v).toFixed(1)+"s", len:v=>(Math.abs(v*10-Math.round(v*10))<1e-6?(+v).toFixed(1):(+v).toFixed(2))+"s", sAmount:v=>"×"+(+v).toFixed(2), goo:v=>Math.round(v*100), sSteps:v=>v, sTrans:v=>(+v).toFixed(2), keys:v=>v, gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1)};
-const SRC_KEYS=new Set(["szAdapt","layout","goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
+const SRC_KEYS=new Set(["szAdapt","mszAdapt","layout","goo","cover","lo","hi","sMode","sMethod","sAmount","sSteps","sTrans","sKeep","sSeed","text","font","weight","stretch","track","lead","skew","pattern","pdens","pthick","pangle","invert","fit","posy","aniso","src"]);
 const KEY_KEYS=new Set(["seed","spread","keys"]);
 function bindRange(id){
   const el=$(id), pv=el.parentElement.querySelector(".pv");
@@ -1330,7 +1384,7 @@ bindSeg("qSeg","q");
 function updateSrcUI(fromUser){
   const media=S.src==="image"||S.src==="video";
   $("srcText").classList.toggle("hide",S.src!=="text"); $("secStretch").classList.toggle("hide",!hasLetters());
-  $("srcLayout").classList.toggle("hide",S.src!=="layout"); $("fitRow").classList.toggle("hide",S.src==="layout"); $("szRow").classList.toggle("hide",S.src!=="layout"); $("posyRow").classList.toggle("hide",S.src==="layout");
+  $("srcLayout").classList.toggle("hide",S.src!=="layout"); $("fitRow").classList.toggle("hide",S.src==="layout"); $("szRow").classList.toggle("hide",S.src!=="layout"); $("mszRow").classList.toggle("hide",!media); $("posyRow").classList.toggle("hide",S.src==="layout");
   if(S.src==="layout"){ buildStretchPlan(); document.fonts.load('400 18px "Noto Sans JP"',"予選").then(()=>{ fontsChanged(); }).catch(()=>{}); } $("srcPattern").classList.toggle("hide",S.src!=="pattern");
   $("srcImage").classList.toggle("hide",S.src!=="image"); $("srcVideo").classList.toggle("hide",S.src!=="video"); $("srcMedia").classList.toggle("hide",!media);
   $("fit").parentElement.style.opacity=media&&S.cover?.4:1;
