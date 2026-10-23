@@ -82,6 +82,14 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 .btn.wide{width:100%;margin-top:8px}
 .btnrow{display:flex;gap:7px;margin-top:8px}
 .btnrow .btn{flex:1}
+.pslist{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.pslist:empty::before{content:"まだ保存した設定はありません";display:block;color:var(--dim,#777);font:11px var(--mono);padding:6px 2px}
+.psrow{display:flex;align-items:center;gap:5px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:4px 4px 4px 8px}
+.psrow.cur{border-color:var(--accent)}
+.psrow .nm{flex:1;min-width:0;cursor:pointer;font:11px var(--mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.psrow .nm small{display:block;opacity:.5;font-size:9.5px}
+.psrow .btn{padding:4px 7px;font-size:10px}
+.psrow .btn.warn{color:#fff;background:#b3122a;border-color:#b3122a}
 .hint{color:var(--faint);font-size:9.5px;margin-top:6px;line-height:1.55}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
 .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--sub);font:10px var(--mono);padding:3px 9px 3px 4px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
@@ -294,8 +302,18 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
       <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
       <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn primary" id="mov">ロスレスMOV</button></div>
       <div class="btnrow"><button class="btn" id="rec">● 動画を書き出す</button></div>
-      <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
       <div class="hint" id="recHint">録画はループ1周ぶんを等倍・30fpsで1コマずつ収録（ブラウザに応じてMP4かWebM）。透過は PNG のみ対応。</div>
+    </section>
+
+    <section id="secPresets">
+      <h2><span><b>09</b>設定の保存</span></h2>
+      <div class="prow"><span>名前</span><input type="text" id="psName" placeholder="例：U19 本番" spellcheck="false"></div>
+      <div class="btnrow"><button class="btn primary" id="psSave">今の設定を保存</button></div>
+      <div class="pslist" id="psList"></div>
+      <div class="btnrow"><button class="btn" id="psExport">ファイルに書き出す</button><button class="btn" id="psImport">ファイルから読み込む</button></div>
+      <input type="file" id="psFile" accept=".json,application/json" hidden>
+      <div class="btnrow"><button class="btn" id="reset">初期設定に戻す</button></div>
+      <div class="hint">文字・配色・ブラー・アニメーション・キーフレーム・書き出しサイズなど、右側の設定をまとめて名前を付けて保存します。名前をクリックで読み込み（⌘Zで戻せます）。⌘S で今読み込んでいる設定に上書き保存。読み込んだ画像・動画・フォントファイルそのものは入らないので、別途読み込んでください。「ファイルに書き出す」で保存した設定を全部 .json にまとめられ、別のブラウザやPCに持っていけます。</div>
     </section>
   </aside>
 </div>
@@ -374,9 +392,14 @@ const LSKEY = "motion-lab:heatmap-blur:v1";
 let S = load();
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function load(){
-  const d = clone(DEFAULTS); d.stops = clone(PALETTES[d.palette]);
-  try{ const s = JSON.parse(localStorage.getItem(LSKEY)||"null"); if(s) Object.assign(d, s); }catch(e){}
+  let s=null; try{ s = JSON.parse(localStorage.getItem(LSKEY)||"null"); }catch(e){}
+  const d = normalizeState(s);
   if(d.src==="image"||d.src==="video") d.src="text"; // 画像・動画そのものは保存されないので、開き直したときはテキストに戻す
+  return d;
+}
+function normalizeState(s){
+  const d = clone(DEFAULTS); d.stops = clone(PALETTES[d.palette]);
+  if(s&&typeof s==="object") Object.assign(d, clone(s));
   d.maxB=Math.min(80,d.maxB); d.minB=Math.min(40,d.minB);
   // 配色はプリセットから選ぶだけ。以前に個別編集した配色は、いちばん近いプリセットへ戻す
   if(!d.layout||!Array.isArray(d.layout.items)) d.layout=clone(LAYOUT_PRESETS[d.layoutPreset]||LAYOUT_PRESETS["u19-qualifier"]);
@@ -1139,6 +1162,61 @@ function commitHist(){ // 操作のまとまり（ドラッグ1回・キー操�
 function restoreState(json){ const o=JSON.parse(json); for(const k of Object.keys(S)) if(!(k in o)) delete S[k]; Object.assign(S,o); histStable=json; histArmed=true; syncAllUI(); try{ localStorage.setItem(LSKEY,json); }catch(e){} }
 function undo(){ if(!HIST.length) return toast("これ以上取り消せません"); REDO.push(JSON.stringify(S)); restoreState(HIST.pop()); toast("取り消しました"); }
 function redo(){ if(!REDO.length) return toast("やり直せる操作はありません"); HIST.push(JSON.stringify(S)); restoreState(REDO.pop()); toast("やり直しました"); }
+/* ---------- 設定の保存（名前付きプリセット） ---------- */
+const PSKEY="motion-lab:heatmap-blur:presets:v1";
+let PRESETS=[], curPreset=null;
+try{ const a=JSON.parse(localStorage.getItem(PSKEY)||"[]"); if(Array.isArray(a)) PRESETS=a.filter(p=>p&&typeof p.name==="string"&&p.state&&typeof p.state==="object"); }catch(e){}
+function storePresets(){ try{ localStorage.setItem(PSKEY,JSON.stringify(PRESETS)); return true; }catch(e){ toast("保存できませんでした（ブラウザの保存容量がいっぱいかもしれません）"); return false; } }
+function presetSnapshot(){ const o=clone(S); delete o.stops; return o; } // 配色は palette 名から作り直せる
+function uniqName(n){ n=(n||"").trim()||"設定"; if(!PRESETS.some(p=>p.name===n)) return n; let i=2; while(PRESETS.some(p=>p.name===`${n} (${i})`)) i++; return `${n} (${i})`; }
+function fmtDate(t){ const d=new Date(t); const z=v=>String(v).padStart(2,"0"); return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; }
+function savePreset(name){
+  name=(name||"").trim(); if(!name) return toast("名前を入れてください");
+  const i=PRESETS.findIndex(p=>p.name===name), item={name,at:Date.now(),state:presetSnapshot()};
+  if(i>=0) PRESETS[i]=item; else PRESETS.unshift(item); // 同じ名前なら上書き
+  if(!storePresets()) return; curPreset=name; buildPresetList(); toast(i>=0?`「${name}」を上書き保存しました`:`「${name}」を保存しました`);
+}
+function applyPreset(p){
+  const d=normalizeState(p.state); let note="";
+  if(d.src==="image"&&!userImage){ d.src=S.src==="image"?"text":S.src; note="（画像は別途読み込んでください）"; }
+  if(d.src==="video"&&!userVideo){ d.src=S.src==="video"?"text":S.src; note="（動画は別途読み込んでください）"; }
+  if(d.src==="video"&&userVideo&&isFinite(userVideo.duration)) d.len=Math.min(600,Math.max(1,userVideo.duration));
+  const kitChanged=(d.adobeKit||"")!==(S.adobeKit||"");
+  HIST.push(JSON.stringify(S)); if(HIST.length>200) HIST.shift(); REDO.length=0;
+  restoreState(JSON.stringify(d)); $("adobeKit").value=S.adobeKit||"";
+  if(kitChanged) loadAdobeKit(S.adobeKit);
+  curPreset=p.name; $("psName").value=p.name; buildPresetList(); toast(`「${p.name}」を読み込みました${note}`);
+}
+function buildPresetList(){
+  const box=$("psList"); box.innerHTML="";
+  PRESETS.forEach((p,i)=>{
+    const row=document.createElement("div"); row.className="psrow"+(p.name===curPreset?" cur":"");
+    const nm=document.createElement("div"); nm.className="nm"; nm.title="クリックで読み込む"; nm.textContent=p.name;
+    const sm=document.createElement("small"); sm.textContent=fmtDate(p.at||0); nm.appendChild(sm); nm.onclick=()=>applyPreset(p);
+    const up=document.createElement("button"); up.className="btn"; up.textContent="上書き"; up.title="今の設定でこの名前に上書き";
+    up.onclick=()=>savePreset(p.name);
+    const del=document.createElement("button"); del.className="btn"; del.textContent="削除";
+    del.onclick=()=>{ if(!del.classList.contains("warn")){ del.classList.add("warn"); del.textContent="本当に？"; setTimeout(()=>{ del.classList.remove("warn"); del.textContent="削除"; },2500); return; }
+      PRESETS.splice(i,1); if(curPreset===p.name) curPreset=null; storePresets(); buildPresetList(); toast(`「${p.name}」を削除しました`); };
+    row.append(nm,up,del); box.appendChild(row);
+  });
+}
+function exportPresets(){
+  const list=PRESETS.length?PRESETS:[{name:"今の設定",at:Date.now(),state:presetSnapshot()}];
+  const blob=new Blob([JSON.stringify({app:"motion-lab/heatmap-blur",version:1,presets:list},null,1)],{type:"application/json"});
+  dl(blob,`heatmap-blur-settings-${stamp()}.json`); toast(`${list.length}件の設定を書き出しました`);
+}
+async function importPresets(file){
+  try{
+    const o=JSON.parse(await file.text()); let list=[];
+    if(o&&Array.isArray(o.presets)) list=o.presets; else if(o&&typeof o==="object"&&("src" in o||"palette" in o)) list=[{name:file.name.replace(/\.json$/i,""),state:o}];
+    list=list.filter(p=>p&&p.state&&typeof p.state==="object");
+    if(!list.length) return toast("このファイルには設定が入っていません");
+    for(const p of list.slice().reverse()) PRESETS.unshift({name:uniqName(p.name),at:p.at||Date.now(),state:p.state});
+    if(!storePresets()) return; buildPresetList();
+    if(list.length===1){ applyPreset(PRESETS[0]); } else toast(`${list.length}件の設定を読み込みました。名前をクリックで反映します`);
+  }catch(e){ toast("読み込めませんでした（JSON ではないようです）"); }
+}
 function syncAllUI(){
   for(const id of Object.keys(fmt)){ const el=$(id); if(!el) continue; el.value=S[id]; const pv=el.parentElement.querySelector(".pv"); if(pv) pv.textContent=fmt[id](S[id]); }
   $("text").value=S.text; fillFonts(); buildLayoutUI(); $("pattern").value=S.pattern; $("size").value=S.size; $("seed").value=S.seed; $("bgColor").value=S.bgColor;
@@ -1462,6 +1540,12 @@ $("wrap").checked=S.wrap; $("wrap").addEventListener("change",()=>{ S.wrap=$("wr
 $("gmove").checked=S.gmove; $("gmove").addEventListener("change",()=>{ S.gmove=$("gmove").checked; changed("gmove"); });
 $("size").value=S.size; $("size").addEventListener("change",()=>{ S.size=$("size").value; changed("size"); });
 view.classList.toggle("alpha",S.bg==="alpha");
+$("psSave").onclick=()=>savePreset($("psName").value||curPreset||"");
+$("psName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("psSave").click(); } });
+$("psExport").onclick=exportPresets;
+$("psImport").onclick=()=>$("psFile").click();
+$("psFile").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) importPresets(f); };
+buildPresetList();
 $("reset").onclick=()=>{ try{localStorage.removeItem(LSKEY)}catch(e){} location.reload(); };
 
 // transport
@@ -1482,6 +1566,7 @@ addEventListener("keydown",e=>{
   const mod=e.metaKey||e.ctrlKey;
   if(mod&&e.code==="KeyZ"){ if(typing()&&document.activeElement.tagName==="TEXTAREA") return; e.preventDefault(); e.shiftKey?redo():undo(); return; }
   if(mod&&e.code==="KeyY"){ e.preventDefault(); redo(); return; }
+  if(mod&&e.code==="KeyS"){ e.preventDefault(); if(curPreset) savePreset(curPreset); else { $("psName").scrollIntoView({block:"center"}); $("psName").focus(); toast("名前を入れて Enter で保存します"); } return; }
   if(typing()) return;
   if(mod&&e.altKey&&e.code==="KeyH"){ e.preventDefault(); const tg=easeTargets(); if(tg.length) setEase(tg.every(k=>k.ease==="hold")?"smooth":"hold"); return; }
   if(mod&&(e.code==="ArrowLeft"||e.code==="ArrowRight")){ e.preventDefault(); stepFrames((e.code==="ArrowLeft"?-1:1)*(e.shiftKey?10:1)); return; }
