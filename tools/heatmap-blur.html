@@ -942,6 +942,7 @@ function pointsAt(t){
 
 /* ---------- render ---------- */
 let dirtySrc=true, dirtyLUT=true, playing=true, playhead=0, lastNow=performance.now(), recording=null, forceQ=null;
+const MP4={ok:false}; // H.264 を WebCodecs で書き出せるか（起動時に確認）
 function outSize(){ const [w,h]=S.size.split("x").map(Number); return [w,h]; }
 function render(t, q){
   applyKeys(t);
@@ -1253,12 +1254,12 @@ function updateSrcUI(fromUser){
 }
 function recLabel(){
   const vid=S.src==="video";
-  $("rec").disabled=vid; $("rec").style.opacity=vid?.4:1;
-  if(!recording) $("rec").textContent="● MP4 / WebM（実時間）";
+  const recOff=vid&&!MP4.ok; $("rec").disabled=recOff; $("rec").style.opacity=recOff?.4:1;
+  if(!recording) $("rec").textContent=MP4.ok?"MP4（コマ落ちなし・Web用）":"● MP4 / WebM（実時間）";
   $("mov").disabled=false; $("mov").style.opacity=1; if(!recording) $("mov").textContent="ロスレスMOV（コマ落ちなし）";
   $("recHint").textContent=vid
-    ? "動画ソースはロスレスMOVで書き出せます。動画を1コマずつ送りながらグラデーションマップ（とキーフレーム）をかけるので、コマ落ちしません（音声は入りません）。MP4/WebM（実時間）は動画ソースでは使えません。"
-    : `尺（${S.len.toFixed(1)}秒）を30fpsで書き出します。ロスレスMOVは1コマずつPNGで固めるので描画が重くてもコマ落ち・スローにならず、After Effects にそのまま読み込めます（背景を透過にすると透過付き・容量は大きめ）。MP4/WebMは実時間で収録するので軽いですが、描画が追いつかないと実際より長くなります。尺がループの倍数で、最初と最後のキーが同じ値なら継ぎ目なくループします。`;
+    ? `動画を1コマずつ送りながらグラデーションマップ（とキーフレーム）をかけて書き出します（音声は入りません）。ロスレスMOV＝編集ソフト用のマスター、${MP4.ok?"MP4＝Web用（H.264・すぐ再生できる形）":"MP4 はこのブラウザでは使えません"}。`
+    : `尺（${S.len.toFixed(1)}秒）を30fpsで書き出します。ロスレスMOVは1コマずつPNGで固めるマスター素材で、After Effects にそのまま読み込めます（背景を透過にすると透過付き・容量は大きめ）。${MP4.ok?"MP4 も1コマずつ描いてから H.264 に変換するので、描画が重くてもスローになりません（Web用・透過なし）。":"MP4/WebM は実時間で収録するので、描画が追いつかないと実際より長くなります。"}尺がループの倍数で、最初と最後のキーが同じ値なら継ぎ目なくループします。`;
 }
 // text
 $("text").value=S.text; $("text").addEventListener("input",()=>{ S.text=$("text").value; changed("text"); fontsThen(); });
@@ -1506,7 +1507,7 @@ $("png").onclick=()=>{
   const was=S.showMap; S.showMap=false; render(playhead,1);
   view.toBlob(b=>{ if(b) dl(b,`heatmap-blur-${stamp()}.png`); else toast("PNGを書き出せませんでした"); S.showMap=was; render(playhead); },"image/png");
 };
-$("rec").onclick=()=>{ recording ? finishRec() : startRec(); };
+$("rec").onclick=()=>{ if(recording) return finishRec(); MP4.ok ? exportMp4() : startRec(); };
 const REC_FPS=30;
 async function startRec(){
   if(S.src==="video") return;
@@ -1592,10 +1593,78 @@ $("mov").onclick=async()=>{
     if(session.stop) toast("書き出しを中止しました");
     else{ const [w,h]=outSize(); dl(makeLosslessMov(frames,w,h,fps),`heatmap-blur-${stamp()}_${fps}fps.mov`); toast(`MOVを保存しました（${N}フレーム・${(bytes/1048576).toFixed(0)}MB）`); }
   }catch(err){ toast("書き出しに失敗しました："+err.message); }
-  recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head; $("rec").disabled=S.src==="video";
+  recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head; recLabel();
   if(vid&&userVideo){ userVideo.currentTime=session.head; }
   $("mov").classList.remove("rec"); recLabel();
 };
+/* ---------- MP4（H.264）— WebCodecs で1コマずつ変換し、MP4 にまとめる ---------- */
+function mp4Codecs(w,h){ const big=w*h>1920*1088; return big?["avc1.640033","avc1.4d0033","avc1.42e033"]:["avc1.640028","avc1.4d0028","avc1.42e028"]; }
+async function pickMp4Config(w,h){
+  if(!("VideoEncoder" in window)) return null;
+  const bitrate=Math.round(Math.min(120e6,Math.max(8e6,w*h*30*.33))); // 1080p で約20Mbps（グレインがあっても崩れにくい）
+  for(const codec of mp4Codecs(w,h)){
+    const cfg={codec,width:w,height:h,bitrate,framerate:REC_FPS,avc:{format:"avc"},latencyMode:"quality"};
+    try{ const r=await VideoEncoder.isConfigSupported(cfg); if(r.supported) return cfg; }catch(e){}
+  }
+  return null;
+}
+(async()=>{ try{ MP4.ok=!!(await pickMp4Config(1920,1080)); }catch(e){ MP4.ok=false; } recLabel(); })();
+function makeMp4(samples,desc,w,h,fps){
+  const N=samples.length, matrix=be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000);
+  const ftyp=atom('ftyp','isom',be32(512),'isom','iso2','avc1','mp41');
+  // 表示順のずれ（Bフレーム）があれば ctts と edts で補正する
+  const pts=samples.map(s=>Math.round(s.ts*fps/1e6)), D=Math.max(0,...samples.map((s,i)=>i-pts[i]));
+  const reorder=pts.some((p,i)=>p!==i);
+  const build=off=>{
+    const avc1=atom('avc1',new Uint8Array(6),be16(1),be16(0,0),be32(0,0,0),be16(w,h),be32(0x00480000,0x00480000,0),be16(1),new Uint8Array(32),be16(0x18,0xffff),
+      atom('avcC',desc), atom('colr','nclx',be16(1,1,1),new Uint8Array([0])));
+    const keys=[]; samples.forEach((s,i)=>{ if(s.key) keys.push(i+1); });
+    const parts=[atom('stsd',be32(0,1),avc1), atom('stts',be32(0,1,N,1))];
+    if(reorder){ parts.push(atom('ctts',be32(0,N),...samples.map((s,i)=>be32(1,pts[i]-i+D)))); }
+    parts.push(atom('stss',be32(0,keys.length),be32(...keys)), atom('stsc',be32(0,1,1,N,1)), atom('stsz',be32(0,0,N),be32(...samples.map(s=>s.data.length))), atom('stco',be32(0,1,off)));
+    const stbl=atom('stbl',...parts);
+    const mdia=atom('mdia',atom('mdhd',be32(0,0,0,fps,N),be16(0x55c4,0)),atom('hdlr',be32(0,0),'vide',new Uint8Array(12),'VideoHandler\0'),
+      atom('minf',atom('vmhd',be32(1),be16(0,0,0,0)),atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1)))),stbl));
+    const edts=reorder?atom('edts',atom('elst',be32(0,1,N,D,0x10000))):new Uint8Array(0);
+    const trak=atom('trak',atom('tkhd',be32(3,0,0,1,0,N),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536)),edts,mdia);
+    return atom('moov',atom('mvhd',be32(0,0,0,fps,N,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2)),trak);
+  };
+  const mdatSize=samples.reduce((n,s)=>n+s.data.length,8);
+  const moov0=build(0), moov=build(ftyp.length+moov0.length+8); // moov を先頭に置く（Web ですぐ再生できる形）
+  return new Blob([ftyp,moov,be32(mdatSize),enc.encode('mdat'),...samples.map(s=>s.data)],{type:'video/mp4'});
+}
+async function exportMp4(){
+  const vid=S.src==="video"; if(vid&&!videoMode()) return toast("動画を読み込んでください");
+  const [w,h]=outSize(), cfg=await pickMp4Config(w,h); if(!cfg) return toast("このブラウザは MP4 の書き出しに対応していません（ロスレスMOVを使ってください）");
+  const fps=REC_FPS, len=vid?Math.min(S.len,userVideo.duration):S.len, N=Math.max(1,Math.round(len*fps));
+  const session={stop:false, wasPlaying:playing, head:playhead, alpha:false}; recording=session; playing=false; forceQ=1;
+  if(vid) userVideo.pause();
+  $("rec").classList.add("rec"); $("mov").disabled=true;
+  const samples=[]; let desc=null, encErr=null;
+  const encoder=new VideoEncoder({ output:(chunk,meta)=>{ if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description) desc=new Uint8Array(meta.decoderConfig.description); const b=new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({data:b,key:chunk.type==="key",ts:chunk.timestamp}); }, error:e=>{ encErr=e; } });
+  try{
+    encoder.configure(cfg);
+    for(let i=0;i<N;i++){
+      if(session.stop||encErr) break;
+      playhead=i/fps;
+      if(vid){ await seekVideoExact(userVideo,Math.min(playhead,userVideo.duration-1e-3)); dirtySrc=true; }
+      render(playhead,1); syncBar();
+      const frame=new VideoFrame(view,{timestamp:Math.round(i*1e6/fps),duration:Math.round(1e6/fps),alpha:"discard"});
+      encoder.encode(frame,{keyFrame:i%(fps*2)===0}); frame.close();
+      while(encoder.encodeQueueSize>6) await new Promise(r=>setTimeout(r,2));
+      $("rec").textContent=`■ MP4 書き出し中 ${i+1}/${N}`;
+      if(i%4===0) await new Promise(r=>setTimeout(r,0));
+    }
+    await encoder.flush(); encoder.close();
+    if(encErr) throw encErr;
+    if(session.stop) toast("書き出しを中止しました");
+    else{ if(!desc||!samples.length) throw new Error("エンコード結果が空でした"); const blob=makeMp4(samples,desc,w,h,fps);
+      dl(blob,`heatmap-blur-${stamp()}_${fps}fps.mp4`); toast(`MP4を保存しました（${N}フレーム・${(blob.size/1048576).toFixed(1)}MB）`); }
+  }catch(err){ try{ encoder.state!=="closed"&&encoder.close(); }catch(e){} toast("MP4の書き出しに失敗しました："+(err&&err.message||err)); }
+  recording=null; forceQ=null; playing=session.wasPlaying; playhead=session.head; $("mov").disabled=false;
+  if(vid&&userVideo) userVideo.currentTime=session.head;
+  $("rec").classList.remove("rec"); recLabel();
+}
 // 書き出し用：指定の時刻のコマが確実に描ける状態になるまで待つ
 function seekVideoExact(v,t){
   return new Promise(res=>{
