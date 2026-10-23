@@ -45,7 +45,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | シーン | 何か |
 |---|---|
 | [U19 Registration Deadline](scenes/u19-registration-deadline.html) | U19eスポーツ選手権2026「エントリー期限」（Figma 992:11263）。HUDが立ち上がり、3.4秒で枠が中央の線から開いて、Thermal Flowの背景（8秒ループ）とコピーが見える。クリック／Rキーで再生し直し |
-| [U19 ECS HUD Sequence](scenes/u19-ecs-hud-sequence/) | U19 ECS のHUDが立ち上がり、3.4秒で中央の線から映像ウィンドウ（角丸、試合映像3.9秒）が開く元のシーケンス。映像はフォルダ内の mp4／webm。クリック／Rキーで再生し直し |
+| [U19 ECS HUD Sequence](scenes/u19-ecs-hud-sequence/) | U19 ECS のHUDが立ち上がり、3.4秒で中央の線から映像ウィンドウ（角丸、試合映像3.9秒）が開く元のシーケンス。映像はフォルダ内の mp4／webm。クリック／Rキーで再生し直し。右下の「● MP4を書き出す」で 1920×1080・30fps の MP4（H.264・WebCodecs、コマ送りで描画するので取りこぼしなし）を保存 |
 
 各ツールの左下の **◆ MOTION LAB** ピルからハブに戻れます。Egg Glassは `@` で編集UIと一緒に非表示になります。
 
