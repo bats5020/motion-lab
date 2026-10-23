@@ -193,7 +193,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
         <button data-p="smooth">なめらか</button><button data-p="std">標準</button><button data-p="snap">キレ強め</button><button data-p="linear">一定速</button>
       </div>
       <div id="speedRows"></div>
-      <div class="hint">タイルの中身が流れる速さ。下の帯がスピードカーブで、山が加速、◆が色の反転。時間はトランジションの頭から数えます。</div>
+      <div class="hint">タイルの中身が流れる速さ。下の帯がスピードカーブで、山が加速、◆が色の反転。時間はトランジションの頭から数えます。入りの勢いは、タイルが現れる瞬間に速く流れていて巡航に落ち着く量（参考動画の気持ちよさの元）。</div>
     </section>
 
     <section>
@@ -260,10 +260,10 @@ const $ = id => document.getElementById(id);
 
 /* ============ settings ============ */
 const DEFAULTS = {
-  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.6, wOut:0.6,
+  holdA:0.6, trans:2.4, holdB:0.6, wIn:0.8, wOut:0.8,
   edge:"thermal", wdir:135, soft:6, jitter:25, wease:"out",
-  twarp:16, trim:17, tsmear:65, tlead:14,
-  cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.55, ease:5,
+  twarp:24, trim:110, tsmear:75, tlead:8,
+  cruise:60, dist:2, dur:0.8, interval:2.0, offset:0.9, ease:5, kin:1.6, kout:1.6,
   bg:"#ff2b12", fg:"#000000",
   inv:"each", invPhase:50, invStart:false,
   angle:15, scale:100, start:0, dir:1,
@@ -279,7 +279,7 @@ const SPEED_PRESETS = {
 const COLOR_PRESETS = [
   ["#ff2b12","#000000"],["#000000","#ff2b12"],["#ff0000","#000000"],["#ff5a2a","#000000"],["#ffffff","#000000"],["#000000","#ffffff"],
 ];
-const STORE = "u19-tile-scroll-v3";
+const STORE = "u19-tile-scroll-v6";
 let S = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
 let saveT = 0;
@@ -313,8 +313,21 @@ const E  = (u,n) => u<=0 ? 0 : u>=1 ? 1 : (u<.5 ? .5*Math.pow(2*u,n) : 1-.5*Math
 const dE = (u,n) => (u<=0||u>=1) ? 0 : (u<.5 ? n*Math.pow(2*u,n-1) : n*Math.pow(2*(1-u),n-1));
 const iv = () => Math.max(S.interval, S.dur);
 function dashAt(tc){ if (tc < S.offset) return {k:-1,u:-1}; const k = Math.floor((tc - S.offset)/iv()); return {k, u:(tc - S.offset - k*iv())/S.dur}; }
-function posAt(tc){ const {k,u} = dashAt(tc); const n = k<0 ? 0 : k + E(u,S.ease); return S.cruise*tc + S.dist*BLOCK*n; }
-function velAt(tc){ const {k,u} = dashAt(tc); return S.cruise + (k<0 ? 0 : S.dist*BLOCK/S.dur*dE(u,S.ease)); }
+// entry / exit kick: tiles arrive already moving fast and settle (and speed up again as they leave)
+const kickIn  = () => [0, Math.max(0.15, wInD()*1.4)];
+const kickOut = () => { const d = Math.max(0.15, wOutD()*1.4); return [S.trans - d, d]; };
+function kickPos(tc){
+  const [a0, ad] = kickIn(), [b0, bd] = kickOut();
+  const u = clamp01((tc - a0)/ad), v = clamp01((tc - b0)/bd);
+  return S.kin*BLOCK*(1 - Math.pow(1-u, 3)) + S.kout*BLOCK*v*v*v;
+}
+function kickVel(tc){
+  const [a0, ad] = kickIn(), [b0, bd] = kickOut();
+  const u = (tc - a0)/ad, v = (tc - b0)/bd;
+  return (u>0&&u<1 ? S.kin*BLOCK*3*(1-u)*(1-u)/ad : 0) + (v>0&&v<1 ? S.kout*BLOCK*3*v*v/bd : 0);
+}
+function posAt(tc){ const {k,u} = dashAt(tc); const n = k<0 ? 0 : k + E(u,S.ease); return S.cruise*tc + S.dist*BLOCK*n + kickPos(tc); }
+function velAt(tc){ const {k,u} = dashAt(tc); return S.cruise + (k<0 ? 0 : S.dist*BLOCK/S.dur*dE(u,S.ease)) + kickVel(tc); }
 function invCenters(){ const out=[]; if (S.inv==="off") return out; for (let k=0;;k++){ const c = S.offset + k*iv() + S.dur*S.invPhase/100; if (c > S.trans) break; out.push(c); if (S.inv==="once") break; } return out; }
 function invAt(tc){ let n = 0; if (S.inv!=="off"){ const c0 = S.offset + S.dur*S.invPhase/100; if (tc >= c0) n = S.inv==="once" ? 1 : Math.floor((tc - c0)/iv()) + 1; } return ((S.invStart?1:0) + n) % 2; }
 function dashStarts(){ const out=[]; for (let k=0;;k++){ const s = S.offset + k*iv(); if (s > S.trans) break; out.push(s); } return out; }
@@ -495,7 +508,7 @@ void main(){
   if (uEdge == 3){
     n = fbm(vec3(q*2.0, uTime*.55)) + .35*fbm(vec3(q*5.2 + 3.1, uTime*.9));
     vec2 uvp = p / uRes; bd = min(min(uvp.x, uvp.y), min(1.-uvp.x, 1.-uvp.y)) * uRes.y / min(uRes.x, uRes.y);
-    s = sOf(p) + n*uTWarp - uTLead*(1. - smoothstep(0., .2, bd));
+    s = sOf(p) + n*uTWarp;
     flow = vec2(fbm(vec3(q*1.6, uTime*.4 + 7.)), fbm(vec3(q*1.6 + 4.7, uTime*.4 + 7.)));
   }
   else if (uEdge == 0) s = sOf(p);
@@ -511,64 +524,86 @@ void main(){
   float cOut = 1. - smoothstep(uFrontOut - uSoft, uFrontOut, s);   // 1 = band has left (B)
   float wT = max(cIn - cOut, 0.), wA = 1. - cIn, wB = min(cOut, cIn);
 
-  /* thermal: distance into the band from either front (wipe units) */
-  float dIn = uFrontIn - s, dOut = s - uFrontOut;                  // >0 inside the band
-  float near = 0.;
-  if (uEdge == 3) near = max(1. - smoothstep(0., uTRim*2.6, dIn), 1. - smoothstep(0., uTRim*2.6, dOut));
-  float smear = uTSmear * near;
-  vec2 Rs = R + flow * 70. * smear;                                // liquid wobble right behind the front
-  float bias = smear * 4.5;
+  vec2 uv = p / uRes;
+  vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
 
-  /* tiles */
+  if (uEdge == 3){
+    /* thermal: every pixel walks the same stages, at its own time
+       0 scene → .06 violet fringe → .32 white/yellow/orange → .50 red over the scene → .62 red → 1 sharp tiles
+       pixels near the frame edge start earlier (uTLead) and walk slower, so the frame stays hot the longest */
+    float border = 1. - smoothstep(0., .22, bd);
+    float wid = uTRim * (1. + .6*border);                          // edges walk a little slower
+    float Lin  = clamp((uFrontIn  - s) / wid, 0., 1.);
+    float Lout = clamp((uFrontOut - s) / wid, 0., 1.);
+    float st = min(Lin, 1. - Lout);
+    float u = clamp((st - .62) / .38, 0., 1.);                     // tile focus 0 → 1
+    float soft = 1. - u;
+    float smear = uTSmear * pow(soft, 1.5);
+    vec2 Rs = R + flow * 140. * smear;
+    float bias = smear * 7.;
+    float m = 0.;
+    if (uTaps <= 1) m = texture(uTex, Rs / period, bias).r;
+    else {
+      for (int i = 0; i < 48; i++){
+        if (i >= uTaps) break;
+        float k = float(i) / float(uTaps - 1) - .5;
+        m += texture(uTex, (Rs + vec2(0., k*uBlur)) / period, bias).r;
+      }
+      m /= float(uTaps);
+    }
+    vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
+    float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
+
+    float nb = fbm(vec3(q*3.1 + 11., uTime*.8));
+    vec3 oc; float oa;
+    // inside the picture the heat is warm (yellow → orange) and turns into a see-through red;
+    // the white / violet / black part of the ramp lives on the frame edge (below)
+    if (st < .25){ float k = st / .25; oc = heat(mix(.42, .17, k) + .05*nb); oa = .72 * smoothstep(0., 1., k); }
+    else if (st < .45){ float k = (st - .25) / .20; oc = mix(heat(.17), uBg, smoothstep(0., .7, k)); oa = mix(.72, .9, k) + .06*nb; }
+    else if (st < .62){ float k = (st - .45) / .17; oc = uBg; oa = mix(.9, 1., k); }
+    else {
+      float f = smoothstep(0., .4, u);
+      oc = mix(uBg, tcol, f); oa = mix(1., ta, f);
+      // leftover heat pockets inside the red, cooling as the tiles come into focus
+      float pocket = smoothstep(.12, .55, nb) * soft * soft * (.55 + .45*border);
+      float lum = max(oc.r, max(oc.g, oc.b));
+      oc = mix(oc, heat(.18 + .25*smoothstep(.12, .9, nb)) * (.25 + .75*lum), pocket); oa = max(oa, pocket);
+    }
+    // frame heat: black at the very edge → violet → white → yellow → orange, fading into the picture.
+    // It grows as the wipe starts, sits over the tiles while they come into focus, then cools away.
+    if (uPre > 0.){
+      float sd = clamp(sOf(p), 0., 1.);
+      float bw = uTLead * uPre * (1. + .6*(1. - sd));              // thicker on the side the wipe comes from
+      float bh = clamp(1. - (bd + (n + .6*nb)*.045*uPre) / max(bw, 1e-4), 0., 1.);
+      float vw = smoothstep(0., .5, bh);
+      vec3 vc = heat(.15 + .85*pow(bh, 2.2));                       // mostly orange/yellow, violet & black only at the very edge
+      float na = oa + vw*(1. - oa);
+      oc = (oc*oa*(1. - vw) + vc*vw) / max(na, 1e-4); oa = na;
+    }
+
+    if (uOut == 1){ o = vec4(oc * oa, oa); return; }
+    vec3 scene = Lout > 0. ? texture(uB, uv).rgb : texture(uA, uv).rgb;
+    o = vec4(scene * (1. - oa) + oc * oa, 1.);
+    return;
+  }
+
+  /* block / column / line */
   float m = 0.;
-  if (uTaps <= 1) m = texture(uTex, Rs / period, bias).r;
+  if (uTaps <= 1) m = texture(uTex, R / period).r;
   else {
     for (int i = 0; i < 48; i++){
       if (i >= uTaps) break;
       float k = float(i) / float(uTaps - 1) - .5;
-      m += texture(uTex, (Rs + vec2(0., k*uBlur)) / period, bias).r;
+      m += texture(uTex, (R + vec2(0., k*uBlur)) / period).r;
     }
     m /= float(uTaps);
   }
-  vec3 A = mix(uBg, uFg, uInv), B = mix(uFg, uBg, uInv);
   vec3 tcol = mix(mix(A, B, m), uFg, uAlpha);
   float ta = mix(1., mix(m, 1.-m, uInv), uAlpha);
-
-  /* thermal rim: heat inside the band near the front, a dark violet fringe just outside it */
-  float hA = 0., fringe = 0.;
-  if (uEdge == 3){
-    float d = min(dIn, dOut);                                     // nearest front, signed
-    float fr = uTRim * .45;
-    if (d > 0.) hA = .8 * (1. - clamp(d / uTRim, 0., 1.));
-    else { hA = .8 + .2 * clamp(-d / fr, 0., 1.); fringe = 1. - smoothstep(0., fr, -d); }
-    float wobble = .08 * snoise(vec3(q*9., uTime*1.3));
-    hA = clamp(hA + wobble*step(.001, hA), 0., 1.);
-    float lum = max(tcol.r, max(tcol.g, tcol.b)) * ta;
-    vec3 hc = heat(hA);
-    float hw = smoothstep(0., .1, hA);
-    tcol = mix(tcol, hc * (.12 + .88*lum), hw * step(0., d)); ta = mix(ta, 1., hw * step(0., d));
-  }
-
-  /* frame-edge heat on scene A as the wipe starts (black at the very edge → violet → white → orange) */
-  float pre = 0., ph = 0.;
-  if (uEdge == 3 && uPre > 0.){
-    float bw = uTLead * .9 * uPre;
-    float bh = clamp(1. - (bd + n*.025) / max(bw, 1e-4), 0., 1.);
-    ph = .18 + .82*bh; pre = smoothstep(0., .3, bh) * wA * (1. - wT);
-  }
-  if (uOut == 1){
-    float fa = fringe * .9;
-    vec3 rgb = tcol * ta * wT + heat(hA) * fa * (1. - wT);
-    float a = ta * wT + fa * (1. - wT);
-    rgb = rgb * (1. - pre) + heat(ph) * pre; a = a * (1. - pre) + pre;
-    o = vec4(rgb, a); return;
-  }
-  vec2 uv = p / uRes;
+  if (uOut == 1){ o = vec4(tcol * ta * wT, ta * wT); return; }
   vec3 sa = texture(uA, uv).rgb, sb = texture(uB, uv).rgb;
   vec3 under = mix(sa, sb, uUnderB);
   vec3 col = (tcol * ta + under * (1. - ta)) * wT + sa * wA + sb * wB;
-  col = mix(col, heat(hA), fringe * .9 * (1. - wT));
-  col = mix(col, heat(ph), pre);
   o = vec4(col, 1.);
 }`;
 let U = {}, texA, texB;
@@ -632,8 +667,8 @@ function render(t, q){
   const cellR = (S.edge === 'line' || th) ? 0 : 260*k/ext;        // half a block, in wipe units
   // start just before the earliest point can be reached (edges lead, warp pulls it forward) and end once the rim has cleared
   const base0 = soft + jit/2 + cellR;
-  const mStart = base0 + (th ? S.twarp/100*0.75 + S.tlead/100 + S.trim/100*0.45 : 0);
-  const mEnd   = base0 + (th ? S.twarp/100*0.75 + S.trim/100*1.1 : 0);
+  const mStart = base0 + (th ? S.twarp/100*0.8 : 0);
+  const mEnd   = base0 + (th ? S.twarp/100*0.8 + S.trim/100*1.6 : 0);
   const [pa, pb] = wipeProgress(t);
   const front = u => -mStart + u*(1 + mStart + mEnd);
   gl.uniform2f(U.uRes, W, H); gl.uniform2f(U.uCenterPx, W/2, H/2);
@@ -648,7 +683,10 @@ function render(t, q){
   gl.uniform1f(U.uUnderB, t >= cutTime() ? 1 : 0);
   gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : S.edge === 'column' ? 2 : 3);
   gl.uniform1f(U.uTWarp, S.twarp/100); gl.uniform1f(U.uTRim, S.trim/100); gl.uniform1f(U.uTSmear, S.tsmear/100); gl.uniform1f(U.uTLead, S.tlead/100); gl.uniform1f(U.uTime, tc);
-  gl.uniform1f(U.uPre, th ? Math.min(1, Math.max(0, tc / Math.max(0.05, wInD()*0.35))) * (1 - pb) : 0);
+  { const wi = wInD(), wo = wOutD(), e0 = tc, e1 = S.trans - tc;
+    const envIn  = clamp01(e0 / (wi*.2)) * (1 - clamp01((e0 - wi*.32) / (wi*.26)));
+    const envOut = clamp01((wo*.58 - e1) / (wo*.26)) * clamp01(e1 / (wo*.2));   // mirror of the entry
+    gl.uniform1f(U.uPre, th ? Math.max(envIn, envOut) : 0); }
   gl.uniform1i(U.uOut, S.out === 'tiles' ? 1 : 0);
   if (S.out !== 'tiles'){
     const hasVid = scenes.A.kind === 'video' || scenes.B.kind === 'video';
@@ -673,9 +711,9 @@ const ROWS = {
     ["jitter","ばらつき",0,100,1, v=>`${v}%`],
     ["soft","ぼかし",0,40,0.5, v=>`${v}%`],
     ["twarp","うねり",0,40,0.5, v=>`${v}%`],
-    ["trim","熱の縁の幅",1,30,0.5, v=>`${v}%`],
+    ["trim","熱の段階の長さ",20,200,1, v=>`${v}%`],
     ["tsmear","にじみ",0,100,1, v=>`${v}%`],
-    ["tlead","フチから先に",0,50,0.5, v=>`${v}%`],
+    ["tlead","フチの熱",0,40,0.5, v=>`${v}%`],
   ],
   speedRows: [
     ["cruise","巡航スピード",0,400,5, v=>`${v}px/s`],
@@ -684,6 +722,8 @@ const ROWS = {
     ["interval","加速の間隔",0.4,8,0.1, v=>`${v.toFixed(1)}s`],
     ["offset","最初の加速",0,8,0.05, v=>`${v.toFixed(2)}s`],
     ["ease","緩急の強さ",1,10,0.5, v=>`${v}`],
+    ["kin","入りの勢い",0,5,0.1, v=>`${v}ブロック`],
+    ["kout","抜けの勢い",0,5,0.1, v=>`${v}ブロック`],
   ],
   invRows: [["invPhase","反転の瞬間",0,100,1, v=>v===50?"最速":`${v}%`]],
   angleRows: [
@@ -722,7 +762,7 @@ function segBind(id, key, parse){
 }
 function syncSeg(id, val){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(val))); }
 const WIPE_HINT = {
-  thermal:'参考動画の入り方。赤い液体がうねりながら流れ込み、縁にサーモの熱（黒→紫→白→オレンジ）。現れた直後のタイルはにじんで揺れ、だんだんくっきりします。「フチから先に」で画面の縁から熱がにじみ始めます。',
+  thermal:'参考動画の入り方。どの場所も「シーン → 紫のフチ → 白・黄・オレンジの熱 → 透ける赤 → 赤 → ぼけたタイル → くっきり」の順に変わり、右下から先に進みます。動き出しと同時に画面のフチがサーモ色に光り、タイルにピントが合うまで残ります（フチの熱）。熱の段階の長さを上げると、画面全体がゆっくり同時に変わる感じに、下げると線のワイプに近づきます。',
   block:'タイルの区切りごとに、帯の進む順で切り替わります。ばらつきで順番を少し崩せます。',
   column:'傾いた列ごとに切り替わります。ばらつきで列ごとのタイミングをずらせます。',
   line:'まっすぐなワイプ。ぼかしで境目を柔らかくできます。',
