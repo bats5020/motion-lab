@@ -54,8 +54,27 @@
   #cta span { color: inherit; }
   #cta:hover { background: var(--fg); color: var(--bg); }
   #cta:focus-visible { outline: 1px solid var(--fg); outline-offset: 3px; }
+
+  /* MP4 export */
+  #exBtn {
+    position: fixed; right: 12px; bottom: 12px; z-index: 2147483646;
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+    background: rgba(10,10,12,.72); border: 1px solid rgba(255,255,255,.16); color: #e6e6ef;
+    font: 600 11px/1 ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: .08em;
+    cursor: pointer; opacity: .55; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: opacity .15s;
+  }
+  #exBtn:hover, #exBtn:focus-visible, #exBtn.rec { opacity: 1; }
+  #exBtn.rec { border-color: #ff5a5a; color: #ffb3b3; }
+  #toast {
+    position: fixed; left: 50%; bottom: 52px; translate: -50% 0; z-index: 2147483646;
+    padding: 8px 14px; border-radius: 6px; background: rgba(20,20,24,.92); border: 1px solid rgba(255,255,255,.14);
+    color: #e6e6ef; font: 12px/1.4 ui-monospace, 'SF Mono', Menlo, monospace; opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #toast.on { opacity: 1; }
 </style>
 
+<button id="exBtn" type="button" title="1920×1080・30fps の MP4 を書き出す（再生中の動きをコマ送りで描画）">● MP4を書き出す</button>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="vp" aria-label="U19 ECS HUD">
   <div id="stage">
     <!-- Scene 2 footage window: mask 78,80 1765×920 r20 / image 76,42 1770×996 -->
@@ -222,7 +241,7 @@
 
     // the clip starts as a thin line opens between the two rows
     s.set(win, { visibility: 'visible', opacity: 0 }, 0);
-    s.call(() => { try { clip.currentTime = 0; const pr = clip.play(); if (pr) pr.catch(() => {}); } catch (e) {} }, null, 0);
+    s.call(() => { if (EX.on) { EX.clipAt = EX.t; clip.pause(); return; } try { clip.currentTime = 0; const pr = clip.play(); if (pr) pr.catch(() => {}); } catch (e) {} }, null, 0);
     s.to(SC, { p: 0.004, duration: 0.001, onUpdate: upd }, 0);
     s.to(win, { opacity: 1, duration: 0.12, ease: 'power1.out' }, 0);
 
@@ -350,6 +369,7 @@
 
   /* ---------- idle: running timecode, blinking dot, small glitches ---------- */
   function startTC() {
+    if (EX.on) { clearInterval(tcTimer); EX.tcAt = EX.t; return; } // export: timecode follows the frame count
     clearInterval(tcTimer);
     // timecode runs from 00:00:00:00 (30 fps)
     let f = 0;
@@ -377,6 +397,253 @@
     next();
   }
 
+  /* ---------- MP4 export ----------
+     The HUD is HTML/SVG, so each frame is redrawn onto a 1920×1080 canvas from the elements' live state
+     (position, rotation/scale, opacity, clip-path, dash, scrambled text). The timeline is stepped frame by frame,
+     the footage is seeked to the exact frame, and frames are encoded to H.264 with WebCodecs
+     (same MP4 writer as U19 Tile Scroll / Flame Transition). Without WebCodecs it records with MediaRecorder. */
+  const EX = { on: false, stop: false, t: 0, tcAt: null, clipAt: null };
+  const FPS = 30, W = 1920, H = 1080;
+  const exBtn = $('#exBtn'), toastEl = $('#toast');
+  let toastT = 0;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 3600); }
+
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d', { alpha: false });
+  const FONT = (px) => `500 ${px}px Inter, ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif`;
+  const DRAW_IDS = ['cTL', 'cTR', 'cBL', 'cBR', 'pL', 'pR', 'sLd', 'sLu', 'sRd', 'sRu', 'tc', 'n20', 'n26', 'scale', 'dot', 'ana', 'sys', 'xy', 'g14', 'u19', 'logo', 'ecs', 'g15', 'cta'];
+  const drawEls = DRAW_IDS.map((id) => document.getElementById(id));
+  const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+  const opa = (el) => num(getComputedStyle(el).opacity, 1);
+
+  // element box in stage pixels: centre from the rendered rect (includes x/y/translate), size from layout
+  function boxOf(el, sr, s) {
+    const r = el.getBoundingClientRect();
+    return { cx: (r.left + r.width / 2 - sr.left) / s, cy: (r.top + r.height / 2 - sr.top) / s, w: el.offsetWidth || num(el.getAttribute('width')), h: el.offsetHeight || num(el.getAttribute('height')) };
+  }
+  // clip-path: inset(t r b l [round r]) in % or px → local rect
+  function clipInset(el, w, h) {
+    const cp = el.style.clipPath || getComputedStyle(el).clipPath;
+    if (!cp || cp === 'none') return null;
+    const m = cp.match(/inset\(([^)]*)\)/); if (!m) return null;
+    const [body, round] = m[1].split('round');
+    const v = body.trim().split(/\s+/); while (v.length < 4) v.push(v[v.length === 3 ? 1 : 0]);
+    const px = (s, ref) => s.endsWith('%') ? num(s) / 100 * ref : num(s);
+    const t = px(v[0], h), r = px(v[1], w), b = px(v[2], h), l = px(v[3], w);
+    return { x: l, y: t, w: Math.max(0, w - l - r), h: Math.max(0, h - t - b), r: round ? num(round) : 0 };
+  }
+  function drawSvg(el, w, h) {
+    for (const ch of el.children) {
+      const o = opa(ch); if (o <= 0) continue;
+      cx.save(); cx.globalAlpha *= o;
+      const m = ch.transform && ch.transform.baseVal && ch.transform.baseVal.consolidate();
+      if (m) { const k = m.matrix; cx.transform(k.a, k.b, k.c, k.d, k.e, k.f); }
+      let p = null;
+      if (ch.tagName === 'path') p = new Path2D(ch.getAttribute('d'));
+      else if (ch.tagName === 'line') { p = new Path2D(); p.moveTo(num(ch.getAttribute('x1')), num(ch.getAttribute('y1'))); p.lineTo(num(ch.getAttribute('x2')), num(ch.getAttribute('y2'))); }
+      else if (ch.tagName === 'circle') { p = new Path2D(); p.arc(num(ch.getAttribute('cx')), num(ch.getAttribute('cy')), num(ch.getAttribute('r')), 0, Math.PI * 2); }
+      if (p) {
+        const fill = ch.getAttribute('fill'), stroke = ch.getAttribute('stroke');
+        if (fill && fill !== 'none') { cx.fillStyle = '#fff'; cx.fill(p); }
+        if (stroke && stroke !== 'none') {
+          cx.strokeStyle = '#fff'; cx.lineWidth = 1;
+          const da = ch.style.strokeDasharray;
+          if (da && da !== 'none') { cx.setLineDash(da.split(/[ ,]+/).map(num)); cx.lineDashOffset = num(ch.style.strokeDashoffset); }
+          cx.stroke(p);
+        }
+      }
+      cx.restore();
+    }
+  }
+  // text: draws visible characters one by one (scrambled spans keep their layout)
+  function drawText(el, x0, y0, h, px, color) {
+    cx.font = FONT(px); cx.fillStyle = color; cx.textBaseline = 'alphabetic';
+    const fm = cx.measureText('Hg'), A = fm.fontBoundingBoxAscent, D = fm.fontBoundingBoxDescent;
+    const base = y0 + (h - (A + D)) / 2 + A;
+    const spans = el.querySelectorAll('span');
+    if (!spans.length) { cx.fillText(el.textContent, x0, base); return; }
+    let x = x0;
+    spans.forEach((sp) => { const c = sp.textContent; if (sp.style.visibility !== 'hidden') cx.fillText(c, x, base); x += cx.measureText(c).width; });
+  }
+  function drawEl(el, sr, s, stageO) {
+    if (!el) return;
+    const o = opa(el) * stageO; if (o <= 0) return;
+    const b = boxOf(el, sr, s), w = b.w, h = b.h;
+    const rot = num(gsap.getProperty(el, 'rotation')), sx = num(gsap.getProperty(el, 'scaleX'), 1), sy = num(gsap.getProperty(el, 'scaleY'), 1);
+    cx.save(); cx.globalAlpha = o;
+    cx.translate(b.cx, b.cy); if (rot) cx.rotate(rot * Math.PI / 180); if (sx !== 1 || sy !== 1) cx.scale(sx, sy); cx.translate(-w / 2, -h / 2);
+    const clip = clipInset(el, w, h);
+    if (clip) { if (clip.w <= 0 || clip.h <= 0) { cx.restore(); return; } cx.beginPath(); cx.rect(clip.x, clip.y, clip.w, clip.h); cx.clip(); }
+    if (el.tagName === 'svg') drawSvg(el, w, h);
+    else if (el.id === 'cta') {
+      const cs = getComputedStyle(el), bg = cs.backgroundColor;
+      if (bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg)) { cx.fillStyle = bg; cx.beginPath(); cx.roundRect(0, 0, w, h, 2); cx.fill(); }
+      cx.strokeStyle = '#fff'; cx.lineWidth = 1; cx.beginPath(); cx.roundRect(0.5, 0.5, w - 1, h - 1, 1.5); cx.stroke();
+      const span = $('#ctaTxt'), rr = span.getBoundingClientRect(), er = el.getBoundingClientRect();
+      drawText(span, (rr.left - er.left) / s / sx, (rr.top - er.top) / s / sy, span.offsetHeight, 12, cs.color);
+    } else drawText(el, 0, 0, h, 14, '#fff');
+    cx.restore();
+  }
+  function drawFrame() {
+    const sr = stage.getBoundingClientRect(), s = sr.width / W, stageO = opa(stage);
+    cx.globalAlpha = 1; cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+    if (getComputedStyle(win).visibility !== 'hidden' && clip.readyState >= 2) {
+      const wo = opa(win) * stageO, c = clipInset(win, 1765, 920);
+      if (wo > 0 && (!c || (c.w > 0 && c.h > 0))) {
+        cx.save(); cx.globalAlpha = wo;
+        const r = c || { x: 0, y: 0, w: 1765, h: 920, r: 20 };
+        cx.beginPath(); cx.roundRect(78 + r.x, 80 + r.y, r.w, r.h, Math.min(20, r.h / 2)); cx.clip();
+        cx.drawImage(clip, 76, 42, 1770, 996);
+        cx.restore();
+      }
+    }
+    drawEls.forEach((el) => drawEl(el, sr, s, stageO));
+  }
+  // seek the footage and wait until the new frame is actually decoded (seeked alone can still hand back the old picture)
+  const seekClip = (t) => new Promise((res) => {
+    if (Math.abs(clip.currentTime - t) < 1e-4 && clip.readyState >= 2) return res();
+    let fin = false;
+    const done = () => { if (fin) return; fin = true; clip.removeEventListener('seeked', onSeeked); res(); };
+    const onSeeked = () => {
+      if (clip.requestVideoFrameCallback) { clip.requestVideoFrameCallback(() => done()); setTimeout(done, 250); }
+      else requestAnimationFrame(() => requestAnimationFrame(done));
+    };
+    clip.addEventListener('seeked', onSeeked); clip.currentTime = t; setTimeout(done, 3000);
+  });
+  async function stepTo(g0, t) {
+    EX.t = t;
+    gsap.globalTimeline.time(g0 + t, false);
+    if (EX.tcAt != null) {
+      const f = Math.round((t - EX.tcAt) * 30), pad = (n) => String(n).padStart(2, '0');
+      T.tc.el.textContent = `TC ${pad(Math.floor(f / 108000))}:${pad(Math.floor(f / 1800) % 60)}:${pad(Math.floor(f / 30) % 60)}:${pad(f % 30)}`;
+    }
+    if (EX.clipAt != null) { clip.pause(); await seekClip(Math.min(clip.duration - 0.001, Math.max(0, t - EX.clipAt))); }
+    drawFrame();
+  }
+
+  /* MP4 writer (H.264 via WebCodecs) — same as U19 Tile Scroll */
+  const enc = new TextEncoder();
+  function joinBytes(...parts) { const arrays = parts.map((p) => typeof p === 'string' ? enc.encode(p) : p), out = new Uint8Array(arrays.reduce((n, a) => n + a.length, 0)); let i = 0; for (const a of arrays) { out.set(a, i); i += a.length; } return out; }
+  function be32(...v) { const out = new Uint8Array(v.length * 4), dv = new DataView(out.buffer); v.forEach((n, i) => dv.setUint32(i * 4, n)); return out; }
+  function be16(...v) { const out = new Uint8Array(v.length * 2), dv = new DataView(out.buffer); v.forEach((n, i) => dv.setUint16(i * 2, n)); return out; }
+  function atom(type, ...parts) { const data = joinBytes(...parts); return joinBytes(be32(data.length + 8), type, data); }
+  async function pickMp4Config(w, h, fps) {
+    if (!('VideoEncoder' in window)) return null;
+    const bitrate = Math.round(Math.min(120e6, Math.max(8e6, w * h * fps * .33)));
+    for (const codec of ['avc1.640028', 'avc1.4d0028', 'avc1.42e028']) {
+      const cfg = { codec, width: w, height: h, bitrate, framerate: fps, avc: { format: 'avc' }, latencyMode: 'quality' };
+      try { const r = await VideoEncoder.isConfigSupported(cfg); if (r.supported) return cfg; } catch (e) {}
+    }
+    return null;
+  }
+  function makeMp4(samples, desc, w, h, fps) {
+    const N = samples.length, matrix = be32(0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    const ftyp = atom('ftyp', 'isom', be32(512), 'isom', 'iso2', 'avc1', 'mp41');
+    const pts = samples.map((s) => Math.round(s.ts * fps / 1e6)), D = Math.max(0, ...samples.map((s, i) => i - pts[i]));
+    const reorder = pts.some((p, i) => p !== i);
+    const build = (off) => {
+      const avc1 = atom('avc1', new Uint8Array(6), be16(1), be16(0, 0), be32(0, 0, 0), be16(w, h), be32(0x00480000, 0x00480000, 0), be16(1), new Uint8Array(32), be16(0x18, 0xffff), atom('avcC', desc), atom('colr', 'nclx', be16(1, 1, 1), new Uint8Array([0])));
+      const keys = []; samples.forEach((s, i) => { if (s.key) keys.push(i + 1); });
+      const parts = [atom('stsd', be32(0, 1), avc1), atom('stts', be32(0, 1, N, 1))];
+      if (reorder) parts.push(atom('ctts', be32(0, N), ...samples.map((s, i) => be32(1, pts[i] - i + D))));
+      parts.push(atom('stss', be32(0, keys.length), be32(...keys)), atom('stsc', be32(0, 1, 1, N, 1)), atom('stsz', be32(0, 0, N), be32(...samples.map((s) => s.data.length))), atom('stco', be32(0, 1, off)));
+      const stbl = atom('stbl', ...parts);
+      const mdia = atom('mdia', atom('mdhd', be32(0, 0, 0, fps, N), be16(0x55c4, 0)), atom('hdlr', be32(0, 0), 'vide', new Uint8Array(12), 'VideoHandler\0'), atom('minf', atom('vmhd', be32(1), be16(0, 0, 0, 0)), atom('dinf', atom('dref', be32(0, 1), atom('url ', be32(1)))), stbl));
+      const edts = reorder ? atom('edts', atom('elst', be32(0, 1, N, D, 0x10000))) : new Uint8Array(0);
+      const trak = atom('trak', atom('tkhd', be32(3, 0, 0, 1, 0, N), new Uint8Array(8), be16(0, 0, 0, 0), matrix, be32(w * 65536, h * 65536)), edts, mdia);
+      return atom('moov', atom('mvhd', be32(0, 0, 0, fps, N, 0x10000), be16(0x100), new Uint8Array(10), matrix, new Uint8Array(24), be32(2)), trak);
+    };
+    const mdatSize = samples.reduce((n, s) => n + s.data.length, 8);
+    const moov0 = build(0), moov = build(ftyp.length + moov0.length + 8);
+    return new Blob([ftyp, moov, be32(mdatSize), enc.encode('mdat'), ...samples.map((s) => s.data)], { type: 'video/mp4' });
+  }
+  const inClaude = !!(window.claude && window.claude.use);
+  async function saveFile(blob, name) {
+    if (inClaude) {
+      try { const dl = await window.claude.use('downloads'); await dl.save({ filename: name, data: blob }); toast(`${name} を保存しました`); return; }
+      catch (e) { toast('保存できませんでした（' + ((e && e.code) || e) + '）'); return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(`${name} を保存しました`);
+  }
+  const stamp = () => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
+
+  async function exportMp4() {
+    if (EX.on) { EX.stop = true; return; }
+    if (!window.gsap) { toast('アニメーションの読み込みに失敗しているため書き出せません'); return; }
+    const cfg = await pickMp4Config(W, H, FPS);
+    let mime = null;
+    if (!cfg) {
+      mime = window.MediaRecorder && ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+      if (!mime || !cv.captureStream) { toast('このブラウザでは動画を書き出せません（Chrome / Edge を使ってください）'); return; }
+    }
+    if (clip.readyState < 1) await new Promise((r) => { clip.addEventListener('loadedmetadata', r, { once: true }); setTimeout(r, 4000); });
+    // frame-exact seeking needs a seekable source; servers without range requests give none → load the clip into memory once
+    if (!clip.src.startsWith('blob:') && !(clip.seekable.length && clip.seekable.end(0) >= clip.duration - 0.05)) {
+      exBtn.textContent = '映像を読み込み中…';
+      try {
+        const blob = await (await fetch(clip.currentSrc)).blob();
+        const ready = new Promise((r) => { clip.addEventListener('loadeddata', r, { once: true }); setTimeout(r, 8000); });
+        clip.src = URL.createObjectURL(blob); clip.load(); await ready;
+      } catch (e) { toast('映像を読み込めませんでした：' + ((e && e.message) || e)); exBtn.textContent = '● MP4を書き出す'; return; }
+    }
+    const dur = 3.4 + (Number.isFinite(clip.duration) ? clip.duration : 3.87) + 0.5;
+    const N = Math.round(dur * FPS);
+    Object.assign(EX, { on: true, stop: false, t: 0, tcAt: null, clipAt: null });
+    exBtn.classList.add('rec');
+    const g = gsap.globalTimeline; g.pause();
+    boot();
+    const g0 = mt.startTime();
+    const samples = []; let desc = null, encErr = null, encoder = null, rec = null, track = null, chunks = [], stopped = null;
+    if (cfg) {
+      encoder = new VideoEncoder({ output: (chunk, meta) => { if (!desc && meta && meta.decoderConfig && meta.decoderConfig.description) desc = new Uint8Array(meta.decoderConfig.description); const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({ data: b, key: chunk.type === 'key', ts: chunk.timestamp }); }, error: (e) => { encErr = e; } });
+      encoder.configure(cfg);
+    } else {
+      const stream = cv.captureStream(0); track = stream.getVideoTracks()[0];
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 24e6 });
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      stopped = new Promise((r) => (rec.onstop = r)); rec.start(200);
+    }
+    const tStart = performance.now();
+    let ok = true;
+    try {
+      for (let i = 0; i < N; i++) {
+        if (EX.stop) { ok = false; break; }
+        await stepTo(g0, i / FPS);
+        if (encoder) {
+          if (encErr) throw encErr;
+          const frame = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+          encoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 }); frame.close();
+          while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 2));
+        } else {
+          while (performance.now() < tStart + i * 1000 / FPS) await new Promise((r) => requestAnimationFrame(r));
+          track.requestFrame && track.requestFrame();
+        }
+        exBtn.textContent = `■ 中止 ${i + 1}/${N}`;
+        if (i % 2 === 0) await new Promise((r) => setTimeout(r, 0));
+      }
+    } catch (err) { ok = false; toast('書き出しに失敗しました：' + ((err && err.message) || err)); }
+    try {
+      if (encoder) { await encoder.flush(); encoder.close(); }
+      else { if (rec.state !== 'inactive') rec.stop(); await stopped; track.stop(); }
+    } catch (e) { encErr = encErr || e; }
+    Object.assign(EX, { on: false, tcAt: null, clipAt: null });
+    exBtn.classList.remove('rec'); exBtn.textContent = '● MP4を書き出す';
+    g.resume(); play();
+    if (EX.stop) { EX.stop = false; toast('書き出しを中止しました'); return; }
+    if (!ok) return;
+    const name = `u19-ecs-hud-sequence-${stamp()}_${FPS}fps`;
+    if (encoder) {
+      if (encErr || !desc || !samples.length) { toast('MP4の書き出しに失敗しました' + (encErr ? '：' + encErr.message : '')); return; }
+      await saveFile(makeMp4(samples, desc, W, H, FPS), name + '.mp4');
+    } else {
+      const blob = new Blob(chunks, { type: mime.split(';')[0] });
+      if (!blob.size) { toast('録画データが空でした'); return; }
+      await saveFile(blob, name + (mime.startsWith('video/mp4') ? '.mp4' : '.webm'));
+    }
+  }
+  exBtn.addEventListener('click', (e) => { e.stopPropagation(); exportMp4(); });
+
   /* ---------- start / replay ---------- */
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function showFinal() {
@@ -390,8 +657,8 @@
   const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]) : Promise.resolve();
   const clipReady = new Promise((r) => { if (clip.readyState >= 3) r(); else { clip.addEventListener('canplaythrough', r, { once: true }); clip.addEventListener('error', r, { once: true }); setTimeout(r, 4000); } });
   Promise.all([fontsReady, clipReady]).then(() => (reduce ? showFinal() : play()));
-  vp.addEventListener('click', play);
-  addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') play(); });
+  vp.addEventListener('click', () => { if (!EX.on) play(); });
+  addEventListener('keydown', (e) => { if (!EX.on && (e.key === 'r' || e.key === 'R')) play(); });
 })();
 </script>
 
