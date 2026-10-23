@@ -332,7 +332,7 @@ in vec2 vUv; out vec4 o;
 uniform sampler2D uA, uB;
 uniform vec2 uRes;
 uniform float uT, uTime, uSwirl, uArms, uRim, uSeed, uCut;
-uniform vec3 uPal[8]; uniform float uPos[8]; uniform int uN;
+uniform vec3 uPal[16]; uniform float uPos[16]; uniform int uN; uniform float uLo;
 uniform int uMode, uExit, uMat; uniform vec2 uDir;
 uniform float uWarp;   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
 
@@ -367,9 +367,9 @@ float fbm(vec3 p){ float a=.55,s=0.; for(int i=0;i<3;i++){ s+=a*snoise(p); p=p*2
 
 // heat ramp from the selected preset (cold edge -> hot core)
 vec3 thermal(float t){
-  t=clamp(t,0.,1.);
+  t=uLo+clamp(t,0.,1.)*(1.-uLo);   // uLo skips a near-black cold end so the rim stays visible
   vec3 c=uPal[0];
-  for(int i=1;i<8;i++){
+  for(int i=1;i<16;i++){
     if(i>=uN) break;
     float a=uPos[i-1], b=uPos[i];
     if(t>=a) c=mix(uPal[i-1],uPal[i],clamp((t-a)/max(b-a,1e-4),0.,1.));
@@ -534,7 +534,7 @@ gl.useProgram(prog);
 gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 { const loc=gl.getAttribLocation(prog,'aPos'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0); }
-const U={}; ['uA','uB','uRes','uT','uTime','uSwirl','uArms','uRim','uSeed','uCut','uPal','uPos','uN','uMode','uExit','uMat','uDir','uWarp'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+const U={}; ['uA','uB','uRes','uT','uTime','uSwirl','uArms','uRim','uSeed','uCut','uPal','uPos','uN','uLo','uMode','uExit','uMat','uDir','uWarp'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 function mkTex(unit){ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); return t; }
@@ -552,7 +552,10 @@ const ASPECTS={'16:9':{scene:[1280,720],out:[1920,1080]},'9:16':{scene:[720,1280
   '1:1':{scene:[1080,1080],out:[1080,1080]},'4:5':{scene:[1080,1350],out:[1080,1350]}};
 const PALETTES=[
   {id:'thermal',name:'Thermal',stops:[['#4d0dbf',0],['#9e6bff',1/6],['#c9f7b5',2/6],['#ffed4d',.5],['#ff8c1a',4/6],['#ff3312',5/6],['#d40d08',1]]},
-  {id:'flow',name:'Thermal Flow',stops:[['#55BCE7',0],['#BFE8FF',.22],['#F8F0C9',.43],['#FFB56B',.64],['#FF6A3D',.82],['#E72F2D',1]]}
+  {id:'flow',name:'Thermal Flow',stops:[['#55BCE7',0],['#BFE8FF',.22],['#F8F0C9',.43],['#FFB56B',.64],['#FF6A3D',.82],['#E72F2D',1]]},
+  {id:'u19',name:'U19',lo:.2,stops:[['#000000',0],['#04121c',.06],['#0c3a57',.14],['#2c86b4',.23],['#54B6DF',.32],['#a9d9de',.42],['#F2EFC9',.52],['#E6A06D',.62],['#FF5A2A',.72],['#FFA64A',.86],['#FFD873',1]]},
+  {id:'u19-mirror',name:'U19 ミラー',lo:.12,stops:[['#000000',0],['#061722',.05],['#1a6a92',.12],['#54B6DF',.19],['#F2EFC9',.29],['#E6A06D',.41],['#FF5A2A',.48],['#FFD873',.53],['#FF5A2A',.58],['#E6A06D',.66],['#F2EFC9',.79],['#54B6DF',.91],['#89C9D3',1]]},
+  {id:'u19-ice',name:'U19 アイス',lo:.2,stops:[['#000000',0],['#160a05',.07],['#5a1a0c',.16],['#FF5A2A',.26],['#E6A06D',.36],['#F2EFC9',.47],['#89C9D3',.58],['#54B6DF',.7],['#a9dcef',.84],['#f4fbfd',1]]}
 ];
 const MODES=[[0,'中央へ渦'],[1,'外へ広がる'],[2,'一方向'],[3,'両側から']];
 const ARROWS=[[90,'↑'],[45,'↗'],[0,'→'],[315,'↘'],[270,'↓'],[225,'↙'],[180,'←'],[135,'↖']];
@@ -620,9 +623,9 @@ PALETTES.forEach(p=>{
 });
 function applyPalette(id){
   const p=PALETTES.find(x=>x.id===id)||PALETTES[0]; state.pal=p.id;
-  const col=new Float32Array(24), pos=new Float32Array(8);
+  const col=new Float32Array(48), pos=new Float32Array(16);
   p.stops.forEach(([c,t],i)=>{ col.set(hex3(c),i*3); pos[i]=t; });
-  gl.uniform3fv(U.uPal,col); gl.uniform1fv(U.uPos,pos); gl.uniform1i(U.uN,p.stops.length);
+  gl.uniform3fv(U.uPal,col); gl.uniform1fv(U.uPos,pos); gl.uniform1i(U.uN,p.stops.length); gl.uniform1f(U.uLo,p.lo||0);
   document.documentElement.style.setProperty('--heat',cssGrad(p));
 }
 slider($('#gFlame'),'渦の強さ','swirl',0,2,.01,v=>v.toFixed(2));
