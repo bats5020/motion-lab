@@ -265,9 +265,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
       <div class="prow"><span>フレームレート</span><div class="seg" id="fpsSeg" style="flex:1;margin:0"><button data-v="24">24</button><button data-v="30">30</button><button data-v="60">60</button></div></div>
       <div class="prow"><span>タイルの地を抜く</span><input type="checkbox" id="alpha"><span class="note">ロゴだけ残して地の色を透過</span></div>
       <div class="prow"><span>プレビュー</span><div class="seg" id="qSeg" style="flex:1;margin:0"><button data-v="0.5">軽量</button><button data-v="1">等倍</button></div></div>
-      <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn primary" id="zip">連番PNG（ZIP）</button></div>
-      <div class="btnrow"><button class="btn" id="mp4">MP4</button><button class="btn" id="mov">ロスレスMOV</button></div>
-      <div class="hint" id="exHint">1コマずつ描いて書き出すのでコマ落ちしません。「タイルだけ（透過）」＋連番PNGかMOVなら、AEで素材の上に重ねるだけでつながります（連番は「読み込み → PNGシーケンス」）。MP4は透過なし。</div>
+      <div class="btnrow"><button class="btn" id="png">PNG保存</button><button class="btn primary" id="mov">ロスレスMOV（コマ落ちなし）</button></div>
+      <div class="btnrow"><button class="btn" id="mp4">● 動画を書き出す</button></div>
+      <div class="btnrow"><button class="btn" id="zip">連番PNG（ZIP）</button></div>
+      <div class="hint" id="exHint">書き出しは Heatmap Blur と同じ形式。ロスレスMOV（PNG・透過対応）と連番PNGは1コマずつ描くのでコマ落ちしません。「タイルだけ（透過）」＋MOVか連番なら、AEで素材の上に重ねるだけでつながります（連番は「読み込み → PNGシーケンス」）。「動画を書き出す」はMP4（H.264）で、MP4を作れないブラウザでは自動でMP4／WebMの録画に切り替えます（透過なし）。</div>
     </section>
 
     <section>
@@ -1225,7 +1226,7 @@ function makeMp4(samples, desc, w, h, fps){
 /* ============ export ============ */
 let recording = null;
 const exportBtns = ['png','zip','mp4','mov'];
-const labels = { zip:'連番PNG（ZIP）', mp4:'MP4', mov:'ロスレスMOV' };
+const labels = { zip:'連番PNG（ZIP）', mp4:'● 動画を書き出す', mov:'ロスレスMOV（コマ落ちなし）' };
 function lockExport(activeId, on){ exportBtns.forEach(id => { if (id !== activeId) $(id).disabled = on; }); $(activeId).classList.toggle('rec', on); }
 const exportSpan = () => S.range === 'trans' ? [S.holdA, S.holdA + S.trans] : [0, total()];
 async function prepareFrame(t){
@@ -1279,7 +1280,7 @@ $('mov').addEventListener('click', async () => {
 $('mp4').addEventListener('click', async () => {
   if (recording){ recording.stop = true; return; }
   const [w,h] = outSize(), fps = S.fps, cfg = await pickMp4Config(w, h, fps);
-  if (!cfg){ toast('このブラウザはMP4の書き出しに対応していません。連番PNGを使ってください'); return; }
+  if (!cfg){ recordFallback(); return; }       // no H.264 encoder here (e.g. some app views): record MP4/WebM like Heatmap Blur
   const samples = []; let desc = null, encErr = null;
   const encoder = new VideoEncoder({ output:(chunk, meta) => { if (!desc && meta && meta.decoderConfig && meta.decoderConfig.description) desc = new Uint8Array(meta.decoderConfig.description); const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({ data:b, key:chunk.type==='key', ts:chunk.timestamp }); }, error:e => { encErr = e; } });
   encoder.configure(cfg);
@@ -1294,6 +1295,58 @@ $('mp4').addEventListener('click', async () => {
   if (encErr || !desc || !samples.length){ toast('MP4の書き出しに失敗しました' + (encErr ? '：' + encErr.message : '')); return; }
   saveFile(makeMp4(samples, desc, w, h, fps), `${baseName()}_${fps}fps.mp4`);
 });
+
+// fallback: MediaRecorder, one frame at a time (same approach as Heatmap Blur's recorder)
+function pickMime(){
+  const [w,h] = outSize(), big = w*h > 1920*1088;
+  const mimes = [big ? 'video/mp4;codecs=avc1.640033' : 'video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  return window.MediaRecorder && mimes.find(m => MediaRecorder.isTypeSupported(m));
+}
+async function recordFallback(){
+  const mime = pickMime();
+  if (!mime || !view.captureStream){ toast('このブラウザでは動画を書き出せません。ロスレスMOVか連番PNG（ZIP）を使ってください'); return; }
+  const fps = S.fps, [t0, t1] = exportSpan(), N = Math.max(1, Math.round((t1 - t0)*fps));
+  const session = { stop:false, wasPlaying:playing, head:playhead }; recording = session; playing = false; forceQ = 1;
+  lockExport('mp4', true);
+  const chunks = []; let stream = null, rec = null, tStart = 0;
+  try {
+    await prepareFrame(t0);
+    stream = view.captureStream(0); const track = stream.getVideoTracks()[0];
+    rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond:24e6 });
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(r => rec.onstop = r);
+    rec.start(200);
+    const raf = () => new Promise(r => requestAnimationFrame(r));
+    tStart = performance.now();
+    for (let i=0;i<N && !session.stop;i++){
+      await raf(); while (performance.now() < tStart + i*1000/fps - 4 && !session.stop) await raf();
+      playhead = t0 + i/fps; await prepareFrame(playhead); syncBar();
+      track.requestFrame && track.requestFrame();
+      $('mp4').textContent = `■ 中止 ${i+1}/${N}`;
+    }
+    while (performance.now() < tStart + N*1000/fps && !session.stop) await raf();
+    await raf();
+    if (rec.state === 'recording' && rec.requestData) rec.requestData();
+    if (rec.state !== 'inactive') rec.stop(); await stopped;
+    stream.getTracks().forEach(tr => tr.stop());
+    if (!session.stop){
+      const blob = new Blob(chunks, { type:mime.split(';')[0] });
+      if (!blob.size) toast('録画データが空でした');
+      else {
+        await saveFile(blob, `${baseName()}_${fps}fps.${mime.startsWith('video/mp4') ? 'mp4' : 'webm'}`);
+        const took = (performance.now() - tStart)/1000;
+        if (took > (t1 - t0)*1.15) toast(`描画が追いつかず、実際より長い動画（約${took.toFixed(1)}秒）になりました。ロスレスMOVか連番PNGなら正確です`);
+      }
+    }
+  } catch(e){
+    try { if (rec && rec.state !== 'inactive') rec.stop(); } catch(_){}
+    if (stream) stream.getTracks().forEach(tr => tr.stop());
+    toast('動画の書き出しを開始できませんでした');
+  }
+  recording = null; forceQ = null; playing = session.wasPlaying; playhead = session.head; dirty = sceneDirty = true;
+  lockExport('mp4', false); $('mp4').textContent = labels.mp4; syncBar();
+  if (session.stop) toast('書き出しを中止しました');
+}
 
 /* ============ settings file ============ */
 $('cfgSave').addEventListener('click', () => saveFile(new Blob([JSON.stringify(S, null, 2)], { type:'application/json' }), `u19-tile-scroll-settings-${stamp()}.json`));
@@ -1319,7 +1372,7 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); au
   $('alpha').addEventListener('change', e => { S.alpha = e.target.checked; changed('alpha'); });
   $('size').addEventListener('change', e => { S.size = e.target.value; changed('size'); });
   $('angleReset').addEventListener('click', () => { S.angle = 15; S.scale = 100; S.start = 0; changed('angle'); });
-  if (inClaude){ $('mov').classList.add('hide'); $('exHint').textContent += ' ロスレスMOVはMOTION LAB版で使えます。'; }
+  if (inClaude){ $('mov').classList.add('hide'); $('zip').classList.add('primary'); $('exHint').textContent += ' ここ（Claude上）では自作のMOVを保存できない仕様のため、ロスレスMOVはMOTION LAB版（bats5020.github.io/motion-lab）で使ってください。'; }
   if (!Array.isArray(S.kf) || !Array.isArray(S.ikf)) autoKeys();
   bindTimeline(); bindKeys(); syncUI();
   compile(); uploadAtlas(await buildAtlas());
