@@ -527,7 +527,8 @@ uniform vec3 uBg, uFg;
 uniform vec2 uDir, uProj;                 // wipe direction (screen, y down), projection min & 1/extent
 uniform float uFrontIn, uFrontOut, uSoft, uJitter, uUnderB;
 uniform int uEdge, uOut;                  // edge: 0 line, 1 block, 2 column, 3 thermal · out: 0 composite, 1 tiles only
-uniform float uTWarp, uTRim, uTSmear, uTLead, uTime, uPre;
+uniform float uTWarp, uTRim, uTSmear, uTLead, uTime, uPre, uFrSp;
+uniform vec4 uFr;                         // frame heat fronts: grow-in, cool-in, grow-out, cool-out
 out vec4 o;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
@@ -639,10 +640,15 @@ void main(){
     }
     // frame heat: black at the very edge → violet → white → yellow → orange, fading into the picture.
     // It grows as the wipe starts, sits over the tiles while they come into focus, then cools away.
-    if (uPre > 0.){
-      float sd = clamp(sOf(p), 0., 1.);
-      float bw = uTLead * uPre * (1. + .6*(1. - sd));              // thicker on the side the wipe comes from
-      float bh = clamp(1. - (bd + (n + .6*nb)*.045*uPre) / max(bw, 1e-4), 0., 1.);
+    // the frame heat travels along the frame from the corner the wipe starts at (bottom-right by default)
+    // to the opposite corner, and cools away in the same order — on the way in and on the way out
+    float sd = clamp(sOf(p), 0., 1.);
+    float aIn  = smoothstep(0., 1., clamp((uFr.x - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.y - sd)/uFrSp, 0., 1.)));
+    float aOut = smoothstep(0., 1., clamp((uFr.z - sd)/uFrSp, 0., 1.)) * (1. - smoothstep(0., 1., clamp((uFr.w - sd)/uFrSp, 0., 1.)));
+    float amt = max(aIn, aOut);
+    if (amt > 0.001){
+      float bw = uTLead * amt * (1. + .6*(1. - sd));               // thicker on the side the wipe comes from
+      float bh = clamp(1. - (bd + (n + .6*nb)*.045*amt) / max(bw, 1e-4), 0., 1.);
       float vw = smoothstep(0., .5, bh);
       vec3 vc = heat(.15 + .85*pow(bh, 2.2));                       // mostly orange/yellow, violet & black only at the very edge
       float na = oa + vw*(1. - oa);
@@ -711,7 +717,7 @@ function compile(){
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  ['uTex','uA','uB','uLut','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  ['uTex','uA','uB','uLut','uRes','uCenterPx','uBase','uRot','uPxPerFig','uScroll','uBlur','uInv','uAlpha','uTaps','uBg','uFg','uDir','uProj','uFrontIn','uFrontOut','uSoft','uJitter','uUnderB','uEdge','uOut','uTWarp','uTRim','uTSmear','uTLead','uTime','uPre','uFr','uFrSp'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
 }
 function makeTex(unit, mip){
   const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -778,10 +784,16 @@ function render(t, q){
   gl.uniform1f(U.uUnderB, t >= cutTime() ? 1 : 0);
   gl.uniform1i(U.uEdge, S.edge === 'line' ? 0 : S.edge === 'block' ? 1 : S.edge === 'column' ? 2 : 3);
   gl.uniform1f(U.uTWarp, S.twarp/100); gl.uniform1f(U.uTRim, S.trim/100); gl.uniform1f(U.uTSmear, S.tsmear/100); gl.uniform1f(U.uTLead, S.tlead/100); gl.uniform1f(U.uTime, tc);
-  { const wi = wInD(), wo = wOutD(), e0 = tc, e1 = S.trans - tc;
-    const envIn  = clamp01(e0 / (wi*.2)) * (1 - clamp01((e0 - wi*.32) / (wi*.26)));
-    const envOut = clamp01((wo*.58 - e1) / (wo*.26)) * clamp01(e1 / (wo*.2));   // mirror of the entry
-    gl.uniform1f(U.uPre, th ? Math.max(envIn, envOut) : 0); }
+  { // frame heat fronts in wipe units (0 = start corner … 1 = far corner); each sweeps 0 → 1 + spread
+    const wi = wInD(), wo = wOutD(), sp = 0.3, f = u => clamp01(u) * (1 + sp);
+    const ease = u => 1 - Math.pow(1 - clamp01(u), 2);
+    const gIn  = f(ease(tc / (wi*.38)));
+    const cIn  = f((tc - wi*.30) / (wi*.48));
+    const xs = S.trans - wo;                                         // exit starts
+    const gOut = f(ease((tc - xs - wo*.05) / (wo*.38)));
+    const cOut = f((tc - xs - wo*.45) / (wo*.5));
+    gl.uniform4f(U.uFr, th ? gIn : 0, th ? cIn : 0, th ? gOut : 0, th ? cOut : 0);
+    gl.uniform1f(U.uFrSp, sp); gl.uniform1f(U.uPre, 0); }
   gl.uniform1i(U.uOut, S.out === 'tiles' ? 1 : 0);
   if (S.out !== 'tiles'){
     const hasVid = scenes.A.kind === 'video' || scenes.B.kind === 'video';
