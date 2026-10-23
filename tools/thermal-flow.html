@@ -1410,7 +1410,7 @@ function paletteButton(p,cls){
   b.append(ramp,label);b.addEventListener('click',()=>setPalette(p));return b;
 }
 function buildQuickUI(){
-  ['基準サーモ','ニュートラル','基準','ダークサーマル'].forEach(name=>{
+  ['基準サーモ','ニュートラル','基準','ダークサーマル','U19','U19 ミラー','U19 アイス'].forEach(name=>{
     $('#quickPalettes').appendChild(paletteButton(LUT_PRESETS.find(p=>p.name===name),'palette-card'));
   });
   UI.quickDirection=mkSel('グラデの方向',[
