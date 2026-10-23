@@ -40,11 +40,12 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 
 ## シーン（案件用のアニメーション）
 
-ツールではなく、案件のFigmaを組んだ完成形のアニメーション。`scenes/` に単体HTMLで置く（ハブのカードには出さない）。Adobe Fontsのキット（`yhz3hqi`）は登録ドメインの `bats5020.github.io` で表示される。
+ツールではなく、案件のFigmaを組んだ完成形のアニメーション。`scenes/` に単体HTMLで置く。映像などの素材があるものはフォルダにして `index.html` と同梱（ハブのカードには出さない）。Adobe Fontsのキット（`yhz3hqi`）は登録ドメインの `bats5020.github.io` で表示される。
 
 | シーン | 何か |
 |---|---|
 | [U19 Registration Deadline](scenes/u19-registration-deadline.html) | U19eスポーツ選手権2026「エントリー期限」（Figma 992:11263）。HUDが立ち上がり、3.4秒で枠が中央の線から開いて、Thermal Flowの背景（8秒ループ）とコピーが見える。クリック／Rキーで再生し直し |
+| [U19 ECS HUD Sequence](scenes/u19-ecs-hud-sequence/) | U19 ECS のHUDが立ち上がり、3.4秒で中央の線から映像ウィンドウ（角丸、試合映像3.9秒）が開く元のシーケンス。映像はフォルダ内の mp4／webm。クリック／Rキーで再生し直し |
 
 各ツールの左下の **◆ MOTION LAB** ピルからハブに戻れます。Egg Glassは `@` で編集UIと一緒に非表示になります。
 
