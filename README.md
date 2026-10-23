@@ -34,6 +34,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [Word Switcher](tools/word-switcher.html) | motion | 単語／SVGを切り替えるモーショングラフィック |
 | [Warp Type](tools/warp-type.html) | motion | テキストをノイズで歪ませるジェネレーター。プリセット・PNG／WebM書き出し |
 | [U19 Aberration](tools/u19-aberration.html) | motion | ロゴ・テキスト輪郭のサーモグロー。背景合成・ループWebM書き出し |
+| [U19 Tile Scroll](tools/u19-tile-scroll.html) | motion | FigmaのHUDの組みで流れるU19ロゴタイル。巡航と急加速の緩急（スピードカーブ）、加速に合わせた色の反転、配色・角度・大きさ・モーションブラー（シャッター角）を調整。AE風タイムライン、連番PNG（ZIP）／ロスレスMOV／MP4書き出し、透過対応 |
 | [Flame Transition](tools/flame-transition.html) | motion | サーモカラーの炎で画面を覆ってシーンA→Bへ切り替えるトランジション（WebGL）。渦・一方向・両側から、映像同士／ロゴ出し、U19系の配色、タイムライン、炎だけの透過レイヤー、ロスレスMOV／MP4（[設計メモ](docs/flame-transition.md)） |
 | [Wireframe](tools/wireframe.html) | motion | ジオメトリックなワイヤーフレーム系モーショングラフィック |
 
