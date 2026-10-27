@@ -73,10 +73,23 @@ button.rec-on{border-color:#ff4f5c;color:#ff4f5c}
 #seed-label{display:block;text-align:center;font-size:10px;color:var(--faint);letter-spacing:.12em;margin-top:8px}
 .note{font-size:10px;color:var(--faint);margin:4px 0 2px;line-height:1.6}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/type-shape.css">
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<script src="../shared/editor-history.js"></script>
+<script src="../shared/numeric-input.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-type-shape.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench" data-ml-editor="ascii-wave" data-ml-graphics="2d">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<header class="ml-toolbar ml-type-toolbar" id="ml-tool-toolbar"><div id="ml-home-mount"></div><div class="ml-document"><strong>ASCII Wave</strong><span class="ml-context">BACKGROUND / TEXTURE</span></div><div class="ml-toolbar-actions"><span class="ml-local-note">ブラウザ内で処理</span><button class="ml-button ml-primary" id="ml-export-jump">書き出し ↗</button></div></header>
 <div id="app">
+  <aside id="ml-type-rail" aria-label="プリセットと開始方法"><div class="ml-type-rail-head">BACKGROUND / TEXTURE</div><div id="ml-type-rail-content"></div><div class="ml-type-guide"><b>START HERE</b><p>文字の波でつくる背景。<br>プリセットから始め、右の設定で調整。</p><p>作品の見た目はプレビューに反映されます。書き出しは右上から。</p></div></aside>
   <main id="stage">
     <div id="topbar">
       <h1>ASCII WAVE</h1>
@@ -840,5 +853,7 @@ syncUI();
 rebuildAll();
 requestAnimationFrame(tick);
 </script>
+<script src="../shared/type-shape-workbench.js"></script>
+<script src="../shared/type-shape-history.js"></script>
 </body>
 </html>

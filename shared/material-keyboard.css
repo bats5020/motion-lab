@@ -1,0 +1,5 @@
+.ml-material .ml-material-history-note{font:10px/1.7 var(--ml-ui);color:#9aa3b0;margin:14px;padding-top:12px;border-top:1px solid #373d45}
+.ml-material .ml-toolbar .ml-history-actions button{padding:0;width:27px;min-width:27px;font-size:17px;line-height:1}
+.ml-material .prow>.ml-number-wrap{flex:0 0 66px}.ml-material .prow input[type=range]{min-width:0}
+.ml-material .ctl .top>.ml-number-wrap{margin-left:auto}
+@media(max-width:600px){.ml-material .ml-document{flex:1;min-width:0}.ml-material .ml-document strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ml-material .ml-toolbar{gap:7px}.ml-material .ml-toolbar .ml-history-actions{gap:2px;margin:0}.ml-material .ml-toolbar .ml-history-actions button{width:23px;min-width:23px}.ml-material .ml-toolbar-actions{gap:4px}}

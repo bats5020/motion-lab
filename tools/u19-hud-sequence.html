@@ -1,4 +1,18 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<link rel="stylesheet" href="../shared/editor-history.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/numeric-input.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/motion-keyboard.css" data-ml-keyboard>
+<script src="../shared/editor-history.js" data-ml-keyboard></script>
+<script src="../shared/numeric-input.js" data-ml-keyboard></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-motion.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
+</head><body class="ml-workbench ml-motion-workbench" data-ml-motion="u19-hud-sequence">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"></div><div class="ml-document"><strong>U19 HUD Sequence</strong><span class="ml-context">映像を差し替えて、HUDをつくる</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <title>U19 HUD Sequence — MOTION LAB</title>
 <link rel="stylesheet" href="../shared/tokens.css">
@@ -598,80 +612,68 @@
   }
   const stamp = () => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
 
+/* QA_FIX_BEGIN:hud-export-single-flight */
   async function exportMp4() {
-    if (EX.on) { EX.stop = true; return; }
-    if (!window.gsap) { toast('アニメーションの読み込みに失敗しているため書き出せません'); return; }
-    const cfg = await pickMp4Config(W, H, FPS);
-    let mime = null;
-    if (!cfg) {
-      mime = window.MediaRecorder && ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
-      if (!mime || !cv.captureStream) { toast('このブラウザでは動画を書き出せません（Chrome / Edge を使ってください）'); return; }
-    }
-    if (clip.readyState < 1) await new Promise((r) => { clip.addEventListener('loadedmetadata', r, { once: true }); setTimeout(r, 4000); });
-    // frame-exact seeking needs a seekable source; servers without range requests give none → load the clip into memory once
-    if (!clip.src.startsWith('blob:') && !(clip.seekable.length && clip.seekable.end(0) >= clip.duration - 0.05)) {
-      exBtn.textContent = '映像を読み込み中…';
-      try {
-        const blob = await (await fetch(clip.currentSrc)).blob();
-        const ready = new Promise((r) => { clip.addEventListener('loadeddata', r, { once: true }); setTimeout(r, 8000); });
-        clip.src = URL.createObjectURL(blob); clip.load(); await ready;
-      } catch (e) { toast('映像を読み込めませんでした：' + ((e && e.message) || e)); exBtn.textContent = '● MP4を書き出す'; return; }
-    }
-    const dur = 3.4 + (Number.isFinite(clip.duration) ? clip.duration : 3.87) + 0.5;
-    const N = Math.round(dur * FPS);
-    Object.assign(EX, { on: true, stop: false, t: 0, tcAt: null, clipAt: null });
-    exBtn.classList.add('rec');
-    const g = gsap.globalTimeline; g.pause();
-    boot();
-    const g0 = mt.startTime();
-    const samples = []; let desc = null, encErr = null, encoder = null, rec = null, track = null, chunks = [], stopped = null;
-    if (cfg) {
-      encoder = new VideoEncoder({ output: (chunk, meta) => { if (!desc && meta && meta.decoderConfig && meta.decoderConfig.description) desc = new Uint8Array(meta.decoderConfig.description); const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({ data: b, key: chunk.type === 'key', ts: chunk.timestamp }); }, error: (e) => { encErr = e; } });
-      encoder.configure(cfg);
-    } else {
-      const stream = cv.captureStream(0); track = stream.getVideoTracks()[0];
-      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 24e6 });
-      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-      stopped = new Promise((r) => (rec.onstop = r)); rec.start(200);
-    }
-    const tStart = performance.now();
-    let ok = true;
-    try {
-      for (let i = 0; i < N; i++) {
-        if (EX.stop) { ok = false; break; }
-        await stepTo(g0, i / FPS);
-        if (encoder) {
-          if (encErr) throw encErr;
-          const frame = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
-          encoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 }); frame.close();
-          while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 2));
-        } else {
-          while (performance.now() < tStart + i * 1000 / FPS) await new Promise((r) => requestAnimationFrame(r));
-          track.requestFrame && track.requestFrame();
-        }
-        exBtn.textContent = `■ 中止 ${i + 1}/${N}`;
-        if (i % 2 === 0) await new Promise((r) => setTimeout(r, 0));
+    if(EX.pending||EX.on){if(EX.pending)EX.pending.cancelled=true;EX.stop=true;exBtn.textContent='中止を待っています…';return;}
+    if(!window.gsap){toast('アニメーションの読み込みに失敗しているため書き出せません');return;}
+    const job={cancelled:false};EX.pending=job;EX.stop=false;exBtn.classList.add('rec');exBtn.textContent='■ 準備中（中止）';
+    mlHudHistory?.refresh();
+    let g=null,encoder=null,rec=null,stream=null,track=null,stopped=null;
+    try{
+      const cfg=await pickMp4Config(W,H,FPS);let mime=null;
+      if(job.cancelled)return;
+      if(!cfg){mime=window.MediaRecorder&&['video/mp4;codecs=avc1.640028','video/mp4','video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));if(!mime||!cv.captureStream)throw Error('このブラウザでは動画を書き出せません（Chrome / Edge を使ってください）');}
+      if(clip.readyState<1)await new Promise(r=>{clip.addEventListener('loadedmetadata',r,{once:true});setTimeout(r,4000);});
+      if(job.cancelled)return;
+      if(!clip.src.startsWith('blob:')&&!(clip.seekable.length&&clip.seekable.end(0)>=clip.duration-0.05)){
+        exBtn.textContent='映像を読み込み中…（中止できます）';
+        const blob=await(await fetch(clip.currentSrc)).blob();if(job.cancelled)return;
+        const ready=new Promise(r=>{clip.addEventListener('loadeddata',r,{once:true});setTimeout(r,8000);});
+        clip.src=URL.createObjectURL(blob);clip.load();await ready;
       }
-    } catch (err) { ok = false; toast('書き出しに失敗しました：' + ((err && err.message) || err)); }
-    try {
-      if (encoder) { await encoder.flush(); encoder.close(); }
-      else { if (rec.state !== 'inactive') rec.stop(); await stopped; track.stop(); }
-    } catch (e) { encErr = encErr || e; }
-    Object.assign(EX, { on: false, tcAt: null, clipAt: null });
-    exBtn.classList.remove('rec'); exBtn.textContent = '● MP4を書き出す';
-    g.resume(); play();
-    if (EX.stop) { EX.stop = false; toast('書き出しを中止しました'); return; }
-    if (!ok) return;
-    const name = `u19-hud-sequence-${stamp()}_${FPS}fps`;
-    if (encoder) {
-      if (encErr || !desc || !samples.length) { toast('MP4の書き出しに失敗しました' + (encErr ? '：' + encErr.message : '')); return; }
-      await saveFile(makeMp4(samples, desc, W, H, FPS), name + '.mp4');
-    } else {
-      const blob = new Blob(chunks, { type: mime.split(';')[0] });
-      if (!blob.size) { toast('録画データが空でした'); return; }
-      await saveFile(blob, name + (mime.startsWith('video/mp4') ? '.mp4' : '.webm'));
+      if(job.cancelled)return;
+      const dur=3.4+(Number.isFinite(clip.duration)?clip.duration:3.87)+0.5,N=Math.round(dur*FPS);
+      Object.assign(EX,{on:true,stop:false,t:0,tcAt:null,clipAt:null});
+      g=gsap.globalTimeline;g.pause();boot();const g0=mt.startTime();
+      const samples=[];let desc=null,encErr=null;const chunks=[];
+      if(cfg){
+        encoder=new VideoEncoder({output:(chunk,meta)=>{if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description)desc=new Uint8Array(meta.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==='key',ts:chunk.timestamp});},error:e=>{encErr=e;}});encoder.configure(cfg);
+      }else{
+        stream=cv.captureStream(0);track=stream.getVideoTracks()[0];rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:24e6});
+        rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};stopped=new Promise(r=>rec.onstop=r);rec.start(200);
+      }
+      const tStart=performance.now();let ok=true;
+      for(let i=0;i<N;i++){
+        if(EX.stop){ok=false;break;}
+        await stepTo(g0,i/FPS);
+        if(encoder){
+          if(encErr)throw encErr;
+          const frame=new VideoFrame(cv,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+          try{encoder.encode(frame,{keyFrame:i%(FPS*2)===0});}finally{frame.close();}
+          while(encoder.encodeQueueSize>6&&!EX.stop&&!encErr)await new Promise(r=>setTimeout(r,2));
+        }else{
+          while(performance.now()<tStart+i*1000/FPS&&!EX.stop)await new Promise(r=>requestAnimationFrame(r));
+          if(!EX.stop)track.requestFrame&&track.requestFrame();
+        }
+        exBtn.textContent=`■ 中止 ${i+1}/${N}`;if(i%2===0)await new Promise(r=>setTimeout(r,0));
+      }
+      if(encoder){await encoder.flush();if(encErr)throw encErr;}
+      else{if(rec.state!=='inactive')rec.stop();await stopped;}
+      if(EX.stop||job.cancelled||!ok)return;
+      const name=`u19-hud-sequence-${stamp()}_${FPS}fps`;
+      if(encoder){if(!desc||!samples.length)throw Error('MP4のエンコード結果が空でした');await saveFile(makeMp4(samples,desc,W,H,FPS),name+'.mp4');}
+      else{const blob=new Blob(chunks,{type:mime.split(';')[0]});if(!blob.size)throw Error('録画データが空でした');await saveFile(blob,name+(mime.startsWith('video/mp4')?'.mp4':'.webm'));}
+    }catch(err){if(!job.cancelled)toast('書き出しに失敗しました：'+((err&&err.message)||err));}
+    finally{
+      try{if(encoder&&encoder.state!=='closed')encoder.close();}catch(_){}
+      try{if(rec&&rec.state!=='inactive')rec.stop();}catch(_){}
+      try{if(stream)for(const t of stream.getTracks()){try{t.stop();}catch(_){}}}catch(_){}
+      const cancelled=job.cancelled||EX.stop;Object.assign(EX,{on:false,stop:false,pending:null,tcAt:null,clipAt:null});
+      exBtn.classList.remove('rec');exBtn.textContent='● MP4を書き出す';
+      if(g){try{g.resume();}catch(_){}try{play();}catch(_){}}mlHudHistory?.refresh();if(cancelled)toast('書き出しを中止しました');
     }
   }
+/* QA_FIX_END:hud-export-single-flight */
   exBtn.addEventListener('click', (e) => { e.stopPropagation(); exportMp4(); });
 
   /* ---------- swap the footage ---------- */
@@ -684,29 +686,45 @@
   }
   clip.addEventListener('loadedmetadata', showInfo);
   if (clip.readyState >= 1) showInfo();
-  async function setClip(file) {
-    if (EX.on) { toast('書き出し中は差し替えできません'); return; }
-    if (!file || !/^video\//.test(file.type || 'video/')) { toast('動画ファイルを選んでください'); return; }
-    const url = URL.createObjectURL(file);
-    const ok = await new Promise((res) => {
-      const done = (v) => { clip.removeEventListener('loadeddata', onOk); clip.removeEventListener('error', onErr); res(v); };
-      const onOk = () => done(true), onErr = () => done(false);
-      clip.addEventListener('loadeddata', onOk); clip.addEventListener('error', onErr);
-      clip.src = url; clip.load();
-    });
-    if (!ok) { URL.revokeObjectURL(url); toast('この動画は読み込めませんでした（MP4 / WebM / MOV(H.264) を試してください）'); resetClip(true); return; }
-    if (userURL) URL.revokeObjectURL(userURL);
-    userURL = url; clipName = file.name; resetBtn.disabled = false; showInfo();
-    toast(`${file.name} に差し替えました`); play();
+/* ML_KEYBOARD_BEGIN:media-history */
+
+  let mlHudFile=null,mlHudLoading=false,mlHudHistory=null;
+  const mlHudLoad=()=>new Promise((resolve,reject)=>{
+    let timer;const clean=()=>{clearTimeout(timer);clip.removeEventListener('loadeddata',ok);clip.removeEventListener('error',bad);};
+    const ok=()=>{clean();resolve();},bad=()=>{clean();reject(Error('動画を読み込めませんでした'));};
+    clip.addEventListener('loadeddata',ok,{once:true});clip.addEventListener('error',bad,{once:true});timer=setTimeout(bad,15000);clip.load();
+  });
+  async function mlHudApply(file,{history=true,quiet=false}={}){
+/* QA_FIX_BEGIN:hud-export-media-lock */
+    if(EX.on||EX.pending||mlHudLoading)throw Error('処理が終わってから差し替えてください');
+/* QA_FIX_END:hud-export-media-lock */
+    if(file&&!/^video\//.test(file.type||'video/'))throw Error('動画ファイルを選んでください');
+    if(history)mlHudHistory?.begin('映像を差し替え');
+    const previousURL=userURL,previousName=clipName,previousFile=mlHudFile;
+    const url=file?URL.createObjectURL(file):null;mlHudLoading=true;mlHudHistory?.refresh();
+    try{
+      if(url)clip.src=url;else clip.removeAttribute('src');
+      await mlHudLoad();
+      userURL=url;mlHudFile=file;clipName=file?file.name:'u19-window.mp4（最初の映像）';
+      resetBtn.disabled=!file;showInfo();if(!quiet)toast(file?`${file.name} に差し替えました`:'最初の映像に戻しました');play();
+      if(previousURL)URL.revokeObjectURL(previousURL);
+    }catch(error){
+      if(url)URL.revokeObjectURL(url);
+      if(previousURL)clip.src=previousURL;else clip.removeAttribute('src');
+      clip.load();userURL=previousURL;clipName=previousName;mlHudFile=previousFile;resetBtn.disabled=!previousFile;showInfo();
+      throw error;
+    }finally{mlHudLoading=false;if(history)mlHudHistory?.commit();mlHudHistory?.refresh();}
   }
-  function resetClip(quiet) {
-    if (EX.on) return;
-    if (userURL) { URL.revokeObjectURL(userURL); userURL = null; }
-    clip.removeAttribute('src'); clip.load();
-    clipName = 'u19-window.mp4（最初の映像）'; resetBtn.disabled = true;
-    if (!quiet) { toast('最初の映像に戻しました'); clip.addEventListener('loadeddata', () => play(), { once: true }); }
-  }
-  pickBtn.addEventListener('click', () => fileIn.click());
+  async function setClip(file){if(!file)return;try{await mlHudApply(file);}catch(error){toast(error.message);}}
+  async function resetClip(quiet){try{await mlHudApply(null,{quiet});}catch(error){toast(error.message);}}
+  if(window.MLEditorHistory)mlHudHistory=MLEditorHistory.register({name:'U19 HUD Sequence',autoEvents:false,maxEntries:12,
+/* QA_FIX_BEGIN:hud-export-history-busy */
+    capture:()=>({file:mlHudFile}),equals:(a,b)=>a.file===b.file,isBusy:()=>EX.on||!!EX.pending||mlHudLoading,
+/* QA_FIX_END:hud-export-history-busy */
+    restore:s=>mlHudApply(s.file,{history:false,quiet:true})
+  });
+
+/* ML_KEYBOARD_END:media-history */  pickBtn.addEventListener('click', () => fileIn.click());
   fileIn.addEventListener('change', () => { if (fileIn.files[0]) setClip(fileIn.files[0]); fileIn.value = ''; });
   resetBtn.addEventListener('click', () => resetClip(false));
   $('#replayBtn').addEventListener('click', () => { if (!EX.on) play(); });
@@ -730,8 +748,94 @@
   const clipReady = new Promise((r) => { if (clip.readyState >= 3) r(); else { clip.addEventListener('canplaythrough', r, { once: true }); clip.addEventListener('error', r, { once: true }); setTimeout(r, 4000); } });
   Promise.all([fontsReady, clipReady]).then(() => (reduce ? showFinal() : play()));
   vp.addEventListener('click', () => { if (!EX.on) play(); });
-  addEventListener('keydown', (e) => { if (!EX.on && (e.key === 'r' || e.key === 'R')) play(); });
+/* ML_KEYBOARD_BEGIN:replay-keyboard */
+  addEventListener('keydown', (e) => { if(e.defaultPrevented||e.isComposing||e.keyCode===229||window.MLEditorHistory?.isEditableTarget(e.target))return; if (!EX.on && !mlHudLoading && !e.metaKey && !e.ctrlKey && (e.key === 'r' || e.key === 'R')) play(); });
+/* ML_KEYBOARD_END:replay-keyboard */
 })();
 </script>
 
+
+<script data-ml-shell="motion">
+
+/* Additive workbench presentation. The original rendering/export script is unchanged. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const app=byId('app');
+  const header=byId('mlMotionToolbar');
+  const home=byId('mlab-home');
+  if(home){home.textContent='↖ MOTION LAB';home.classList.add('ml-home');header.querySelector('.ml-motion-home').append(home);}
+  const rail=document.createElement('aside');rail.id='mlMotionSources';rail.className='ml-motion-sources';rail.setAttribute('aria-label','素材とルック');
+  rail.innerHTML='<div class="ml-motion-eyebrow">SOURCE / 素材</div>';
+  function move(target,...nodes){nodes.filter(Boolean).forEach(node=>target.append(node));}
+  function title(text){const h=document.createElement('div');h.className='ml-motion-eyebrow';h.textContent=text;return h;}
+  function labelControls(root=document){
+    root.querySelectorAll('.prow,.field').forEach(row=>{
+      const label=row.querySelector(':scope > label,:scope > span:first-child');if(!label)return;
+      const text=label.textContent.trim();if(!text)return;
+      row.querySelectorAll('input,select,textarea').forEach(control=>{
+        if(control.hasAttribute('aria-label')||control.labels?.length)return;
+        control.setAttribute('aria-label',text);
+      });
+    });
+    root.querySelectorAll('button[title]').forEach(button=>{if(!button.hasAttribute('aria-label')&&button.textContent.trim().length<4)button.setAttribute('aria-label',button.title);});
+  }
+  function jumpTo(node){
+    if(!node)return;
+    if(node.matches('details'))node.open=true;
+    const details=node.closest('details');if(details)details.open=true;
+    node.classList.remove('collapsed');
+    node.scrollIntoView({block:'nearest',behavior:'auto'});
+    const control=node.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)');if(control)control.focus({preventScroll:true});
+  }
+  function tabs(panel,groups){
+    const nav=document.createElement('nav');nav.className='ml-motion-tabs';nav.setAttribute('aria-label','設定パネル');
+    const wrappers={};
+    for(const [key,label,nodes] of groups){
+      const button=document.createElement('button');button.type='button';button.className='ml-motion-tab';button.dataset.motionTab=key;button.textContent=label;
+      nav.append(button);
+      const group=document.createElement('div');group.className='ml-motion-group';group.id='ml-motion-'+key;wrappers[key]=group;move(group,...nodes);panel.append(group);
+    }
+    panel.prepend(nav);
+    const select=key=>{
+      for(const [name,group]of Object.entries(wrappers))group.hidden=name!==key;
+      nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.motionTab===key)));
+      panel.scrollTop=0;
+    };
+    nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)select(b.dataset.motionTab);});
+    select(groups[0][0]);return select;
+  }
+  function unsupported(stage,message,ids){
+    const note=document.createElement('div');note.className='ml-motion-capability ml-capability';note.setAttribute('role','status');
+    const strong=document.createElement('strong');strong.textContent='この環境ではプレビューできません';
+    const text=document.createElement('p');text.textContent=message;
+    const help=document.createElement('small');help.textContent='設定やファイルは変更されていません。対応ブラウザで同じページを開いてください。';
+    note.append(strong,text,help);stage.append(note);
+    document.body.classList.add('ml-render-unavailable');
+    ids.forEach(id=>{const el=byId(id);if(el){el.disabled=true;el.title=message;}});
+    const exportJump=byId('mlMotionExport');if(exportJump){exportJump.disabled=true;exportJump.title=message;}
+  }
+
+  const panel=byId('panel'),sections=[...panel.querySelectorAll(':scope > section')];
+  panel.querySelector('header').classList.add('ml-legacy-title');
+  const intro=title('WORKFLOW / 作業の流れ');panel.prepend(intro);
+  sections[0].querySelector('h2').textContent='01 — 映像を選ぶ';sections[1].querySelector('h2').textContent='02 — 確認して書き出す';
+  const strip=document.createElement('ol');strip.className='ml-hud-sequence';strip.setAttribute('aria-label','シーケンスの構成');
+  [['01','HUD','3.4秒'],['02','差し替え映像','選んだ動画の長さ'],['03','余韻','0.5秒']].forEach(([n,name,time])=>{const li=document.createElement('li');li.innerHTML='<span>'+n+'</span><strong>'+name+'</strong><small>'+time+'</small>';strip.append(li);});
+  byId('preview').append(strip);
+  byId('mlMotionExport').onclick=()=>jumpTo(sections[1]);
+  const note=document.createElement('p');note.className='ml-motion-tip';note.textContent='このツールは完成済みのHUDに映像を差し替える専用エディタです。HUD自体の形や順番は固定です。';panel.append(note);
+  if(typeof window.gsap==='undefined')unsupported(byId('stageArea'),'アニメーションライブラリを読み込めませんでした。接続を確認してページを再読み込みしてください。',['exBtn','replayBtn','pickBtn','resetBtn']);
+  else if(!('VideoEncoder' in window)){
+    // The original exporter can fall back to MediaRecorder; do not disable that supported route.
+    const canRecord=!!(window.MediaRecorder&&document.createElement('canvas').captureStream&&['video/mp4;codecs=avc1.640028','video/mp4','video/webm;codecs=vp9','video/webm'].some(type=>MediaRecorder.isTypeSupported(type)));
+    const note=document.createElement('p');note.className='ml-motion-tip';note.setAttribute('role','status');
+    note.textContent=canRecord?'WebCodecs が使えないため、このブラウザに対応した録画方式・形式で書き出します。':'このブラウザは動画書き出しに対応していません。プレビューは利用できます。';sections[1].append(note);
+    if(!canRecord){byId('exBtn').disabled=true;byId('mlMotionExport').disabled=true;}
+  }
+
+  labelControls();
+  // Native resize listeners keep the original preview fitting its new workspace.
+  window.dispatchEvent(new Event('resize'));
+})();
+</script>
 </body></html>

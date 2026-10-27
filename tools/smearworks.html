@@ -81,8 +81,24 @@ button.danger.armed{background:#c62828;border-color:#c62828;color:#fff}
 #modal p{margin:0;font-size:12.5px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/material-workbench.css">
+<script src="../shared/workbench.js"></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/material-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/material-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-material" data-material-tool="smearworks">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
 <div id="stage">
@@ -664,9 +680,15 @@ $('#presetFile').addEventListener('change', async e => {
     const j = JSON.parse(await f.text());
     const list = (Array.isArray(j) ? j : j.presets || [j]).filter(validPreset);
     if(!list.length) throw new Error('empty');
+/* ML_KEYBOARD_BEGIN */
+    window.MLMaterialKeyboard?.history.begin('プリセットを読み込み');
+/* ML_KEYBOARD_END */
     let added = 0, replaced = 0;
     list.forEach(p => { const i = presets.findIndex(q => q.name === p.name); if(i >= 0){ presets[i] = p; replaced++; } else { presets.push(p); added++; } });
     storePresets(); renderPresets(null);
+/* ML_KEYBOARD_BEGIN */
+    window.MLMaterialKeyboard?.history.commit();
+/* ML_KEYBOARD_END */
     toast(`読み込みました（追加 ${added}件${replaced ? `・同名を上書き ${replaced}件` : ''}）`);
   } catch { toast('読み込めませんでした。Smearworksで書き出したJSONを選んでください'); }
 });
@@ -700,6 +722,9 @@ function useImage(img, opts = {}){
   const s = Math.min(1, Math.min(6000, MAXTEX)/Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
   let im = img;
   if(s < 1){ im = document.createElement('canvas'); im.width = Math.round(img.naturalWidth*s); im.height = Math.round(img.naturalHeight*s); im.getContext('2d').drawImage(img, 0, 0, im.width, im.height); }
+/* ML_KEYBOARD_BEGIN */
+  queueMicrotask(()=>window.MLMaterialKeyboard?.boundary('写真の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
   upload(im);
   Object.assign(S, {zoom:1, ox:.5, oy:.5}, opts);
   cropRect(); sync(); fit(); schedule();
@@ -743,6 +768,11 @@ async function save(filename, blob){
   setTimeout(() => URL.revokeObjectURL(url), 4000); toast('保存しました');
 }
 $('#export').addEventListener('click', async () => {
+/* ML_KEYBOARD_BEGIN */
+  if(window.MLMaterialKeyboard?.exportBusy)return;
+  if(window.MLMaterialKeyboard){window.MLMaterialKeyboard.exportBusy=true;window.MLMaterialKeyboard.history.refresh();}
+  try{
+/* ML_KEYBOARD_END */
   const r = cropRect(), cw = r[2]*srcW, ch = r[3]*srcH, long = Math.max(cw, ch);
   const target_ = Math.min(4096, MAXTEX, Math.max(2000, long)), k = target_/long;
   const w = Math.round(cw*k), h = Math.round(ch*k);
@@ -758,6 +788,9 @@ $('#export').addEventListener('click', async () => {
   const blob = await new Promise(res => c.toBlob(res, 'image/png'));
   $('#toast').hidden = true;
   save(`${name}-smear-${w}x${h}.png`, blob);
+/* ML_KEYBOARD_BEGIN */
+  }finally{if(window.MLMaterialKeyboard){window.MLMaterialKeyboard.exportBusy=false;window.MLMaterialKeyboard.history.refresh();}}
+/* ML_KEYBOARD_END */
 });
 
 /* ───── boot：埋め込みサンプル（プレビュー版のみ）があればそれを使う ───── */
@@ -768,7 +801,30 @@ if(window.SW_SAMPLE){
   img.src = window.SW_SAMPLE;
   upload(drawnSample()); sync(); fit();
 } else { upload(drawnSample()); sync(); fit(); draw(); overlay(); }
+/* ML_KEYBOARD_BEGIN */
+window.MLMaterialModel={
+  name:'Smearworks',tool:'smearworks',
+  capture:()=>({values:clone(S),gradient:clone(G),gradients:clone(GRADS),presets:clone(presets),presetName:$('#presetName').value,presetSelection:$('#presetSel').value}),
+  restore:s=>{
+    const savedChanged=JSON.stringify(presets)!==JSON.stringify(s.presets);
+    S=clone(s.values);G=clone(s.gradient);GRADS=clone(s.gradients);presets=clone(s.presets);
+    drag=null;dragging=false;sliding=false;ov.classList.remove('dragging');
+    buildLut(G);cropRect();sync();fit();schedule();
+    if(savedChanged)storePresets();renderPresets(s.presetSelection);
+    $('#presetName').value=s.presetName;updateSaveLabel();
+  },
+  isBusy:()=>!!window.MLMaterialKeyboard?.exportBusy,
+  rangeEntries:()=>[...document.querySelectorAll('input[type=range]')].map(range=>{
+    const key=range.dataset.k,gradientKey=range.dataset.g;
+    const scale=key&&!['zoom','con'].includes(key)||gradientKey==='off'?100:1;
+    const suffix=scale===100?'%':key==='zoom'||key==='con'||gradientKey==='spread'?'×':gradientKey==='ang'?'°':'';
+    return {range,readout:document.querySelector(`output[data-o="${range.id}"]`),scale,suffix,label:range.getAttribute('aria-label')||document.querySelector(`label[for="${range.id}"]`)?.textContent||range.id,
+      getValue:()=>key?S[key]:G[gradientKey],setValue:v=>{if(key)S[key]=v;else G[gradientKey]=v;if(key==='zoom')cropRect();sync();schedule();}};
+  })
+};
+/* ML_KEYBOARD_END */
 })();
 </script>
+<script src="../shared/material-workbench.js"></script>
 </body>
 </html>

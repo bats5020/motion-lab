@@ -1,0 +1,36 @@
+{
+  "image-switcher": {
+    "checkpoint": "function checkpoint(){undoStack.push(snapshot());if(undoStack.length>30)undoStack.shift();redoStack=[];syncHistory()}",
+    "number-handlers": " for(const id of ['holdN','transitionN','width','height','firstHold','lastHold','enterTime','exitTime'])$('#'+id).onchange=e=>{if(busy)return;checkpoint();const key=id.endsWith('N')?id.slice(0,-1):id;config=normalizeConfig({...config,[key]:Number(e.target.value)});preset='';refresh(false)};",
+    "sync-numbers": "function refresh(reset=true){if(reset)time=0;renderer=createRenderer(config,decodedItems(),view);time=Math.min(time,renderer.duration);if(!assets.some(a=>a.enabled))playing=false;syncUI();renderAssets();resize();draw();}",
+    "history-vars": "const images=new Map(),view=$('#view');",
+    "integration": "",
+    "busy-status": "function setBusy(value,dialog=true){busy=value;$('#settings').inert=value;$('#transport').inert=value;$('#filmstrip').inert=value;document.querySelector('.topbar').inert=value;$('#exportBar').inert=value;syncHistory();if(dialog){if(value){cancelled=false;$('#progress').value=0;$('#exportMessage').textContent='準備しています…';$('#exportDialog').showModal()}else $('#exportDialog').close()}if(!value)syncUI()}"
+  },
+  "word-switcher": {
+    "sync-numbers": "function syncUI(){\n  $('#animType').value=state.anim.type;",
+    "integration": ""
+  },
+  "u19-tile-scroll": {
+    "history-var": "let saveT = 0;",
+    "sync-numbers": "  syncUI(); drawTimeline(); persist(); dirty = true;",
+    "value-editor": "      pv.addEventListener('click', () => {\n        const inp = document.createElement('input'); inp.type = 'text'; inp.value = S[key];\n        inp.style.cssText = 'width:52px;flex:0 0 52px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:10px var(--mono);padding:1px 3px;text-align:right';\n        pv.replaceWith(inp); inp.focus(); inp.select();\n        let closed = false;\n        const done = ok => { if (closed) return; closed = true; if (ok){ const n = parseFloat(inp.value); if (!isNaN(n)){ S[key] = Math.min(max, Math.max(min, n)); changed(key); } } inp.replaceWith(pv); syncUI(); };\n        inp.addEventListener('keydown', e => { if (e.key==='Enter') done(true); if (e.key==='Escape') done(false); e.stopPropagation(); });\n        inp.addEventListener('blur', () => done(true), { once:true });\n      });",
+    "integration": "",
+    "media-video": "scenes[which] = { kind:'video', el:v, name:file.name };",
+    "media-image": "scenes[which] = { kind:'image', el:i, name:file.name };"
+  },
+  "flame-transition": {
+    "history-vars": "const HIST=[], REDO=[]; let histArmed=true, histStable=null, histLast=0;",
+    "history-grouping": "  const now=JSON.stringify(S); if(histStable===null){ histStable=now; return; } if(now===histStable) return;",
+    "keyboard-guard": "  const mod=e.metaKey||e.ctrlKey;\n  if(mod&&e.code===\"KeyZ\")",
+    "redo-text-guard": "  if(mod&&e.code===\"KeyY\"){ e.preventDefault(); redo(); return; }",
+    "sync-numbers": "  dirtyPal=true; buildPresets(); syncDirUI(); drawSamples(); playhead=Math.min(playhead,totalDur()); layoutTrack(); render(playhead); syncBar();",
+    "integration": "",
+    "media-boundary": "function loadFile(key,file){\n  if(!file) return;\n  const isVid=file.type.startsWith(\"video/\")||/\\.(mov|mp4|webm|m4v)$/i.test(file.name);\n  if(!isVid&&!file.type.startsWith(\"image/\")) return toast(\"画像または動画ファイルを選んでください\");\n  const sc=scenes[key];\n  if(isVideo(sc)) sc.media.pause();\n  if(sc.url) URL.revokeObjectURL(sc.url);\n  const url=URL.createObjectURL(file); sc.url=url;\n  const done=el=>{ sc.media=el; sc.name=file.name; $(\"name\"+key).textContent=file.name; sc.redraw=true; layoutTrack(); syncVideos(true); if(!playing) render(playhead); toast(`シーン${key}を差し替えました`); };\n  if(isVid){\n    const v=document.createElement(\"video\"); v.src=url; v.muted=true; v.loop=false; v.playsInline=true; v.preload=\"auto\";\n    v.addEventListener(\"loadeddata\",()=>done(v),{once:true});\n    v.addEventListener(\"error\",()=>toast(\"この動画は読み込めませんでした（H.264のMP4かWebMを試してください）\"),{once:true});\n  }else{\n    const im=new Image(); im.onload=()=>done(im); im.onerror=()=>toast(\"画像を読み込めませんでした\"); im.src=url;\n  }\n}",
+    "media-reset-boundary": "$(\"resetScenes\").onclick=()=>{\n  for(const key of [\"A\",\"B\"]){ const sc=scenes[key]; if(isVideo(sc)) sc.media.pause(); if(sc.url) URL.revokeObjectURL(sc.url); sc.media=null; sc.url=null; sc.redraw=true; $(\"name\"+key).textContent=\"サンプル\"; }"
+  },
+  "u19-hud-sequence": {
+    "media-history": "  async function setClip(file) {\n    if (EX.on) { toast('書き出し中は差し替えできません'); return; }\n    if (!file || !/^video\\//.test(file.type || 'video/')) { toast('動画ファイルを選んでください'); return; }\n    const url = URL.createObjectURL(file);\n    const ok = await new Promise((res) => {\n      const done = (v) => { clip.removeEventListener('loadeddata', onOk); clip.removeEventListener('error', onErr); res(v); };\n      const onOk = () => done(true), onErr = () => done(false);\n      clip.addEventListener('loadeddata', onOk); clip.addEventListener('error', onErr);\n      clip.src = url; clip.load();\n    });\n    if (!ok) { URL.revokeObjectURL(url); toast('この動画は読み込めませんでした（MP4 / WebM / MOV(H.264) を試してください）'); resetClip(true); return; }\n    if (userURL) URL.revokeObjectURL(userURL);\n    userURL = url; clipName = file.name; resetBtn.disabled = false; showInfo();\n    toast(`${file.name} に差し替えました`); play();\n  }\n  function resetClip(quiet) {\n    if (EX.on) return;\n    if (userURL) { URL.revokeObjectURL(userURL); userURL = null; }\n    clip.removeAttribute('src'); clip.load();\n    clipName = 'u19-window.mp4（最初の映像）'; resetBtn.disabled = true;\n    if (!quiet) { toast('最初の映像に戻しました'); clip.addEventListener('loadeddata', () => play(), { once: true }); }\n  }\n",
+    "replay-keyboard": "  addEventListener('keydown', (e) => { if (!EX.on && (e.key === 'r' || e.key === 'R')) play(); });"
+  }
+}

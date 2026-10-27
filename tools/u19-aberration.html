@@ -95,10 +95,23 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
   #panel{flex:1;width:100%;border-left:none;border-top:1px solid var(--line)}
 }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/type-shape.css">
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<script src="../shared/editor-history.js"></script>
+<script src="../shared/numeric-input.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-type-shape.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench" data-ml-editor="u19-aberration" data-ml-graphics="webgl">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<header class="ml-toolbar ml-type-toolbar" id="ml-tool-toolbar"><div id="ml-home-mount"></div><div class="ml-document"><strong>U19 Aberration</strong><span class="ml-context">TYPE / LOGO</span></div><div class="ml-toolbar-actions"><span class="ml-local-note">ブラウザ内で処理</span><button class="ml-button ml-primary" id="ml-export-jump">書き出し ↗</button></div></header>
 <div id="app">
+  <aside id="ml-type-rail" aria-label="プリセットと開始方法"><div class="ml-type-rail-head">TYPE / LOGO</div><div id="ml-type-rail-content"></div><div class="ml-type-guide"><b>START HERE</b><p>ロゴ・文字のサーモグロー。<br>プリセットから始め、右の設定で調整。</p><p>作品の見た目はプレビューに反映されます。書き出しは右上から。</p></div></aside>
   <main id="stage">
     <canvas id="view" width="608" height="1080"></canvas>
     <div id="recbadge"><i></i>REC <span id="rectime"></span></div>
@@ -410,18 +423,18 @@ gl.activeTexture(gl.TEXTURE0);
 const U19_LOGO_SVG='<svg width="765" height="316" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 765.45 316.29"><g><g><g><g><g><path d="M272.61,170.84c-5.03,7.67-10.3,15.21-17.53,21.2-44.09,36.54-119.39,38.01-166.63,4.12-23.18-16.63-36.9-39.5-37.55-64.26l-.02-125.2,69.65-.03.02,113.85c.68,17.39,9.14,33.44,24.33,45.87,33.88,27.74,90.4,29.77,127.73,4.43Z"/><path d="M287.64,116.52c.05,23.08-15.15,43.67-41.53,53.89-27.19,10.53-60.41,7.59-83.02-7.48,19.61,3.76,38.4,1.29,53.85-7.99,13.7-8.24,22.82-21.07,22.83-35.44V6.71s47.65,0,47.65,0l.23,109.82Z"/><path d="M35.23,132.39c2,51.63,52.14,93.5,119.95,99.67C72.77,237.48.2,187.41.13,123.75L0,6.72l35.22-.05.02,125.72Z"/><path d="M224.18,119.83c-.53,15.32-14.09,27.85-32.21,31.67-19.31,4.07-39.72-2.12-50.07-15.95,10.2,2.16,20.16,1.48,28.85-3.3,7.34-4.04,13.37-11.01,13.37-18.86l.06-106.75,40.01.09v113.09Z"/></g></g><g><path d="M381.43,4.92c-6.36,0-13.59,0-20.24-.29-11.28,14.17-29.2,28.05-46.84,36.14.87,9.83,4.05,25.15,4.05,72.28s-.29,76.91-.58,108.43c17.93-.58,30.65-.58,42.21-.58s22.55.29,39.61.58c-.87-31.23-1.16-62.45-1.16-108.43s.29-79.8,1.16-108.43c-4.05.29-10.7.29-18.22.29Z"/><path d="M591.1,0c-115.65,0-163.36,31.23-163.36,76.62,0,40.48,40.77,61.87,138.5,61.87,55.51,0,100.62-6.36,125.49-27.47l1.16.58c-.87,6.07-1.45,11.28-2.02,15.32-4.91,34.41-34.7,45.68-101.49,45.68s-84.72-7.81-84.72-21.11v-1.73c-10.41,1.16-24.58,1.45-40.48,1.45s-28.63-.29-39.61-1.45v5.78c0,41.35,34.41,70.55,164.23,70.55,100.62,0,176.66-28.91,176.66-110.16S704.15,0,591.1,0ZM583.58,96.57c-61.01,0-77.78-6.07-77.78-20.82s25.73-21.69,86.74-21.69,85.01,6.07,85.01,21.69-28.05,20.82-93.97,20.82Z"/></g></g><g><path d="M97.44,244.93c-.09,2.03-.18,5.25-.18,8.11s0,6.27.18,8.2c-19.17-.09-53.84-.18-71.08-.18v10.6c19.91,0,54.67,0,70.06-.28-.09,3.6-.18,10.97-.09,14.84-15.12-.18-50.24-.37-69.97-.37v10.79c17.24,0,53.1-.09,71.08-.18-.18,2.21-.18,5.72-.18,8.94,0,2.95,0,6.36.18,8.67H0c.37-9.4.37-19.82.37-34.57s0-25.26-.37-34.57h97.44Z"/><path d="M130.84,291.49c0,4.7,5.99,6.55,27.93,6.55,24.15,0,27.2-1.57,27.2-4.52,0-3.13-1.66-4.7-30.7-5.62-39.18-1.29-49.6-7.74-49.6-22.03,0-15.21,13.83-23.14,51.26-23.14,39.82,0,52.36,4.98,52.36,21.02,0,1.38,0,2.77-.09,4.33-2.77-.18-7.65-.28-12.35-.28s-9.77.09-12.54.28v-1.75c0-4.7-3.32-6.27-27.75-6.27-22.49,0-25.81,1.38-25.81,4.15s1.75,3.96,32.63,5.53c36.6,1.84,47.85,7.19,47.85,22.68s-12.81,23.88-52.18,23.88-53.93-6.73-53.93-20.74c0-1.66.09-3.41.37-5.25,3.23.37,8.11.65,12.72.65s9.13-.09,12.63-.28v.83Z"/><path d="M306.79,272.41c0-7.01-9.68-9.77-32.08-9.77-24.43.65-33.92,4.42-33.92,15.86s10.42,16.96,35.03,16.96c23.23,0,30.97-3.32,30.97-9.68v-2.03c4.24.18,8.48.18,12.72.18s8.48,0,12.72-.18c0,1.01.09,2.12.09,3.13,0,16.78-12.17,28.67-56.51,28.67s-61.03-10.97-61.03-36.51c0-26.92,23.42-35.58,59.92-35.58s57.34,4.33,57.34,26.09c0,1.38-.09,2.95-.18,4.42-4.15-.18-8.39-.18-12.54-.18s-8.3,0-12.54.18v-1.57Z"/><path d="M364.31,273.97c-2.3-.18-7.93-.28-12.72-.28s-9.4.09-12.17.28c-.09-1.38-.18-2.67-.18-3.96,0-20.37,19.91-26.46,49.97-26.46,32.63,0,48.03,8.39,48.03,23.42,0,12.81-6.82,17.42-43.42,20.83-24.8,2.3-30.61,3.23-31.71,6.55,13.55.09,29.96-.18,39.18-.18,13,0,24.61-.18,34.75-.37-.09,3.13-.18,7.93-.18,12.35,0,3.32,0,6.36.18,7.93h-97.35c.09-1.47.18-3.96.18-6.55,0-1.75-.09-4.24-.09-6.08,0-17.33,14.57-20.28,43.42-24.15,25.9-3.5,30.15-4.24,30.15-9.5,0-4.7-6.18-7.1-22.68-7.1-19.36,0-25.35,2.86-25.35,10.88v2.4Z"/><path d="M496.04,316.29c-34.94,0-56.6-11.25-56.6-37.7s23.51-35.86,56.7-35.86,57.25,9.4,57.25,35.86-22.49,37.7-57.34,37.7ZM465.07,279.04c0,12.45,12.45,17.52,31.34,17.52s31.34-5.53,31.34-17.52-12.45-17.15-31.34-17.15-31.34,4.79-31.34,17.15Z"/><path d="M581.68,273.97c-2.3-.18-7.93-.28-12.72-.28s-9.4.09-12.17.28c-.09-1.38-.18-2.67-.18-3.96,0-20.37,19.91-26.46,49.97-26.46,32.63,0,48.03,8.39,48.03,23.42,0,12.81-6.82,17.42-43.42,20.83-24.8,2.3-30.61,3.23-31.71,6.55,13.55.09,29.96-.18,39.18-.18,13,0,24.61-.18,34.75-.37-.09,3.13-.18,7.93-.18,12.35,0,3.32,0,6.36.18,7.93h-97.35c.09-1.47.18-3.96.18-6.55,0-1.75-.09-4.24-.09-6.08,0-17.33,14.57-20.28,43.42-24.15,25.9-3.5,30.15-4.24,30.15-9.5,0-4.7-6.18-7.1-22.68-7.1-19.36,0-25.35,2.86-25.35,10.88v2.4Z"/><path d="M680.31,280.15c7.93-6.73,22.31-8.76,40.01-8.76,31.16,0,44.16,6.82,44.16,19.73,0,14.47-14.01,24.43-47.94,24.43-38.72,0-59.74-11.06-59.74-36.97s25.07-35.12,58.35-35.12c38.63,0,48.86,9.31,48.86,22.49v1.84c-3.5-.37-7.37-.46-12.63-.46s-9.59.09-12.91.46v-.55c0-4.24-4.06-6.73-23.51-6.73-22.59,0-32.82,3.6-34.39,14.57-.18,1.29-.37,2.95-.65,4.89l.37.18ZM739.59,291.4c0-4.7-5.99-6.64-24.8-6.64-21.3,0-29.96,1.84-29.96,6.64s8.85,6.91,29.96,6.91c18.35,0,24.8-2.21,24.8-6.91Z"/></g></g></g></svg>';
 function logoDefaultURL(){return'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(U19_LOGO_SVG)}
 /* 背景画像 */
-let _bgImg=null;
-function setBgFromURL(url){
+/* ML_KEYBOARD_BEGIN */let mlBgRevision=0,mlLogoRevision=0;/* ML_KEYBOARD_END */let _bgImg=null;
+function setBgFromURL(url){/* ML_KEYBOARD_BEGIN */const mlAssetRevision=++mlBgRevision,mlNotify=!!window.MLTypeShapeHistory;window.MLTypeShapeHistory?.assetBegin("background");/* ML_KEYBOARD_END */
   const im=new Image();
-  im.onload=()=>{_bgImg=im};
-  im.onerror=()=>toast('背景画像を読み込めませんでした');
+  /* ML_KEYBOARD_BEGIN original-base64:aW0ub25sb2FkPSgpPT57X2JnSW1nPWltfTs= */im.onload=()=>{if(mlAssetRevision!==mlBgRevision)return;_bgImg=im;if(mlNotify)window.MLTypeShapeHistory?.assetEnd("background",true)};/* ML_KEYBOARD_END */
+  /* ML_KEYBOARD_BEGIN original-base64:aW0ub25lcnJvcj0oKT0+dG9hc3QoJ+iDjOaZr+eUu+WDj+OCkuiqreOBv+i+vOOCgeOBvuOBm+OCk+OBp+OBl+OBnycpOw== */im.onerror=()=>{if(mlAssetRevision!==mlBgRevision)return;if(mlNotify)window.MLTypeShapeHistory?.assetEnd("background",false);toast('背景画像を読み込めませんでした')};/* ML_KEYBOARD_END */
   im.src=url;
 }
 let _logoImg=null;
-function setLogoFromURL(url){
+function setLogoFromURL(url){/* ML_KEYBOARD_BEGIN */const mlAssetRevision=++mlLogoRevision,mlNotify=!!window.MLTypeShapeHistory;window.MLTypeShapeHistory?.assetBegin("logo");/* ML_KEYBOARD_END */
   const im=new Image();
-  im.onload=()=>{_logoImg=im;rebuildSDF()};
-  im.onerror=()=>toast('画像を読み込めませんでした');
+  /* ML_KEYBOARD_BEGIN original-base64:aW0ub25sb2FkPSgpPT57X2xvZ29JbWc9aW07cmVidWlsZFNERigpfTs= */im.onload=()=>{if(mlAssetRevision!==mlLogoRevision)return;_logoImg=im;rebuildSDF();if(mlNotify)window.MLTypeShapeHistory?.assetEnd("logo",true)};/* ML_KEYBOARD_END */
+  /* ML_KEYBOARD_BEGIN original-base64:aW0ub25lcnJvcj0oKT0+dG9hc3QoJ+eUu+WDj+OCkuiqreOBv+i+vOOCgeOBvuOBm+OCk+OBp+OBl+OBnycpOw== */im.onerror=()=>{if(mlAssetRevision!==mlLogoRevision)return;if(mlNotify)window.MLTypeShapeHistory?.assetEnd("logo",false);toast('画像を読み込めませんでした')};/* ML_KEYBOARD_END */
   im.src=url;
 }
 /* ロゴを白マスク化して目的サイズちょうどでラスタライズ(SVGはベクターから直接描画されるため常にシャープ) */
@@ -884,13 +897,13 @@ function deepAssign(dst,src){
 }
 /* ============ UI widgets ============ */
 function fmtv(v){return String(Math.round(v*10)/10)}
-function mkRange(lbl,min,max,st,val,cb){
+function mkRange(lbl,min,max,st,val,cb){/* ML_KEYBOARD_BEGIN */let mlValue=Number(val);/* ML_KEYBOARD_END */
   const row=ce('div','prow');
   const inp=document.createElement('input');inp.type='range';inp.min=min;inp.max=max;inp.step=st;inp.value=val;
   const pv=ce('span','pv',fmtv(val));
-  inp.addEventListener('input',()=>{pv.textContent=fmtv(+inp.value);cb(+inp.value)});
+  /* ML_KEYBOARD_BEGIN original-base64:aW5wLmFkZEV2ZW50TGlzdGVuZXIoJ2lucHV0JywoKT0+e3B2LnRleHRDb250ZW50PWZtdHYoK2lucC52YWx1ZSk7Y2IoK2lucC52YWx1ZSl9KTs= */inp.addEventListener('input',()=>{mlValue=+inp.value;pv.textContent=fmtv(mlValue);cb(mlValue)});/* ML_KEYBOARD_END */
   row.append(ce('span',null,lbl),inp,pv);
-  return{row,set:v=>{inp.value=v;pv.textContent=fmtv(+v)}};
+  /* ML_KEYBOARD_BEGIN original-base64:cmV0dXJue3JvdyxzZXQ6dj0+e2lucC52YWx1ZT12O3B2LnRleHRDb250ZW50PWZtdHYoK3YpfX07 */return{row,getValue:()=>mlValue,write:v=>{mlValue=v;inp.value=v;pv.textContent=fmtv(v);cb(v)},set:v=>{mlValue=+v;inp.value=v;pv.textContent=fmtv(+v)}};/* ML_KEYBOARD_END */
 }
 function mkSeg(opts,val,cb){
   const seg=ce('div','seg');
@@ -1079,7 +1092,7 @@ function buildThermo(){
       th.src='logo';syncThermo();
       toast('ロゴ画像を読み込みました');
     };
-    rd.readAsDataURL(f);
+    /* ML_KEYBOARD_BEGIN */window.MLTypeShapeHistory?.assetBegin("logo");rd.onerror=()=>window.MLTypeShapeHistory?.assetEnd("logo",false);/* ML_KEYBOARD_END */rd.readAsDataURL(f);
   });
   rsBtn.addEventListener('click',()=>{
     localStorage.removeItem('u19ab_logo');
@@ -1102,7 +1115,7 @@ function buildThermo(){
       th.bg='image';syncThermo();
       toast('背景画像を読み込みました');
     };
-    rd.readAsDataURL(f);
+    /* ML_KEYBOARD_BEGIN */window.MLTypeShapeHistory?.assetBegin("background");rd.onerror=()=>window.MLTypeShapeHistory?.assetEnd("background",false);/* ML_KEYBOARD_END */rd.readAsDataURL(f);
   });
   bgRs.addEventListener('click',()=>{
     localStorage.removeItem('u19ab_bg');
@@ -1292,5 +1305,7 @@ if(location.hash.startsWith('#p=')){
 }
 requestAnimationFrame(t=>{lastFrame=t;loop(t)});
 </script>
+<script src="../shared/type-shape-workbench.js"></script>
+<script src="../shared/type-shape-history.js"></script>
 </body>
 </html>

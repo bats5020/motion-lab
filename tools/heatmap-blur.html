@@ -119,14 +119,48 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
   #tl{flex:1 1 100%;order:5}
 }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/editor.css">
+<script src="../shared/workbench.js"></script>
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<script src="../shared/editor-history.js"></script>
+<script src="../shared/numeric-input.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-material-native.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="workbench ml-workbench">
+<header id="workbenchTop">
+  <div id="workbenchBrand"></div><span class="wb-divider"></span>
+  <div class="wb-document"><strong>Heatmap Blur</strong><span id="workspaceName">Type / Logo</span></div>
+  <div class="wb-top-actions">
+    <button id="wbUndo" class="wb-button wb-icon" title="取り消す（⌘ / Ctrl Z）" aria-label="取り消す">↶</button>
+    <button id="wbRedo" class="wb-button wb-icon" title="やり直す（⌘ / Ctrl Shift Z）" aria-label="やり直す">↷</button>
+    <span class="wb-local">● ブラウザ内で処理</span>
+    <button id="wbExport" class="wb-button wb-primary">書き出し <span aria-hidden="true">↗</span></button>
+  </div>
+</header>
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
 <div id="app">
+  <aside id="libraryPanel" aria-label="ソースとルック">
+    <div class="wb-rail-title">WORKSPACE <span>01</span></div>
+    <nav class="wb-workspaces" aria-label="作業の種類">
+      <button data-workspace="type">Type / Logo <span>文字・ロゴ</span></button>
+      <button data-workspace="media">Image / Video <span>画像・動画</span></button>
+    </nav>
+    <div class="wb-rail-title">SOURCE</div><div id="sourceMount"></div>
+    <div class="wb-rail-title wb-looks-title">COLOR LOOKS <span>12</span></div><div id="lookMount"></div>
+    <p class="wb-rail-note">ソース → ルック → 調整<br>素材はサーバーに送信されません。</p>
+  </aside>
   <div id="stageWrap">
+    <div class="wb-stage-head"><span id="canvasLabel">COMPOSITION / TYPE</span><span data-ml-live>LIVE PREVIEW <i></i></span></div>
     <div id="stage">
-      <canvas id="view"></canvas>
+      <canvas id="view" aria-label="作品のプレビュー"></canvas>
+      <div id="mediaEmpty" hidden><span class="wb-empty-icon">↥</span><h2>素材から、つくる。</h2><p>画像や動画を読み込んで<br>色とブラーを重ねます。</p><button class="wb-button wb-primary" id="emptyUpload">素材を読み込む</button><small>PNG / JPG / SVG · MP4 / WebM / MOV</small></div>
       <div id="meta"></div>
     </div>
     <div id="bar">
@@ -146,7 +180,9 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
     </div>
   </div>
 
-  <aside id="panel">
+  <aside id="panel" aria-label="調整パネル">
+    <div class="wb-inspector-title">INSPECTOR <span id="inspectorSource">Text</span></div>
+    <div id="inspectorTabs" aria-label="調整する内容"><button data-tab="edit" aria-pressed="true">編集</button><button data-tab="motion" aria-pressed="false">モーション</button><button data-tab="save" aria-pressed="false">保存</button></div>
     <header>
       <h1>HEATMAP <em>BLUR</em></h1>
       <p>4点グラデのブラーマップで文字を部分的にぼかし、輝度をヒートマップ配色に置き換えるループ。</p>
@@ -325,7 +361,8 @@ textarea:focus,select:focus,input[type=text]:focus{outline:none;border-color:var
 <input type="file" id="fileVid" accept="video/*,.mov,.mp4,.webm">
 <input type="file" id="fileLF" accept=".ttf,.otf,.woff,.woff2" style="display:none">
 <input type="file" id="fileFont" accept=".ttf,.otf,.woff,.woff2">
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="exportDialog" aria-labelledby="exportTitle"><div class="wb-dialog-head"><div><span>EXPORT</span><h2 id="exportTitle">作品を書き出す</h2></div><button id="exportClose" class="wb-button wb-icon" aria-label="書き出しを閉じる">×</button></div><div id="exportMount"></div></dialog>
 
 <script>
 "use strict";
@@ -1223,7 +1260,7 @@ function bindTimeline(){
 
 /* ---------- 取り消し／やり直し（⌘Z／⌘⇧Z） ---------- */
 const HIST=[], REDO=[]; let histArmed=true, histStable=null, histLast=0;
-function commitHist(){ // 操作のまとまり（ドラッグ1回・キー操作1回・入力の区切り）ごとに、変更前の状態を積む
+function commitHist(){ /* ML_KEYBOARD_BEGIN:revision */window.mlHeatmapRevision=(window.mlHeatmapRevision||0)+1;/* ML_KEYBOARD_END:revision */ // 操作のまとまり（ドラッグ1回・キー操作1回・入力の区切り）ごとに、変更前の状態を積む
   const now=JSON.stringify(S); if(histStable===null){ histStable=now; return; } if(now===histStable) return;
   if(histArmed||performance.now()-histLast>1000){ HIST.push(histStable); if(HIST.length>200) HIST.shift(); REDO.length=0; histArmed=false; }
   histStable=now; histLast=performance.now();
@@ -1405,6 +1442,7 @@ function updateSrcUI(fromUser){
   $("kctl").classList.remove("hide"); $("kmarks").classList.remove("hide");
   drawRuler(); drawKeys();
   recLabel();
+  document.dispatchEvent(new Event("workbench:source"));
 }
 function recLabel(){
   const vid=S.src==="video";
@@ -1439,7 +1477,7 @@ $("cover").checked=S.cover; $("cover").addEventListener("change",()=>{ S.cover=$
 $("imgUp").onclick=()=>$("fileImg").click();
 $("fileImg").addEventListener("change",e=>{
   const file=e.target.files[0]; if(!file) return; const url=URL.createObjectURL(file); const img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.cover=false; $("cover").checked=false; /* 画像（ロゴ・SVGなど）は大きさを変えられる表示で始める */ S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); };
+  img.onload=()=>{ URL.revokeObjectURL(url); userImage=img; userImageAlpha=detectAlpha(img); S.cover=false; $("cover").checked=false; /* 画像（ロゴ・SVGなど）は大きさを変えられる表示で始める */ S.src="image"; setSrcSeg(); updateSrcUI(); changed("src"); toast("画像を読み込みました"); /* ML_KEYBOARD_BEGIN:asset-boundary */window.MLHeatmapHistory?.reset("画像を変更したため、ここから新しい履歴を開始します");/* ML_KEYBOARD_END:asset-boundary */ };
   img.onerror=()=>{ URL.revokeObjectURL(url); toast("画像を読み込めませんでした"); }; img.src=url; e.target.value="";
 });
 let userImageAlpha=false;
@@ -1532,6 +1570,9 @@ function adoptVideo(v,file,url){
   S.cover=true; $("cover").checked=true; S.src="video"; setSrcSeg(); playing=true; v.currentTime=0; updateSrcUI(); changed("src"); changed("len"); videoDirty=true;
   v.play().catch(()=>{});
   toast("動画を読み込みました"+note);
+/* ML_KEYBOARD_BEGIN:asset-boundary */
+  window.MLHeatmapHistory?.reset("動画を変更したため、ここから新しい履歴を開始します");
+/* ML_KEYBOARD_END:asset-boundary */
 }
 $("fileVid").addEventListener("change",async e=>{
   const file=e.target.files[0]; e.target.value=""; if(!file) return;
@@ -1599,7 +1640,7 @@ function buildPts(){
 function syncValAll(){ const avg=S.vals.reduce((a,b)=>a+b,0)/S.vals.length; $("valAll").value=avg; $("valAllPv").textContent=Math.round(avg*100); }
 $("valAll").addEventListener("input",()=>{
   const v=parseFloat($("valAll").value); S.vals=S.vals.map(()=>v);
-  $("pts").querySelectorAll("input").forEach(el=>{ el.value=v; el.nextElementSibling.textContent=Math.round(v*100); });
+  $("pts").querySelectorAll(/* ML_KEYBOARD_BEGIN:range-filter */"input[type=range]"/* ML_KEYBOARD_END:range-filter */).forEach(el=>{ el.value=v; el.nextElementSibling.textContent=Math.round(v*100); });
   $("valAllPv").textContent=Math.round(v*100); kfEdit("vals"); changed("vals");
 });
 buildPts();
@@ -1851,6 +1892,153 @@ fontsThen();
 requestAnimationFrame(t=>{ lastNow=t; loop(t); });
 // テスト・外部操作用
 window.HMB={get state(){return S}, seek:t=>seekTo(t), undo:()=>undo(), redo:()=>redo(), sel:()=>[...SEL].map(k=>S.kf.indexOf(k)), set:(k,v)=>{S[k]=v;changed(k);}, render:(t,q)=>{render(t,q);}, pause:()=>{playing=false}, keys:()=>KEYS, rebuild:()=>{dirtySrc=true;dirtyLUT=true;}};
+/* ML_KEYBOARD_BEGIN:integration */
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!window.MLEditorHistory||document.body.dataset.graphicsStatus==='unavailable')return;
+  let gesture=null;
+  const finish=cancel=>{
+    if(!gesture)return;const before=gesture;gesture=null;
+    const after=JSON.stringify(S),changedRevision=(window.mlHeatmapRevision||0)!==before.revision;
+    HIST.splice(0,HIST.length,...before.past);REDO.splice(0,REDO.length,...before.future);
+    if(cancel)restoreState(before.state);
+    else if(changedRevision&&before.state!==after){HIST.push(before.state);if(HIST.length>60)HIST.shift();REDO.length=0;}
+    histStable=JSON.stringify(S);histArmed=true;
+  };
+  const controller=MLEditorHistory.register({name:'Heatmap Blur',toolbar:false,isBusy:()=>!!recording,native:{
+    begin(){gesture={state:JSON.stringify(S),past:HIST.slice(),future:REDO.slice(),revision:window.mlHeatmapRevision||0};},
+    commit(){finish(false);},cancel(){finish(true);},undo,redo,
+    canUndo:()=>HIST.length>0,canRedo:()=>REDO.length>0,
+    reset(){HIST.length=0;REDO.length=0;gesture=null;histStable=JSON.stringify(S);histArmed=true;}
+  }});
+  window.MLHeatmapHistory=controller;
+  for(const [id,action]of [['wbUndo','undo'],['wbRedo','redo']]){
+    const button=$(id);button.dataset.mlHistory='true';button.onclick=()=>controller[action]();
+  }
+  controller.subscribe(c=>{$('wbUndo').disabled=!c.canUndo;$('wbRedo').disabled=!c.canRedo;document.dispatchEvent(new Event('workbench:source'));});
+  for(const id of Object.keys(fmt)){
+    const inp=$(id),scale=['pth','goo'].includes(id)?100:1;
+    MLNumberInputs.bind({range:inp,readout:inp.parentElement.querySelector('.pv'),label:inp.getAttribute('aria-label')||id,scale,
+      suffix:['pth','stretch','lead','pthick','fit','spread'].includes(id)?'%':['skew','pangle'].includes(id)?'°':['dur','len'].includes(id)?'s':'',
+      getValue:()=>S[id],setValue:v=>{S[id]=v;inp.value=v;inp.parentElement.querySelector('.pv').textContent=fmt[id](v);kfEdit(id);changed(id);}
+    });
+  }
+  MLNumberInputs.bind({range:$('valAll'),readout:$('valAllPv'),scale:100,getValue:()=>S.vals.reduce((a,b)=>a+b,0)/S.vals.length,setValue:v=>{
+    S.vals=S.vals.map(()=>v);$('pts').querySelectorAll('input[type=range]').forEach(el=>{el.value=v;el.nextElementSibling.textContent=Math.round(v*100);});
+    syncValAll();kfEdit('vals');changed('vals');MLNumberInputs.refresh($('pts'));
+  }});
+  let pointBindings=[];
+  const bindPoints=()=>{
+    pointBindings=pointBindings.filter(b=>{if(b.range.isConnected)return true;b.destroy();return false;});
+    for(const inp of $('pts').querySelectorAll('input[type=range]')){
+      if(MLNumberInputs.getBinding(inp))continue;
+      const i=+inp.dataset.i;
+      pointBindings.push(MLNumberInputs.bind({range:inp,readout:inp.nextElementSibling,scale:100,getValue:()=>S.vals[i],setValue:v=>{
+        S.vals[i]=v;inp.value=v;inp.nextElementSibling.textContent=Math.round(v*100);syncValAll();kfEdit('vals');changed('vals');MLNumberInputs.getBinding($('valAll'))?.refresh();
+      }}));
+    }
+  };
+  bindPoints();new MutationObserver(bindPoints).observe($('pts'),{childList:true});
+  const note=document.createElement('p');note.className='wb-help';note.textContent='数値は直接入力 / ↑↓、Shiftで10倍。⌘ / Ctrl Zで取消。画像・動画の読み替えは新しい履歴の開始点になります。';$('secSource').append(note);
+});
+/* ML_KEYBOARD_END:integration */
+</script>
+
+<script>
+/* Workbench shell: presentation + entry points only; renderer/export state stays above. */
+(() => {
+  const byId = id => document.getElementById(id);
+  const panel = byId('panel');
+  const sections = [...panel.querySelectorAll(':scope > section')];
+  const sourceSection = sections[0];
+  const colorSection = byId('presets').closest('section');
+  const outputSection = byId('size').closest('section');
+  sourceSection.id = 'secSource'; colorSection.id = 'secColor';
+  panel.querySelector('header').classList.add('wb-legacy-title');
+  byId('workbenchBrand').append(byId('mlab-home'));
+  byId('mlab-home').textContent = '↖ MOTION LAB';
+  byId('sourceMount').append(byId('srcSeg'));
+  byId('lookMount').append(byId('presets'));
+  byId('exportMount').append(outputSection);
+  outputSection.querySelector('h2').hidden = true;
+  const sourceNames = {text:['Aa','テキスト'],layout:['≡','レイアウト'],image:['▧','画像'],video:['▷','動画'],flame:['≈','炎'],pattern:['▥','模様']};
+  const srcSeg = byId('srcSeg');
+  ['text','layout','image','video','flame','pattern'].forEach(key => {
+    const button = srcSeg.querySelector('[data-v="'+key+'"]');
+    const [glyph,label] = sourceNames[key];
+    button.innerHTML = '<span class="wb-source-art art-'+key+'" aria-hidden="true">'+glyph+'</span><span>'+label+'</span>';
+    button.setAttribute('aria-label',label+'ソース'); srcSeg.append(button);
+  });
+  const groups = {};
+  ['edit','motion','save'].forEach(name => {
+    const group = document.createElement('div'); group.className='inspector-group'; group.id='inspector-'+name;
+    panel.append(group); groups[name]=group;
+  });
+  [sourceSection,byId('secStretch'),byId('secBlur'),colorSection,byId('secGrain')].forEach(s=>groups.edit.append(s));
+  [byId('secMap'),byId('secAnim')].forEach(s=>groups.motion.append(s));
+  groups.save.append(byId('secPresets'));
+  function selectTab(name) {
+    Object.entries(groups).forEach(([key,group])=>group.hidden=key!==name);
+    byId('inspectorTabs').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===name)));
+    panel.scrollTop=0;
+  }
+  byId('inspectorTabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)selectTab(b.dataset.tab);});
+  selectTab('edit');
+  // Preserve every original control and add explicit accessible names.
+  document.querySelectorAll('.prow').forEach(row=>{
+    const label=row.querySelector(':scope > span:first-child');
+    if(!label)return;
+    row.querySelectorAll('input,select').forEach(input=>{if(!input.hasAttribute('aria-label'))input.setAttribute('aria-label',label.textContent.trim());});
+  });
+  byId('text').setAttribute('aria-label','テキスト');
+  byId('play').setAttribute('aria-label','再生・停止');
+  document.body.dataset.workspace=new URLSearchParams(location.search).get('workspace')==='media'?'media':'type';
+  if(!MLWorkbench.requireGraphics({canvas:'#view',context:'webgl2',stage:'#stage'})) {
+    byId('canvasLabel').textContent='PREVIEW UNAVAILABLE';
+    byId('workspaceName').textContent=document.body.dataset.workspace==='media'?'Image / Video':'Type / Logo';
+    return;
+  }
+  byId('wbUndo').onclick=()=>{undo();syncShell();};
+  byId('wbRedo').onclick=()=>{redo();syncShell();};
+  const dialog=byId('exportDialog');
+  byId('wbExport').onclick=()=>{if(!dialog.open)dialog.showModal();};
+  byId('exportClose').onclick=()=>dialog.close();
+  dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
+  let mode='type';
+  function syncShell() {
+    const media=isMedia();
+    mode=media?'media':'type';
+    document.body.dataset.workspace=mode;
+    byId('workspaceName').textContent=media?'Image / Video':'Type / Logo';
+    byId('canvasLabel').textContent='COMPOSITION / '+S.src.toUpperCase();
+    byId('inspectorSource').textContent=sourceNames[S.src]?.[1]||S.src;
+    document.querySelectorAll('[data-workspace]').forEach(b=>{if(b.tagName==='BUTTON')b.setAttribute('aria-pressed',String(b.dataset.workspace===mode));});
+    srcSeg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===S.src)));
+    byId('mediaEmpty').hidden=!(media&&!(S.src==='image'?userImage:userVideo));
+    byId('wbUndo').disabled=!HIST.length; byId('wbRedo').disabled=!REDO.length;
+  }
+  function chooseSource(source) {
+    if(recording)return toast('書き出しを停止してからソースを切り替えてください');
+    S.src=source; setSrcSeg(); updateSrcUI(false); changed('src'); syncShell(); selectTab('edit');
+  }
+  document.querySelector('.wb-workspaces').addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    const target=b.dataset.workspace;
+    if(target!==mode)chooseSource(target==='media'?'image':'text');
+  });
+  byId('emptyUpload').onclick=()=>byId(S.src==='video'?'fileVid':'fileImg').click();
+  srcSeg.addEventListener('click',()=>{syncShell();selectTab('edit');});
+  // Optional query parameter selects an entrance; never replace any saved visual settings.
+  const entry=new URLSearchParams(location.search).get('workspace');
+  if(entry==='media'&&!isMedia())chooseSource('image');
+  else if(entry==='type'&&!hasLetters())chooseSource('text');
+  syncShell();
+  // Also catch original preset imports, undo shortcuts and asynchronous media imports.
+  document.addEventListener('input',()=>queueMicrotask(syncShell));
+  document.addEventListener('change',()=>queueMicrotask(syncShell));
+  document.addEventListener('click',()=>queueMicrotask(syncShell));
+  document.addEventListener('keydown',()=>queueMicrotask(syncShell));
+  document.addEventListener('workbench:source',syncShell);
+})();
 </script>
 </body>
 </html>

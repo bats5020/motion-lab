@@ -448,14 +448,26 @@
   }
   .coach-skip:hover { color: var(--txt); }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/type-shape.css">
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<script src="../shared/editor-history.js"></script>
+<script src="../shared/numeric-input.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-type-shape.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench" data-ml-editor="wireframe" data-ml-graphics="webgl">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
  onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
 <div id="boot"><div class="mark"></div><div class="txt">LOADING ENGINE…</div></div>
 
 <div id="app">
+  <aside id="ml-type-rail" aria-label="プリセットと開始方法"><div class="ml-type-rail-head">3D / SHAPE</div><div id="ml-type-rail-content"></div><div class="ml-type-guide"><b>START HERE</b><p>線と立体のループ。<br>プリセットから始め、右の設定で調整。</p><p>作品の見た目はプレビューに反映されます。書き出しは右上から。</p></div></aside>
   <!-- TOP BAR -->
   <div id="topbar">
     <div class="brand">
@@ -821,7 +833,7 @@ function applyLang() {
    Every visual is fully described by `params`. Defaults per scene live in
    SCENE_DEFAULTS; the active set is a merge of global + scene params.
 ---------------------------------------------------------------------------- */
-const GLOBAL_DEFAULTS = {
+const GLOBAL_DEFAULTS = {/* ML_KEYBOARD_BEGIN */mlStarSeed:(Math.random()*0x100000000)>>>0,/* ML_KEYBOARD_END */
   bgColor:    "#000000",
   lineColor:  "#ffffff",
   lineWidth:  1,
@@ -1162,11 +1174,11 @@ function buildTunnel() {
   if (params.stars > 0) {
     const sg = new THREE.BufferGeometry();
     const n = Math.min(params.stars, 4000);
-    const sp = new Float32Array(n * 3);
+    const sp = new Float32Array(n * 3);/* ML_KEYBOARD_BEGIN */let mlStarState=(params.mlStarSeed??1234)>>>0;const mlStarRandom=()=>{mlStarState=(Math.imul(1664525,mlStarState)+1013904223)>>>0;return mlStarState/4294967296;};/* ML_KEYBOARD_END */
     for (let i = 0; i < n; i++) {
-      sp[i*3]   = (Math.random() - 0.5) * s * 4;
-      sp[i*3+1] = (Math.random() - 0.5) * s * 4;
-      sp[i*3+2] = -Math.random() * span;
+      sp[i*3]   = /* ML_KEYBOARD_BEGIN original-base64:KE1hdGgucmFuZG9tKCkgLSAwLjUpICogcyAqIDQ= */(mlStarRandom() - 0.5) * s * 4/* ML_KEYBOARD_END */;
+      sp[i*3+1] = /* ML_KEYBOARD_BEGIN original-base64:KE1hdGgucmFuZG9tKCkgLSAwLjUpICogcyAqIDQ= */(mlStarRandom() - 0.5) * s * 4/* ML_KEYBOARD_END */;
+      sp[i*3+2] = /* ML_KEYBOARD_BEGIN original-base64:LU1hdGgucmFuZG9tKCkgKiBzcGFu */-mlStarRandom() * span/* ML_KEYBOARD_END */;
     }
     sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
     stars = new THREE.Points(sg, new THREE.PointsMaterial({
@@ -1321,11 +1333,11 @@ function finishBox(D) {
 
   if (params.stars > 0) {
     const n = Math.min(params.stars, 4000);
-    const sp = new Float32Array(n * 3);
+    const sp = new Float32Array(n * 3);/* ML_KEYBOARD_BEGIN */let mlStarState=(params.mlStarSeed??1234)>>>0;const mlStarRandom=()=>{mlStarState=(Math.imul(1664525,mlStarState)+1013904223)>>>0;return mlStarState/4294967296;};/* ML_KEYBOARD_END */
     for (let i = 0; i < n; i++) {
-      sp[i*3]   = (Math.random() - 0.5) * W * 0.96;
-      sp[i*3+1] = (Math.random() - 0.5) * H * 0.96;
-      sp[i*3+2] = -Math.random() * D;
+      sp[i*3]   = /* ML_KEYBOARD_BEGIN original-base64:KE1hdGgucmFuZG9tKCkgLSAwLjUpICogVyAqIDAuOTY= */(mlStarRandom() - 0.5) * W * 0.96/* ML_KEYBOARD_END */;
+      sp[i*3+1] = /* ML_KEYBOARD_BEGIN original-base64:KE1hdGgucmFuZG9tKCkgLSAwLjUpICogSCAqIDAuOTY= */(mlStarRandom() - 0.5) * H * 0.96/* ML_KEYBOARD_END */;
+      sp[i*3+2] = /* ML_KEYBOARD_BEGIN original-base64:LU1hdGgucmFuZG9tKCkgKiBE */-mlStarRandom() * D/* ML_KEYBOARD_END */;
     }
     const sg = new THREE.BufferGeometry();
     sg.setAttribute("position", new THREE.BufferAttribute(sp, 3));
@@ -1789,6 +1801,15 @@ function renderPanel() {
   act.querySelector("#resetBtn2").onclick = resetParams;
   act.querySelector("#randBtn2").onclick = randomize;
 }
+/* ML_QA_FIX_BEGIN:wireframe-panel-rebuild */
+const mlNativeRenderPanel = renderPanel;
+renderPanel = function mlRenderPanelWithExport() {
+  const exportUI = window.MLExportUI?.registrations.get('wireframe');
+  return exportUI?.withNativeRebuild
+    ? exportUI.withNativeRebuild(() => mlNativeRenderPanel())
+    : mlNativeRenderPanel();
+};
+/* ML_QA_FIX_END:wireframe-panel-rebuild */
 
 function buildSection(sec) {
   const el = document.createElement("div");
@@ -1818,7 +1839,7 @@ function buildControl(c) {
   // conditional visibility: hide entirely when a depEq condition isn't met
   if (c.depEq && params[c.depEq.key] !== c.depEq.val) return null;
   const wrap = document.createElement("div");
-  wrap.className = "ctrl";
+  wrap.className = "ctrl";/* ML_KEYBOARD_BEGIN */wrap.dataset.mlParam=c.key||"resolution";/* ML_KEYBOARD_END */
   if (c.dep && !params[c.dep]) wrap.style.opacity = "0.45";
 
   if (c.type === "range") {
@@ -2073,10 +2094,14 @@ function buildExportSection() {
       <div class="hint">${t("exportHint")}</div>
     </div>`;
   el.querySelector('.section-head').onclick = () => el.classList.toggle("collapsed");
-  el.querySelectorAll('#fpsSeg button').forEach(b => b.onclick = () => {
-    el.querySelectorAll('#fpsSeg button').forEach(x => x.classList.remove("active"));
+/* ML_QA_FIX_BEGIN:wireframe-fps-group original-base64:ICBlbC5xdWVyeVNlbGVjdG9yQWxsKCcjZnBzU2VnIGJ1dHRvbicpLmZvckVhY2goYiA9PiBiLm9uY2xpY2sgPSAoKSA9PiB7CiAgICBlbC5xdWVyeVNlbGVjdG9yQWxsKCcjZnBzU2VnIGJ1dHRvbicpLmZvckVhY2goeCA9PiB4LmNsYXNzTGlzdC5yZW1vdmUoImFjdGl2ZSIpKTsKICAgIGIuY2xhc3NMaXN0LmFkZCgiYWN0aXZlIik7IGV4cG9ydEZwcyA9ICtiLmRhdGFzZXQuZnBzOwogIH0pOw== */
+  const fpsButtons = [...el.querySelectorAll('#fpsSeg button')];
+  fpsButtons.forEach(b => b.onclick = () => {
+    // The same controls can be temporarily moved into the shared export dialog.
+    fpsButtons.forEach(x => x.classList.remove("active"));
     b.classList.add("active"); exportFps = +b.dataset.fps;
   });
+/* ML_QA_FIX_END:wireframe-fps-group */
   el.querySelectorAll('.exp-card').forEach(b => b.onclick = () => window.runExport(b.dataset.exp));
   return el;
 }
@@ -2139,12 +2164,14 @@ function drawExportOverlay(cx, w, h, t) {
   }
 }
 
+/* ML_QA_FIX_BEGIN:wireframe-export-cleanup original-base64:YXN5bmMgZnVuY3Rpb24gcnVuRXhwb3J0KGtpbmQpIHsKICBpZiAoZXhwb3J0aW5nKSByZXR1cm47CiAgY29uc3Qgd2FzUGxheWluZyA9IHBsYXlpbmc7IHNldFBsYXkoZmFsc2UpOwogIHNldEV4cG9ydExvY2sodHJ1ZSk7CiAgbWFrZUV4cG9ydFJlbmRlcmVyKCk7CiAgdHJ5IHsKICAgIGlmIChraW5kID09PSAiaHRtbCIpIHsgZXhwb3J0SFRNTCgpOyB9CiAgICBlbHNlIGlmIChraW5kID09PSAic3ZnIikgeyBleHBvcnRTVkcoKTsgfQogICAgZWxzZSBpZiAoa2luZCA9PT0gInBuZyIpIHsgYXdhaXQgZXhwb3J0UE5HKCk7IH0KICAgIGVsc2UgaWYgKGtpbmQgPT09ICJnaWYiKSB7IGF3YWl0IGV4cG9ydEdJRigpOyB9CiAgICBlbHNlIGlmIChraW5kID09PSAid2VibSIpIHsgYXdhaXQgZXhwb3J0V2ViTSgpOyB9CiAgfSBjYXRjaCAoZSkgewogICAgc2V0RXhwb3J0U3RhdHVzKHRydWUsICJFeHBvcnQgZmFpbGVkOiAiICsgZS5tZXNzYWdlLCAwKTsKICAgIGNvbnNvbGUuZXJyb3IoZSk7CiAgICBzZXRUaW1lb3V0KCgpID0+IHNldEV4cG9ydFN0YXR1cyhmYWxzZSksIDI1MDApOwogIH0KICBpZiAoZXhSZW5kZXJlcikgZXhSZW5kZXJlci5kaXNwb3NlKCk7CiAgc2V0RXhwb3J0TG9jayhmYWxzZSk7CiAgc2V0UGxheSh3YXNQbGF5aW5nKTsKfQ== */
 async function runExport(kind) {
   if (exporting) return;
   const wasPlaying = playing; setPlay(false);
   setExportLock(true);
-  makeExportRenderer();
+  exRenderer = null;
   try {
+    makeExportRenderer();
     if (kind === "html") { exportHTML(); }
     else if (kind === "svg") { exportSVG(); }
     else if (kind === "png") { await exportPNG(); }
@@ -2154,11 +2181,18 @@ async function runExport(kind) {
     setExportStatus(true, "Export failed: " + e.message, 0);
     console.error(e);
     setTimeout(() => setExportStatus(false), 2500);
+  } finally {
+    // Allocation/encoding/disposal failures must not strand the editor in busy mode.
+    try { if (exRenderer) exRenderer.dispose(); }
+    catch (e) { console.error(e); }
+    finally {
+      exRenderer = null; exCanvas = null;
+      setExportLock(false);
+      setPlay(wasPlaying);
+    }
   }
-  if (exRenderer) exRenderer.dispose();
-  setExportLock(false);
-  setPlay(wasPlaying);
 }
+/* ML_QA_FIX_END:wireframe-export-cleanup */
 window.runExport = runExport;
 
 function downloadBlob(blob, name) {
@@ -2392,7 +2426,7 @@ function resetParams() {
   if (!playing) renderFrame(phase);
   toast(t("tReset"));
 }
-function randomize() {
+function randomize() {/* ML_KEYBOARD_BEGIN */params.mlStarSeed=(Math.random()*0x100000000)>>>0;/* ML_KEYBOARD_END */
   const r = (a,b) => a + Math.random()*(b-a);
   activeLook = -1;
   if (currentScene === "wave") {
@@ -2599,5 +2633,7 @@ let bootTries = 0;
   else boot();
 })();
 </script>
+<script src="../shared/type-shape-workbench.js"></script>
+<script src="../shared/type-shape-history.js"></script>
 </body>
 </html>

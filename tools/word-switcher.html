@@ -124,8 +124,22 @@
   .small-label{font-size:10px;color:var(--subtext);margin:8px 0 2px;}
   .note{font-size:10px;color:var(--subtext);background:#241f1a;border:1px solid #4a3a1a;border-radius:6px;padding:7px 9px;margin-top:8px;line-height:1.5;}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<link rel="stylesheet" href="../shared/editor-history.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/numeric-input.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/motion-keyboard.css" data-ml-keyboard>
+<script src="../shared/editor-history.js" data-ml-keyboard></script>
+<script src="../shared/numeric-input.js" data-ml-keyboard></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-motion.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-motion-workbench" data-ml-motion="word-switcher">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"></div><div class="ml-document"><strong>Word Switcher</strong><span class="ml-context">登録済みSVGをリズムで切り替える</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
  onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
@@ -669,8 +683,11 @@ $('#btnLoad').onclick=()=>{
 $('#btnReset').onclick=()=>{ if(!confirm('初期状態に戻しますか？')) return;
   state=defaultState(); syncUI(); renderAssetList(); rt.pos=0; renderStage(); play(); toast('リセットしました'); };
 
+/* ML_KEYBOARD_BEGIN:sync-numbers */
 function syncUI(){
+  window.MLNumberInputs?.refresh();
   $('#animType').value=state.anim.type;
+/* ML_KEYBOARD_END:sync-numbers */
   $('#durR').value=$('#durN').value=state.anim.duration;
   $('#transR').value=$('#transN').value=state.anim.transition;
   $('#scaleR').value=$('#scaleN').value=state.style.wordScale;
@@ -1108,6 +1125,116 @@ function init(){
   requestAnimationFrame(loop);
 }
 init();
+/* ML_KEYBOARD_BEGIN:integration */
+
+(function(){
+ if(!window.MLEditorHistory||!window.MLNumberInputs)return;
+ let exporting=false;
+ const copy=x=>JSON.parse(JSON.stringify(x));
+ const capture=()=>({order:copy(state.order),playOrder:state.playOrder,anim:copy(state.anim),style:copy(state.style),exportCfg:copy(state.exportCfg)});
+ const history=MLEditorHistory.register({name:'Word Switcher',capture,isBusy:()=>exporting,
+  restore:s=>{pause();state={...copy(s),playing:false};rt.pos=0;rt.dir=1;rt.lastSwitch=0;syncUI();renderAssetList();renderStage();}
+ });
+ const originalCapture=captureFrames;
+ captureFrames=async function(...args){if(exporting)throw Error('書き出し中です');exporting=true;history.refresh();try{return await originalCapture(...args);}finally{exporting=false;history.refresh();}};
+ const labels={duration:'1素材の表示秒数',transition:'切り替え秒数',wordScale:'文字の大きさ',pad:'書き出しの余白',fps:'書き出しFPS',length:'書き出しの長さ（0で1巡）'};
+ for(const [r,n,group,key] of [['durR','durN','anim','duration'],['transR','transN','anim','transition'],['scaleR','scaleN','style','wordScale'],['padR','padN','exportCfg','pad'],['fpsR','fpsN','exportCfg','fps'],['lenR','lenN','exportCfg','length']]){
+  $('#'+n).oninput=null;
+  MLNumberInputs.bind({range:'#'+r,number:'#'+n,label:labels[key],integer:key==='fps',getValue:()=>state[group][key],setValue:v=>{if(exporting)return;state[group][key]=v;$('#'+r).value=v;if(group!=='exportCfg')renderStage();}});
+ }
+ $('#outW').oninput=null;
+ MLNumberInputs.bind({number:'#outW',label:'出力幅（0で自動）',min:0,step:10,integer:true,getValue:()=>state.exportCfg.outW,setValue:v=>{if(!exporting)state.exportCfg.outW=Math.max(0,Math.round(v));}});
+})();
+
+/* ML_KEYBOARD_END:integration */</script>
+
+<script data-ml-shell="motion">
+
+/* Additive workbench presentation. The original rendering/export script is unchanged. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const app=byId('app');
+  const header=byId('mlMotionToolbar');
+  const home=byId('mlab-home');
+  if(home){home.textContent='↖ MOTION LAB';home.classList.add('ml-home');header.querySelector('.ml-motion-home').append(home);}
+  const rail=document.createElement('aside');rail.id='mlMotionSources';rail.className='ml-motion-sources';rail.setAttribute('aria-label','素材とルック');
+  rail.innerHTML='<div class="ml-motion-eyebrow">SOURCE / 素材</div>';
+  function move(target,...nodes){nodes.filter(Boolean).forEach(node=>target.append(node));}
+  function title(text){const h=document.createElement('div');h.className='ml-motion-eyebrow';h.textContent=text;return h;}
+  function labelControls(root=document){
+    root.querySelectorAll('.prow,.field').forEach(row=>{
+      const label=row.querySelector(':scope > label,:scope > span:first-child');if(!label)return;
+      const text=label.textContent.trim();if(!text)return;
+      row.querySelectorAll('input,select,textarea').forEach(control=>{
+        if(control.hasAttribute('aria-label')||control.labels?.length)return;
+        control.setAttribute('aria-label',text);
+      });
+    });
+    root.querySelectorAll('button[title]').forEach(button=>{if(!button.hasAttribute('aria-label')&&button.textContent.trim().length<4)button.setAttribute('aria-label',button.title);});
+  }
+  function jumpTo(node){
+    if(!node)return;
+    if(node.matches('details'))node.open=true;
+    const details=node.closest('details');if(details)details.open=true;
+    node.classList.remove('collapsed');
+    node.scrollIntoView({block:'nearest',behavior:'auto'});
+    const control=node.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)');if(control)control.focus({preventScroll:true});
+  }
+  function tabs(panel,groups){
+    const nav=document.createElement('nav');nav.className='ml-motion-tabs';nav.setAttribute('aria-label','設定パネル');
+    const wrappers={};
+    for(const [key,label,nodes] of groups){
+      const button=document.createElement('button');button.type='button';button.className='ml-motion-tab';button.dataset.motionTab=key;button.textContent=label;
+      nav.append(button);
+      const group=document.createElement('div');group.className='ml-motion-group';group.id='ml-motion-'+key;wrappers[key]=group;move(group,...nodes);panel.append(group);
+    }
+    panel.prepend(nav);
+    const select=key=>{
+      for(const [name,group]of Object.entries(wrappers))group.hidden=name!==key;
+      nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.motionTab===key)));
+      panel.scrollTop=0;
+    };
+    nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)select(b.dataset.motionTab);});
+    select(groups[0][0]);return select;
+  }
+  function unsupported(stage,message,ids){
+    const note=document.createElement('div');note.className='ml-motion-capability ml-capability';note.setAttribute('role','status');
+    const strong=document.createElement('strong');strong.textContent='この環境ではプレビューできません';
+    const text=document.createElement('p');text.textContent=message;
+    const help=document.createElement('small');help.textContent='設定やファイルは変更されていません。対応ブラウザで同じページを開いてください。';
+    note.append(strong,text,help);stage.append(note);
+    document.body.classList.add('ml-render-unavailable');
+    ids.forEach(id=>{const el=byId(id);if(el){el.disabled=true;el.title=message;}});
+    const exportJump=byId('mlMotionExport');if(exportJump){exportJump.disabled=true;exportJump.title=message;}
+  }
+
+  const panel=byId('propPane'),preview=byId('previewPane');
+  const source=panel.querySelector('[data-sec="order"]');move(rail,source);app.prepend(rail);
+  source.querySelector('h2').textContent='表示する素材';
+  const sourceTip=document.createElement('p');sourceTip.className='ml-motion-tip';sourceTip.append('登録済みSVGを選んで使います。自分の画像を並べる場合は ');const sourceLink=document.createElement('a');sourceLink.href='image-switcher.html';sourceLink.textContent='Image Switcher';sourceTip.append(sourceLink,' へ。');rail.append(sourceTip);
+  const first=panel.querySelector(':scope > .section');
+  const stage=document.createElement('div');stage.className='ml-word-stage';move(stage,byId('stageWrap'),byId('wordTag'),byId('stageHint'));preview.append(stage);
+  const transport=document.createElement('div');transport.className='ml-word-transport';transport.setAttribute('aria-label','再生コントロール');
+  move(transport,byId('btnPlay'),byId('btnRestart'),byId('btnStep'));preview.append(transport);
+  const transportHint=document.createElement('span');transportHint.textContent='切り替えのリズムを確認';transport.append(transportHint);
+  first.querySelectorAll('.body > div:not(.btn-row)').forEach(e=>e.classList.add('ml-legacy-title'));
+  byId('btnSave').textContent='設定を保存';byId('btnLoad').textContent='保存設定を読込';byId('btnReset').textContent='初期化';
+  byId('btnRestart').textContent='↺ 最初から';byId('btnStep').textContent='次の素材 →';byId('btnPlay').setAttribute('aria-label','再生・停止');
+  byId('btnShuffle').textContent='並びをシャッフル';byId('btnAllOn').textContent='すべて使用';byId('btnReverse').textContent='逆順';
+  panel.querySelector('[data-sec="anim"] h2').textContent='モーション';panel.querySelector('[data-sec="style"] h2').textContent='見た目';panel.querySelector('[data-sec="export"] h2').textContent='書き出し';
+  document.querySelectorAll('.section[data-sec] > .head').forEach(head=>{
+    head.setAttribute('role','button');head.tabIndex=0;
+    const sync=()=>head.setAttribute('aria-expanded',String(!head.parentElement.classList.contains('collapsed')));
+    head.addEventListener('click',()=>queueMicrotask(sync));head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();head.click();}});sync();
+  });
+  const select=tabs(panel,[['edit','見た目',[first,panel.querySelector('[data-sec="style"]')]],['motion','動き',[panel.querySelector('[data-sec="anim"]')]],['export','書き出し',[panel.querySelector('[data-sec="export"]')]]]);
+  byId('mlMotionExport').onclick=()=>{select('export');jumpTo(panel.querySelector('[data-sec="export"]'));};
+  const saveHint=document.createElement('p');saveHint.className='ml-motion-tip';saveHint.textContent='「設定を保存」はこのブラウザ内に保存します。持ち出すには単体HTMLを書き出してください。';first.append(saveHint);
+
+  labelControls();
+  // Native resize listeners keep the original preview fitting its new workspace.
+  window.dispatchEvent(new Event('resize'));
+})();
 </script>
 </body>
 </html>

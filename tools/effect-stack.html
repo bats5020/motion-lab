@@ -122,8 +122,24 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
   #panel{flex:1;width:100%;border-left:none;border-top:1px solid var(--line)}
 }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/raster-workbench.css">
+<script src="../shared/raster-workbench.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/raster-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/raster-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench raster-workbench" data-raster-tool="effect-stack">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <div id="app">
   <main id="stage">
@@ -1280,7 +1296,13 @@ $('#fileJson').addEventListener('change',e=>{
     try{
       const o=JSON.parse(rd.result);
       if(o.app!=='effect-stack')throw new Error('形式が違います');
+/* ML_KEYBOARD_BEGIN */
+      window.MLRasterKeyboard?.history.begin('設定JSONを読み込み');
+/* ML_KEYBOARD_END */
       applyConfig(o);
+/* ML_KEYBOARD_BEGIN */
+      window.MLRasterKeyboard?.history.commit();
+/* ML_KEYBOARD_END */
       toast('設定を読み込みました');
     }catch(err){toast('読み込み失敗: '+err.message)}
   };
@@ -1333,6 +1355,9 @@ function loadVideoFile(f){
   const v=document.createElement('video');
   v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';
   v.addEventListener('loadeddata',()=>{
+/* ML_KEYBOARD_BEGIN */
+    queueMicrotask(()=>window.MLRasterKeyboard?.boundary('動画の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
     if(srcVideoURL)URL.revokeObjectURL(srcVideoURL);
     if(srcVideo)srcVideo.pause();
     srcVideo=v;srcVideoURL=url;
@@ -1356,6 +1381,9 @@ function loadImageFile(f){
   rd.onload=()=>{
     const img=new Image();
     img.onload=()=>{
+/* ML_KEYBOARD_BEGIN */
+      queueMicrotask(()=>window.MLRasterKeyboard?.boundary('画像の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
       srcImage=img;state.src.type='img';
       refreshAll();schedule();
       toast('画像を読み込みました ('+img.naturalWidth+'×'+img.naturalHeight+')');
@@ -1397,6 +1425,31 @@ buildStack();
 buildStampUI();
 refreshAll();
 doRender();
+/* ML_KEYBOARD_BEGIN */
+window.MLRasterModel={
+  name:'Effect Stack',tool:'effect-stack',
+  capture:()=>({values:JSON.parse(JSON.stringify(state)),recent:hist.slice()}),
+  restore:s=>{Object.assign(state,JSON.parse(JSON.stringify(s.values)));hist=s.recent.slice();clearTimeout(_rt);refreshAll();syncVideoLoop();schedule();},
+  isBusy:()=>!!_rec,
+  setRange:(r,v)=>{
+    r.value=v;const out=r.closest('.prow').querySelector('.pv');if(out)out.textContent=fmtv(v);
+    for(const row of state.stack){for(const [key,widget] of Object.entries(UI.rows[row.id].widgets)){if(widget.row.contains(r)){row.p[key]=v;schedule();return;}}}
+    for(const key of ['noiseScale','shapeN','palN'])if(UI.src[key].row.contains(r)){state.src[key==='palN'?'n':key]=v;schedule();return;}
+    if(UI.stampSize.row.contains(r))state.stamp.size=v;schedule();
+  },
+  numbers:()=>[
+    {integer:true,number:$('#seed'),min:0,max:4294967295,step:1,label:'生成シード',getValue:()=>state.seed,setValue:v=>{state.seed=Math.round(v)>>>0;$('#seed').value=state.seed;renderChips();schedule();}},
+    {integer:true,number:UI.src.customW,min:64,max:4096,step:1,label:'キャンバス幅 px',getValue:()=>state.canvas.w,setValue:v=>{state.canvas.w=Math.round(v);schedule();}},
+    {integer:true,number:UI.src.customH,min:64,max:4096,step:1,label:'キャンバス高さ px',getValue:()=>state.canvas.h,setValue:v=>{state.canvas.h=Math.round(v);schedule();}}
+  ],
+  valueFor:r=>{
+    for(const row of state.stack){for(const [key,widget] of Object.entries(UI.rows[row.id].widgets)){if(widget.row.contains(r))return row.p[key];}}
+    for(const key of ['noiseScale','shapeN','palN'])if(UI.src[key].row.contains(r))return state.src[key==='palN'?'n':key];
+    if(UI.stampSize.row.contains(r))return state.stamp.size;
+    return +r.value;
+  }
+};
+/* ML_KEYBOARD_END */
 </script>
 </body>
 </html>
