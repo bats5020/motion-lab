@@ -128,8 +128,24 @@
   .modal textarea{flex:1;min-height:360px;margin:0;border:none;border-radius:0;font:11.5px monospace;background:#161616;color:var(--text);resize:none;padding:12px;}
   .modal .mfoot{padding:11px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/raster-workbench.css">
+<script src="../shared/raster-workbench.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/raster-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/raster-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench raster-workbench" data-raster-tool="dither-svg">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
  onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
@@ -428,6 +444,15 @@ const state={
 let srcImage=null;      // Image オブジェクト
 let lastSVG='';         // 生成したSVG文字列
 let renderTimer=null;
+// Export readiness covers debounce + queued animation frames, not only computation.
+let ditherRenderRevision=0, ditherRenderPending=false;
+function ditherExportReady(){ return !!srcImage && !ditherRenderPending && !!lastSVG; }
+function updateDitherExportState(pending){
+  ditherRenderPending=pending;
+  $('#busy').classList.toggle('show',pending);
+  ['#btnDownloadSVG','#btnCopySVG','#btnDownloadPNG'].forEach(id=>$(id).disabled=!ditherExportReady());
+}
+window.MLDitherExport={isReady:ditherExportReady};
 
 /* どのmethodがセル系か */
 function isCellMethod(m){ return m==='halftone'||m==='dotgrid'; }
@@ -444,6 +469,11 @@ function loadFile(file){
   const url=URL.createObjectURL(file);
   const img=new Image();
   img.onload=()=>{
+/* ML_KEYBOARD_BEGIN */
+    window.MLRasterKeyboard?.beforeImageLoad();
+    const mlPreviousURL=window._peekURL;
+    if(window.MLRasterKeyboard)window._peekURL=null;
+/* ML_KEYBOARD_END */
     srcImage=img;
     // のぞき窓用の元画像をセット（このURLは表示中ずっと使うので、前の分だけ解放）
     if(window._peekURL) URL.revokeObjectURL(window._peekURL);
@@ -455,6 +485,9 @@ function loadFile(file){
     ['#btnDownloadSVG','#btnCopySVG','#btnDownloadPNG'].forEach(id=>$(id).disabled=false);
     zoom.pendingFit=true; // 新しい画像は読み込み後にFitする
     scheduleRender();
+/* ML_KEYBOARD_BEGIN */
+    window.MLRasterKeyboard?.afterImageLoad(mlPreviousURL,url);
+/* ML_KEYBOARD_END */
     toast('読み込みました: '+(file.name||'image'));
   };
   img.onerror=()=>{ toast('画像の読み込みに失敗しました'); URL.revokeObjectURL(url); };
@@ -864,13 +897,24 @@ $('#previewPane').addEventListener('pointerleave',()=>{
 /* ================================================================
    レンダリング（デバウンス）
    ================================================================ */
-function scheduleRender(){ clearTimeout(renderTimer); renderTimer=setTimeout(render,120); }
+function scheduleRender(){
+  clearTimeout(renderTimer);renderTimer=null;
+  const revision=++ditherRenderRevision;
+  // The old preview can remain visible, but is no longer an exportable result.
+  lastSVG='';updateDitherExportState(!!srcImage);
+  if(srcImage)renderTimer=setTimeout(()=>{renderTimer=null;render(revision);},120);
+}
 
-function render(){
-  if(!srcImage) return;
+function render(revision=ditherRenderRevision){
+  if(revision!==ditherRenderRevision)return;
+  if(!srcImage){lastSVG='';updateDitherExportState(false);return;}
   $('#busy').classList.add('show');
   // 次フレームで重い処理（UI更新を反映させる）
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
+/* ML_KEYBOARD_BEGIN */
+    if(revision!==ditherRenderRevision)return;
+    if(!srcImage){lastSVG='';updateDitherExportState(false);return;}
+/* ML_KEYBOARD_END */
     try{
       const m=state.method;
       const {gray,W,H}=getGrayData(state.res);
@@ -913,8 +957,8 @@ function render(){
       // 初回 or 画像変更時はFit、それ以外は現在のズームを維持
       if(zoom.pendingFit){ zoom.pendingFit=false; zoomFit(); }
       else applyZoom();
-    }catch(err){ console.error(err); toast('変換エラー'); }
-    $('#busy').classList.remove('show');
+    }catch(err){ lastSVG='';console.error(err);toast('変換エラー'); }
+    if(revision===ditherRenderRevision)updateDitherExportState(false);
   }));
 }
 
@@ -1000,9 +1044,9 @@ function downloadFile(name,content,mime){
   const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1000);
 }
-$('#btnDownloadSVG').onclick=()=>{ if(!lastSVG)return; downloadFile('bitmap.svg',lastSVG,'image/svg+xml'); toast('SVGをダウンロードしました'); };
+$('#btnDownloadSVG').onclick=()=>{ if(!ditherExportReady())return; downloadFile('bitmap.svg',lastSVG,'image/svg+xml'); toast('SVGをダウンロードしました'); };
 $('#btnCopySVG').onclick=()=>{
-  if(!lastSVG)return;
+  if(!ditherExportReady())return;
   $('#modalText').value=lastSVG; $('#modalBg').classList.add('show');
   navigator.clipboard.writeText(lastSVG).then(()=>toast('コピーしました')).catch(()=>{});
 };
@@ -1011,7 +1055,8 @@ $('#modalBg').onclick=e=>{ if(e.target===$('#modalBg'))$('#modalBg').classList.r
 $('#modalCopy').onclick=()=>{ navigator.clipboard.writeText($('#modalText').value).then(()=>toast('コピーしました')); };
 
 $('#btnDownloadPNG').onclick=()=>{
-  if(!lastSVG)return;
+  if(!ditherExportReady())return;
+  const exportTransparent=state.transBg, exportBackground=state.bg;
   const img=new Image();
   const blob=new Blob([lastSVG],{type:'image/svg+xml;charset=utf-8'});
   const url=URL.createObjectURL(blob);
@@ -1019,7 +1064,7 @@ $('#btnDownloadPNG').onclick=()=>{
     const scale=Math.max(1, Math.round(1200/img.width)); // 出力を高解像度に
     const c=document.createElement('canvas'); c.width=img.width*scale; c.height=img.height*scale;
     const cx=c.getContext('2d'); cx.imageSmoothingEnabled=false;
-    if(!state.transBg){ cx.fillStyle=state.bg; cx.fillRect(0,0,c.width,c.height); }
+    if(!exportTransparent){ cx.fillStyle=exportBackground; cx.fillRect(0,0,c.width,c.height); }
     cx.drawImage(img,0,0,c.width,c.height);
     c.toBlob(b=>{ downloadFile('bitmap.png',b,'image/png'); toast('PNGをダウンロードしました'); });
     URL.revokeObjectURL(url);
@@ -1032,6 +1077,53 @@ $('#resInfo').textContent=' '+state.res+'px';
 $('#gamInfo').textContent=state.gamma;
 $('#peekSizeInfo').textContent=' '+state.peek.size+'px';
 setPeekCSSVars();
+/* ML_KEYBOARD_BEGIN */
+window.MLRasterModel={
+  name:'Dither → SVG',tool:'dither-svg',
+  capture:()=>({values:JSON.parse(JSON.stringify(state)),image:srcImage,url:window._peekURL||null}),
+  equals:(a,b)=>a.image===b.image&&a.url===b.url&&JSON.stringify(a.values)===JSON.stringify(b.values),
+  restore:s=>{
+    const changedImage=srcImage!==s.image;clearTimeout(renderTimer);
+    Object.assign(state,JSON.parse(JSON.stringify(s.values)));srcImage=s.image;window._peekURL=s.url;
+    const pairs={res:'res',cell:'cell',bri:'brightness',con:'contrast',gam:'gamma',thr:'threshold',dot:'dotScale'};
+    Object.entries(pairs).forEach(([id,key])=>{$('#'+id+'R').value=$('#'+id+'N').value=state[key];});
+    ['Size','Feather','Fade','Lag','Delay','Opacity','Mag'].forEach(k=>{$('#peek'+k+'R').value=$('#peek'+k+'N').value=state.peek[k.toLowerCase()];});
+    $('#methodGrid').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.m===state.method));
+    $('#cellField').style.display=isCellMethod(state.method)?'block':'none';
+    $('#shapeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===state.shape));
+    $('#peekShapeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===state.peek.shape));
+    ['invert','transBg'].forEach(k=>$('#'+k).checked=state[k]);
+    ['On','Ring','Pixel'].forEach(k=>$('#peek'+k).checked=state.peek[k.toLowerCase()]);
+    ['fg','bg'].forEach(k=>{$('#'+k).value=$('#'+k+'T').value=state[k];});
+    $('#peekRingColor').value=$('#peekRingColorT').value=state.peek.ringColor;
+    $('#peekRingColorField').style.display=state.peek.ring?'block':'none';
+    $('#resInfo').textContent=' '+state.res+'px';$('#briInfo').textContent=state.brightness>0?'+'+state.brightness:state.brightness;
+    $('#conInfo').textContent=state.contrast>0?'+'+state.contrast:state.contrast;$('#gamInfo').textContent=state.gamma;
+    $('#peekSizeInfo').textContent=' '+state.peek.size+'px';setPeekCSSVars();removeRing();
+    $('#peekLayer').classList.remove('on');
+    if(s.url)$('#peekImg').src=s.url;else $('#peekImg').removeAttribute('src');
+    $('#emptyWrap').style.display=srcImage?'none':'';$('#zoomCtl').classList.toggle('show',!!srcImage);
+    ['#btnSampleReset','#btnDownloadSVG','#btnCopySVG','#btnDownloadPNG'].forEach(id=>$(id).disabled=!srcImage);
+    lastSVG='';if(!srcImage){$('#svgHolder').replaceChildren();$('#stat').style.display='none';}
+    if(changedImage)zoom.pendingFit=!!srcImage;scheduleRender();
+  },
+  setRange:(r,v)=>{
+    const key={resR:'res',cellR:'cell',briR:'brightness',conR:'contrast',gamR:'gamma',thrR:'threshold',dotR:'dotScale'}[r.id];
+    r.value=v;$('#'+r.id.slice(0,-1)+'N').value=v;
+    if(key){state[key]=v;
+      if(key==='res')$('#resInfo').textContent=' '+v+'px';
+      if(key==='brightness')$('#briInfo').textContent=v>0?'+'+v:v;
+      if(key==='contrast')$('#conInfo').textContent=v>0?'+'+v:v;
+      if(key==='gamma')$('#gamInfo').textContent=v;
+      scheduleRender();
+    }else{const k=r.id.slice(4,-1).toLowerCase();state.peek[k]=v;if(k==='size')$('#peekSizeInfo').textContent=' '+v+'px';if(k==='fade')setPeekCSSVars();}
+  },
+  valueFor:r=>{
+    const key={resR:'res',cellR:'cell',briR:'brightness',conR:'contrast',gamR:'gamma',thrR:'threshold',dotR:'dotScale'}[r.id];
+    return key?state[key]:state.peek[r.id.slice(4,-1).toLowerCase()];
+  }
+};
+/* ML_KEYBOARD_END */
 </script>
 </body>
 </html>

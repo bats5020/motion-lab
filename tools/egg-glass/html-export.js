@@ -1,4 +1,10 @@
 const textFiles=['index.html','style.css','egg.js','keyframes.js','scroll-controls.js','transform-gizmo.js','lighting-controls.js','light-placement.js','preview-viewport.js','svg-background.js','flow-mapping.js','pattern-controls.js','logo-controls.js','shell-material.js','export-controls.js','html-export.js','webm-duration.js','vendor/three.module.js','vendor/three.core.js','vendor/SVGLoader.js','vendor/LICENSE','assets/u19-background.svg'];
+/* ML_KEYBOARD_BEGIN */
+textFiles.push('keyboard-controls.js','editor-history.js','editor-history.css','numeric-input.js','numeric-input.css');
+/* ML_KEYBOARD_END */
+/* ML_EXPORT_BEGIN */
+textFiles.push('export-workbench.js','export-workbench.css','export-type-shape.js');
+/* ML_EXPORT_END */
 
 async function getFiles() {
   if(globalThis.__eggBundle)return globalThis.__eggBundle;
@@ -34,13 +40,28 @@ async function boot() {
   }
   const map=document.createElement('script');map.type='importmap';map.textContent=JSON.stringify({imports});document.head.appendChild(map);
   await import('u19/egg.js');
+/* ML_EXPORT_BEGIN */
+  // Module execution also works for these self-contained IIFEs; no network scripts remain.
+  await import('u19/export-workbench.js');
+  await import('u19/export-type-shape.js');
+/* ML_EXPORT_END */
 }
 
 export async function buildHtml(search,embed) {
   const files=await getFiles();
   const doc=new DOMParser().parseFromString(files['index.html'],'text/html');
-  doc.querySelector('link[rel=stylesheet]').remove();doc.querySelector('script[type=module]').remove();
-  const style=doc.createElement('style');style.textContent=files['style.css'];doc.head.appendChild(style);
+/* ML_KEYBOARD_BEGIN original-base64:ICBkb2MucXVlcnlTZWxlY3RvcignbGlua1tyZWw9c3R5bGVzaGVldF0nKS5yZW1vdmUoKTtkb2MucXVlcnlTZWxlY3Rvcignc2NyaXB0W3R5cGU9bW9kdWxlXScpLnJlbW92ZSgpOw== */
+  doc.querySelectorAll('link[rel=stylesheet]').forEach(link=>link.remove());doc.querySelector('script[type=module]').remove();
+/* ML_KEYBOARD_END */
+/* ML_EXPORT_BEGIN */
+  doc.querySelectorAll('script[src="./export-workbench.js"],script[src="./export-type-shape.js"]').forEach(script=>script.remove());
+/* ML_EXPORT_END */
+/* ML_KEYBOARD_BEGIN original-base64:ICBjb25zdCBzdHlsZT1kb2MuY3JlYXRlRWxlbWVudCgnc3R5bGUnKTtzdHlsZS50ZXh0Q29udGVudD1maWxlc1snc3R5bGUuY3NzJ107ZG9jLmhlYWQuYXBwZW5kQ2hpbGQoc3R5bGUpOw== */
+  const style=doc.createElement('style');style.textContent=[files['style.css'],files['numeric-input.css'],files['editor-history.css']].join('\n');doc.head.appendChild(style);
+/* ML_KEYBOARD_END */
+/* ML_EXPORT_BEGIN */
+  const exportStyle=doc.createElement('style');exportStyle.textContent=files['export-workbench.css'];doc.head.appendChild(exportStyle);
+/* ML_EXPORT_END */
   doc.querySelector('#mlab-home')?.remove();
   doc.body.classList.add('ui-hidden');
   const license=doc.createElement('script');license.type='text/plain';license.id='third-party-license';license.textContent=files['vendor/LICENSE'];doc.body.appendChild(license);

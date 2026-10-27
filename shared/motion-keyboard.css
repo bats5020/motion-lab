@@ -1,0 +1,6 @@
+/* Allow room for history controls without clipping actions on small workbenches. */
+.ml-motion-workbench #mlMotionToolbar .ml-document{flex:1 1 auto;overflow:hidden}
+.ml-motion-workbench #mlMotionToolbar .ml-document strong{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ml-motion-workbench #mlMotionToolbar .ml-toolbar-actions{flex:0 0 auto}
+.ml-motion-workbench .ml-number-wrap{max-width:88px}
+@media(max-width:600px){.ml-motion-workbench #mlMotionToolbar{gap:8px}.ml-motion-workbench #mlMotionToolbar .ml-toolbar-actions{gap:4px}.ml-motion-workbench #mlMotionToolbar .ml-document strong{font-size:10px}}

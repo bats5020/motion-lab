@@ -6,9 +6,17 @@
   <title>Egg Glass — Motion Lab</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./style.css">
+  <!-- ML_KEYBOARD_BEGIN -->
+  <link rel="stylesheet" href="./numeric-input.css">
+  <link rel="stylesheet" href="./editor-history.css">
+  <!-- ML_KEYBOARD_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="./export-workbench.css">
+<script src="./export-workbench.js" defer></script>
+<script src="./export-type-shape.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
-  <a href="../../index.html" id="mlab-home" title="MOTION LAB ホームへ">◆ MOTION LAB</a>
+<body class="ml-egg-workbench">
   <main class="scroll-space">
     <section class="stage" aria-label="卵形の3D素材。マウスとスクロールで動きます。">
       <div id="preview-workspace"><div id="scene" aria-label="3Dプレビュー"></div></div>
@@ -17,13 +25,13 @@
         <label>W <input id="preview-width" type="number" min="240" max="3840" step="1" aria-label="プレビューの幅（CSS px）"></label>
         <label>H <input id="preview-height" type="number" min="240" max="3840" step="1" aria-label="プレビューの高さ（CSS px）"></label>
         <button id="preview-swap" aria-label="幅と高さを入れ替える" title="縦横を入れ替え">⇄</button>
-        <span id="preview-size"></span><button id="pattern-open" aria-expanded="false" aria-controls="pattern-panel">柄・画像</button><button id="export-open">Export</button><span class="preview-key-hint">@ 全画面</span>
+        <span id="preview-size"></span>
       </div>
-      <header><span class="mark">EGG GLASS / MOTION LAB</span><span class="edition">U19 · @ 編集／全画面</span></header>
+      <header class="egg-toolbar"><a href="../../index.html" id="mlab-home" title="MOTION LAB ホームへ">↖ MOTION LAB</a><span class="mark">Egg Glass</span><span class="egg-category">3D / SHAPE</span><div class="egg-toolbar-actions"><span class="preview-key-hint">@ 全画面</span><button id="pattern-open" aria-expanded="false" aria-controls="pattern-panel">柄・画像</button><button id="export-open">書き出し ↗</button></div></header>
       <div id="light-hit" hidden aria-hidden="true"><span>ハイライト</span></div>
       <div id="light-edit-hint" hidden>卵をドラッグしてハイライトを移動 <span>Escで終了</span></div>
       <details id="lighting-panel" class="lighting-panel" open>
-        <summary>ライト調整 <span aria-hidden="true">⌄</span></summary>
+        <summary>ライト・質感 <span aria-hidden="true">⌄</span></summary>
         <div class="lighting-body">
           <div class="light-section-heading">ハイライトの位置 <span>正面から見た卵</span></div>
           <div id="light-direction" class="light-direction" role="group" tabindex="0" aria-label="卵をドラッグしてハイライトを移動"><canvas id="light-preview" width="468" height="292" aria-hidden="true"></canvas><i id="light-dot" aria-hidden="true"></i></div>
@@ -101,7 +109,7 @@
         <div class="timeline-title"><span>SCROLL TIMELINE / <b id="timeline-target">EGG</b></span><span>◆ キーを選択 / ドラッグで時点を移動</span></div>
         <div class="timeline-track"><div class="timeline-ticks"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div><input id="scroll-preview" aria-label="スクロール位置をプレビュー" type="range" min="0" max="100" step="0.1" value="0"><div id="keyframe-marks"></div><i id="timeline-playhead"></i></div>
       </section>
-      <div class="caption">
+      <div class="caption" role="group" aria-label="マテリアルと背景"><span class="egg-section-title">MATERIAL / SURFACE</span>
         <div class="surfaces" role="group" aria-label="素材の選択">
           <button data-surface="pattern" aria-pressed="true">模様ガラス</button>
           <button data-surface="clear" aria-pressed="false">クリア</button>
@@ -168,7 +176,7 @@
         <section class="export-section"><h3>HTML</h3><p class="export-note">3D・素材・設定を1ファイルにまとめます。単体で開いてスクロールやマウスで動かせます。PC / SPを分けた場合は、表示先の画面幅に合わせて動きが切り替わります。</p><button id="export-html" class="export-primary">HTMLを保存</button></section>
         <progress id="export-progress" max="1" value="0" hidden></progress><p id="export-status" role="status"></p><button id="export-cancel" hidden>中止</button>
       </dialog>
-      <div id="fallback" role="status" hidden>3D表示を開始できませんでした。WebGL対応のブラウザで開いてください。</div>
+      <div id="fallback" role="status" hidden>3D表示を開始できませんでした。WebGL 2 対応のブラウザで開いてください。</div>
       <footer>
         <div class="controls" role="group" aria-label="動きの選択">
           <button data-mode="blend" aria-pressed="true">組み合わせ</button>
@@ -181,6 +189,28 @@
       </footer>
     </section>
   </main>
+  <script>
+  /* This UI-only adapter is included by the existing offline HTML bundler. */
+  (() => {
+    document.querySelectorAll('button').forEach(button => { if (!button.hasAttribute('type')) button.type = 'button'; });
+    // On tablet widths only one inspector occupies the lower work area.
+    const motion = document.querySelector('#scroll-panel'), light = document.querySelector('#lighting-panel');
+    motion.addEventListener('toggle', () => { if (motion.open && matchMedia('(max-width:900px)').matches) light.open = false; });
+    light.addEventListener('toggle', () => { if (light.open && matchMedia('(max-width:900px)').matches) motion.open = false; });
+    let supported = false;
+    try {
+      const probe = document.createElement('canvas').getContext('webgl2');
+      supported = Boolean(probe);
+      probe?.getExtension('WEBGL_lose_context')?.loseContext();
+    } catch {}
+    if (supported) return;
+    document.body.classList.add('egg-graphics-unavailable');
+    const message = document.querySelector('#fallback');
+    message.textContent = 'この環境では WebGL 2 が使用できません。3D プレビューと書き出しを停止しています。対応するブラウザで開き、ハードウェア アクセラレーションの設定を確認してください。';
+    message.hidden = false;
+    document.querySelectorAll('.stage button, .stage input, .stage select').forEach(control => { control.disabled = true; });
+  })();
+  </script>
   <script type="module" src="./egg.js"></script>
 </body>
 </html>

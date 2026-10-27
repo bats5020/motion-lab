@@ -19,6 +19,9 @@ export async function setupLogoControls({egg,pivot,state,renderer,lightingContro
   const panel=document.querySelector('#logo-settings'),status=document.querySelector('#logo-status');
   const params=new URLSearchParams(globalThis.__eggInitialSearch??location.search);
   let settings=defaults(),texture=null,customImage=null,revision=0;
+/* ML_KEYBOARD_BEGIN */
+  let assetBusy=0;
+/* ML_KEYBOARD_END */
   try {
     const saved=JSON.parse(params.get('logo')??localStorage.getItem(storageKey)??'null');
     if(saved&&typeof saved==='object'){
@@ -96,12 +99,19 @@ export async function setupLogoControls({egg,pivot,state,renderer,lightingContro
     status.textContent='正面で一時停止しました。下の「再生」で動きを再開できます。';
   });
   document.querySelector('#logo-original').addEventListener('click',async()=>{
-    const token=++revision;try{if(await load(provided,'sMask group.png',token)){settings.imageSource='provided';customImage=null;settings.enabled=true;apply(true);}}catch{status.textContent='元画像を読み込めませんでした。';}
+/* ML_KEYBOARD_BEGIN original-base64:ICAgIGNvbnN0IHRva2VuPSsrcmV2aXNpb247dHJ5e2lmKGF3YWl0IGxvYWQocHJvdmlkZWQsJ3NNYXNrIGdyb3VwLnBuZycsdG9rZW4pKXtzZXR0aW5ncy5pbWFnZVNvdXJjZT0ncHJvdmlkZWQnO2N1c3RvbUltYWdlPW51bGw7c2V0dGluZ3MuZW5hYmxlZD10cnVlO2FwcGx5KHRydWUpO319Y2F0Y2h7c3RhdHVzLnRleHRDb250ZW50PSflhYPnlLvlg4/jgpLoqq3jgb/ovrzjgoHjgb7jgZvjgpPjgafjgZfjgZ/jgIInO30= */
+    const token=++revision;assetBusy++;let assetChanged=false;
+    try{if(await load(provided,'sMask group.png',token)){settings.imageSource='provided';customImage=null;settings.enabled=true;apply(true);assetChanged=true;}}catch{status.textContent='元画像を読み込めませんでした。';}
+    finally{assetBusy=Math.max(0,assetBusy-1);if(assetChanged)document.dispatchEvent(new CustomEvent('egg-asset-boundary',{detail:{kind:'logo'}}));}
+/* ML_KEYBOARD_END */
   });
   document.querySelector('#logo-upload').addEventListener('change',async event=>{
     const file=event.target.files[0];event.target.value='';if(!file)return;
     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>20*1024*1024){status.textContent='20MB以下のPNG・JPEG・WebPを選んでください。';return;}
     const token=++revision;status.textContent='画像を読み込んでいます…';
+/* ML_KEYBOARD_BEGIN */
+    assetBusy++;let assetChanged=false;
+/* ML_KEYBOARD_END */
     try {
       const bitmap=await createImageBitmap(file),ratio=Math.min(1,2048/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');
       canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
@@ -109,9 +119,21 @@ export async function setupLogoControls({egg,pivot,state,renderer,lightingContro
       const data=canvas.toDataURL('image/png');if(token!==revision)return;
       if(!await load(data,file.name,token))return;
       settings.imageSource='custom';settings.enabled=true;customImage={data,name:file.name};apply(true);
+/* ML_KEYBOARD_BEGIN */
+      assetChanged=true;
+/* ML_KEYBOARD_END */
       try{await imageStore(customImage);}catch{status.textContent='画像の自動保存に失敗しました。HTMLで保存してください。';}
     }catch{status.textContent='画像を読み込めませんでした。現在の画像は維持しています。';}
+/* ML_KEYBOARD_BEGIN */
+    finally{assetBusy=Math.max(0,assetBusy-1);if(assetChanged)document.dispatchEvent(new CustomEvent('egg-asset-boundary',{detail:{kind:'logo'}}));}
+/* ML_KEYBOARD_END */
   });
   apply();
-  return {attach,uniforms,serialize:()=>({...settings}),get image(){return settings.imageSource==='custom'?customImage:null;}};
+/* ML_KEYBOARD_BEGIN original-base64:ICByZXR1cm4ge2F0dGFjaCx1bmlmb3JtcyxzZXJpYWxpemU6KCk9Pih7Li4uc2V0dGluZ3N9KSxnZXQgaW1hZ2UoKXtyZXR1cm4gc2V0dGluZ3MuaW1hZ2VTb3VyY2U9PT0nY3VzdG9tJz9jdXN0b21JbWFnZTpudWxsO319Ow== */
+  function restoreEditor(saved) {
+    if(saved.imageSource!==settings.imageSource)throw new Error('画像変更前の履歴は復元できません');
+    settings=structuredClone(saved);revision++;apply(true);
+  }
+  return {attach,uniforms,serialize:()=>({...settings}),restoreEditor,get busy(){return assetBusy>0;},get image(){return settings.imageSource==='custom'?customImage:null;}};
+/* ML_KEYBOARD_END */
 }

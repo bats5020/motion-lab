@@ -85,8 +85,24 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
   #panel{flex:1;width:100%;border-left:none;border-top:1px solid var(--line)}
 }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/material-workbench.css">
+<script src="../shared/workbench.js"></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/material-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/material-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-material" data-material-tool="glass-lab">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <div id="app">
   <main id="stage">
@@ -445,9 +461,15 @@ function buildPresets(){
   PRESETS.forEach(p=>{
     const ch=ce('button','chip','<i style="background:'+p.dot+'"></i>'+p.name);
     ch.addEventListener('click',()=>{
+/* ML_KEYBOARD_BEGIN */
+      const mlGlassIdentity=state.glass;
+/* ML_KEYBOARD_END */
       state.src={...p.src,cols:p.src.cols.slice()};
       state.glass={...p.glass};
       state.motion={...p.motion};
+/* ML_KEYBOARD_BEGIN */
+      Object.assign(mlGlassIdentity,state.glass);state.glass=mlGlassIdentity;
+/* ML_KEYBOARD_END */
       srcTypeGuard();refreshAll();
     });
     c.appendChild(ch);
@@ -692,6 +714,9 @@ function loadImageFile(f){
   rd.onload=()=>{
     const img=new Image();
     img.onload=()=>{
+/* ML_KEYBOARD_BEGIN */
+      queueMicrotask(()=>window.MLMaterialKeyboard?.boundary('画像の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
       srcImage=img;state.src.type='img';
       uploadTexture(img,img.naturalWidth,img.naturalHeight);
       refreshAll();
@@ -707,6 +732,9 @@ function loadVideoFile(f){
   const v=document.createElement('video');
   v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';
   v.addEventListener('loadeddata',()=>{
+/* ML_KEYBOARD_BEGIN */
+    queueMicrotask(()=>window.MLMaterialKeyboard?.boundary('動画の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
     if(srcVideoURL)URL.revokeObjectURL(srcVideoURL);
     if(srcVideo)srcVideo.pause();
     srcVideo=v;srcVideoURL=url;
@@ -761,6 +789,31 @@ buildMotion();
 if(location.hash.length>2&&decodeState(location.hash.slice(1)))toast('URLから設定を復元しました');
 refreshAll();
 requestAnimationFrame(loop);
+/* ML_KEYBOARD_BEGIN */
+window.MLMaterialModel={
+  name:'Glass Lab',tool:'glass-lab',
+  capture:()=>({values:JSON.parse(JSON.stringify(state)),duration:UI.recDur.row.querySelector('select').value}),
+  restore:s=>{
+    const values=JSON.parse(JSON.stringify(s.values));state.seed=values.seed;
+    for(const key of ['canvas','src','glass','motion'])Object.assign(state[key],values[key]);
+    srcTypeGuard();_orbs=orbState();
+    if(state.src.type==='img'&&srcImage)uploadTexture(srcImage,srcImage.naturalWidth,srcImage.naturalHeight);
+    if(srcVideo){if(state.src.type==='video')srcVideo.play().catch(()=>{});else srcVideo.pause();}
+    UI.recDur.set(s.duration);refreshAll();renderGL(...previewSize());
+  },
+  isBusy:()=>!!_rec,
+  rangeEntries:()=>{
+    const map={orbN:['src','n'],orbSize:['src','size'],orbGlow:['src','glow'],orbDrift:['src','drift'],speed:['motion','speed'],count:['glass','count'],angle:['glass','angle'],dist:['glass','dist'],stretch:['glass','stretch'],shift:['glass','shift'],chroma:['glass','chroma'],hi:['glass','hi'],sh:['glass','sh'],blur:['glass','blur'],grain:['glass','grain']};
+    return Object.entries(map).map(([key,[group,field]])=>({range:UI[key].row.querySelector('input[type=range]'),readout:UI[key].row.querySelector('.pv'),label:UI[key].row.querySelector('span').textContent,scale:1,getValue:()=>state[group][field],setValue:v=>{state[group][field]=v;UI[key].set(v);}}));
+  },
+  numbers:()=>[
+    {integer:true,number:$('#seed'),min:0,max:4294967295,step:1,label:'生成シード',getValue:()=>state.seed,setValue:v=>applyRandom(Math.round(v)>>>0)},
+    {integer:true,number:UI.customW,min:64,max:4096,step:1,label:'キャンバス幅 px',getValue:()=>state.canvas.w,setValue:v=>{state.canvas.w=Math.round(v);}},
+    {integer:true,number:UI.customH,min:64,max:4096,step:1,label:'キャンバス高さ px',getValue:()=>state.canvas.h,setValue:v=>{state.canvas.h=Math.round(v);}}
+  ]
+};
+/* ML_KEYBOARD_END */
 </script>
+<script src="../shared/material-workbench.js"></script>
 </body>
 </html>

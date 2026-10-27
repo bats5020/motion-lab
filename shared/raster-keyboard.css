@@ -1,0 +1,9 @@
+/* Ergonomics chrome only: no canvas/output typography or geometry. */
+.raster-workbench .raster-history-note{font:10px/1.7 var(--raster-ui-font);color:#929ba8;margin:14px;padding:12px 0;border-top:1px solid #34383d}
+.raster-workbench .raster-toolbar .ml-history-actions button{padding:0;width:27px;min-width:27px;font-size:17px;line-height:1}
+.raster-workbench .raster-toolbar .ml-history-actions{margin-right:3px}
+@media(max-width:600px){.raster-workbench .raster-document{flex:1;min-width:0}.raster-workbench .raster-document strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.raster-workbench .raster-toolbar{gap:7px}.raster-workbench .raster-toolbar .ml-history-actions{gap:2px;margin:0}.raster-workbench .raster-toolbar .ml-history-actions button{width:23px;min-width:23px}.raster-workbench .raster-toolbar-actions{gap:4px}}
+/* Per-point x/y controls keep a readable range plus exact number on narrow inspectors. */
+body[data-raster-tool=pixel-gradient] .color-card .cc-pos{display:grid;grid-template-columns:20px minmax(0,1fr) 68px;gap:6px}
+body[data-raster-tool=pixel-gradient] .color-card .cc-pos input[type=range]{min-width:0;width:100%}
+body[data-raster-tool=pixel-gradient] .color-card .cc-pos .ml-number-wrap{width:68px}

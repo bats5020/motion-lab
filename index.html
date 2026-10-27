@@ -6,103 +6,46 @@
 <title>MOTION LAB — animation &amp; graphics tools</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="shared/tokens.css">
-<style>
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:var(--bg);color:var(--text);
-    font-family:var(--font-mono);
-    -webkit-font-smoothing:antialiased;
-    line-height:1.5;min-height:100vh;
-  }
-  a{color:inherit;text-decoration:none;}
-
-  .wrap{max-width:1080px;margin:0 auto;padding:56px 24px 80px;}
-
-  /* header */
-  header{margin-bottom:44px;}
-  .brand{display:flex;align-items:center;gap:12px;}
-  .brand .mark{
-    width:26px;height:26px;border-radius:6px;background:var(--accent);
-    display:inline-flex;align-items:center;justify-content:center;
-    color:#fff;font-size:13px;
-  }
-  .title{font-size:26px;font-weight:600;letter-spacing:.06em;margin:0;}
-  .title span{color:var(--accent);}
-  .subtitle{color:var(--subtext);font-size:13px;margin-top:10px;}
-  .count{color:var(--faint);font-size:12px;margin-top:2px;}
-
-  /* category */
-  .cat{margin-top:40px;}
-  .cat-head{
-    display:flex;align-items:baseline;gap:10px;
-    padding-bottom:12px;margin-bottom:18px;border-bottom:1px solid var(--line);
-  }
-  .cat-name{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;}
-  .cat-desc{color:var(--faint);font-size:11px;}
-
-  /* grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
-
-  .card{
-    display:flex;flex-direction:column;
-    background:var(--panel);border:1px solid var(--line);border-radius:10px;
-    overflow:hidden;transition:background .14s,border-color .14s,transform .14s;
-  }
-  .card:hover{background:var(--panel2);border-color:var(--line-hover);transform:translateY(-2px);}
-  .card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-
-  .thumb{
-    height:132px;background:#0e0e10;border-bottom:1px solid var(--line);
-    display:flex;align-items:center;justify-content:center;overflow:hidden;
-  }
-  .thumb svg{width:100%;height:100%;display:block;}
-
-  .body{padding:14px 16px 16px;flex:1;display:flex;flex-direction:column;}
-  .name{font-size:14px;font-weight:600;}
-  .desc{color:var(--subtext);font-size:11.5px;margin-top:6px;flex:1;}
-  .foot{
-    display:flex;align-items:center;justify-content:space-between;
-    margin-top:14px;
-  }
-  .tag{color:var(--faint);font-size:10.5px;letter-spacing:.05em;}
-  .open{
-    color:var(--accent);font-size:11px;font-weight:600;
-    display:inline-flex;align-items:center;gap:5px;
-  }
-  .open .arrow{transition:transform .14s;}
-  .card:hover .open .arrow{transform:translateX(3px);}
-
-  footer{margin-top:56px;color:var(--faint);font-size:11px;line-height:1.7;}
-  footer code{background:#0f0f0f;padding:1px 6px;border-radius:4px;color:var(--subtext);}
-</style>
+<link rel="stylesheet" href="shared/catalog.css">
 </head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <span class="mark">◆</span>
-      <h1 class="title">MOTION <span>LAB</span></h1>
+<body class="catalog-app">
+<a class="skip-link" href="#main">ツール一覧へスキップ</a>
+<header class="appbar">
+  <a class="brand" href="index.html" aria-label="MOTION LAB ホーム"><span class="brand-mark" aria-hidden="true">M<span>↗</span></span><span>MOTION LAB</span></a>
+  <div class="app-location">WORKSPACE <span>/</span> ツールライブラリ</div>
+  <div class="app-status"><i aria-hidden="true"></i> ブラウザ内で処理</div>
+</header>
+<div class="app-layout">
+  <aside class="sidebar" aria-label="ライブラリナビゲーション">
+    <div class="nav-label">LIBRARY</div>
+    <nav id="categoryNav" aria-label="カテゴリ"></nav>
+    <div class="nav-label collections-label">COLLECTIONS</div>
+    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">3</span></button>
+    <div class="sidebar-note"><span class="note-title">素材は、あなたの手元に。</span><p>画像・動画はサーバーに送信せず、ブラウザ内で編集します。</p><span class="note-meta" id="totalCount"></span></div>
+  </aside>
+  <main id="main" tabindex="-1">
+    <div class="library-heading"><div><div class="eyebrow">TOOL LIBRARY</div><h1 id="pageTitle">すべてのツール</h1><p id="pageDescription">つくりたい表現から、ワークスペースを選ぶ。</p></div><span class="library-index" aria-hidden="true">ML / 001</span></div>
+    <div class="filterbar">
+      <label class="search-wrap"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m12 12 5 5" stroke="currentColor" stroke-width="1.5"/></svg><input id="search" type="search" placeholder="ツール・表現を検索" aria-label="ツールを検索" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
+      <label class="output-filter"><span>書き出し</span><select id="outputFilter" aria-label="書き出し形式で絞り込み"><option value="">すべて</option><option value="PNG">PNG</option><option value="SVG">SVG</option><option value="VIDEO">動画</option><option value="HTML">HTML</option></select></label>
+      <span id="resultCount" role="status" aria-live="polite"></span>
     </div>
-    <p class="subtitle">アニメーション&amp;グラフィックツールの統合プラットフォーム — すべてブラウザ内処理・依存ゼロ</p>
-    <p class="count" id="count"></p>
-  </header>
-
-  <div id="catalog"></div>
-
-  <footer>
-    すべてビルド不要の単体HTML。カードをクリックすると新しいタブで開きます。<br>
-    ツールを増やしたら <code>tools/</code> にHTMLを置き、<code>index.html</code> 内の <code>TOOLS</code> に1件足すだけで一覧に反映されます。
-  </footer>
+    <div class="catalog-content" id="catalog"></div>
+    <div class="empty-state" id="emptyState" hidden><span aria-hidden="true">⌕</span><h2>一致するツールがありません</h2><p>検索語や書き出し形式を変えてみてください。</p><button id="clearFilters" type="button">フィルターをリセット</button></div>
+    <footer class="library-footer"><span>19 TOOLS / 21 WORKSPACES</span><span>同じツールでも、目的に合わせた入口を用意しています。</span></footer>
+  </main>
 </div>
 
 <script>
 /* ------------------------------------------------------------------
-   ツール定義 — 増えたらここに1件足すだけ。thumb はカード内サムネSVG。
+   ツール定義 — 追加時は TOOLS と TOOL_META の両方を更新。thumb はカード内サムネSVG。
 ------------------------------------------------------------------ */
 const CATEGORIES = [
-  { key:"raster",    name:"Raster",    desc:"ビットマップ・ピクセル・質感" },
-  { key:"motion",    name:"Motion",    desc:"動き・アニメーション" },
+  {key:"image", name:"画像加工", english:"IMAGE PROCESSING", icon:"◩", desc:"画像・動画に質感やエフェクトを加える"},
+  {key:"texture", name:"背景・テクスチャ", english:"BACKGROUNDS & TEXTURES", icon:"▧", desc:"色・粒子・パターンから、動く背景をつくる"},
+  {key:"type", name:"タイプ・ロゴ", english:"TYPE & LOGO", icon:"T", desc:"文字やロゴを、印象的なグラフィックに"},
+  {key:"motion", name:"モーション・合成", english:"MOTION & COMPOSITING", icon:"▷", desc:"素材を組み合わせ、リズムと切り替わりをつくる"},
+  {key:"3d", name:"3D・シェイプ", english:"3D & SHAPES", icon:"◇", desc:"立体の形・質感・動きを編集する"},
 ];
 
 const TOOLS = [
@@ -432,39 +375,111 @@ const TOOLS = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-const catalog = document.getElementById("catalog");
-CATEGORIES.forEach(cat=>{
-  const tools = TOOLS.filter(t=>t.cat===cat.key);
-  if(!tools.length) return;
-  const sec = document.createElement("section");
-  sec.className = "cat";
-  sec.innerHTML = `<div class="cat-head"><span class="cat-name">${cat.name}</span><span class="cat-desc">${cat.desc}</span></div>`;
-  const grid = document.createElement("div");
-  grid.className = "grid";
-  tools.forEach(t=>{
-    const a = document.createElement("a");
-    a.className = "card";
-    a.href = t.href;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.innerHTML = `
-      <div class="thumb">${t.thumb}</div>
-      <div class="body">
-        <div class="name">${t.name}</div>
-        <div class="desc">${t.desc}</div>
-        <div class="foot">
-          <span class="tag">${cat.name}</span>
-          <span class="open">開く <span class="arrow">→</span></span>
-        </div>
-      </div>`;
-    if(t.draw) t.draw(a.querySelector("svg"));
-    grid.appendChild(a);
-  });
-  sec.appendChild(grid);
-  catalog.appendChild(sec);
+/* Purpose-oriented entrances share the original tools and their saved settings. */
+const TOOL_META = {
+  "Egg Glass": {cat:"3d", input:"図形 / 画像", output:["PNG","VIDEO","HTML"], summary:"卵形3Dの柄・ロゴ・照明を編集。スクロールに合わせた動きも。"},
+  "Halftone Lab": {cat:"image", input:"画像", output:["PNG","SVG","VIDEO","HTML"], summary:"画像を網点・ディザ・ASCIIに。質感を重ねて、印刷のような表現に。"},
+  "Dither → SVG": {cat:"image", input:"画像", output:["PNG","SVG"], summary:"写真やイラストを網点・ディザ・ドットへ。ベクターで書き出し。"},
+  "Pixel Gradient": {cat:"texture", input:"生成", output:["PNG"], summary:"メッシュグラデーションにピクセル・ポスタライズ・グレインを加える。"},
+  "Thermal Flow": {cat:"texture", input:"生成", output:["PNG","VIDEO","HTML"], summary:"炎のフレームと流体グラデーション。形・配色・動きをつくる。"},
+  "Smearworks": {cat:"image", input:"画像", output:["PNG"], summary:"ポートレートに放射ブラーと残像。顔を残して、色面を引き伸ばす。"},
+  "Grid Stretch": {cat:"image", input:"画像", output:["PNG"], summary:"画像をグリッドで切り分け、ピクセルを引き伸ばすグリッチ。"},
+  "ASCII Wave": {cat:"texture", input:"生成", output:["PNG","VIDEO","HTML"], summary:"流体ノイズを文字で描く。カーソルに反応するASCIIの背景。"},
+  "Warp Type": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字を波打たせ、ノイズで歪ませる。動くタイポグラフィ。"},
+  "U19 Aberration": {cat:"type", input:"テキスト / ロゴ", output:["PNG","VIDEO"], collection:"u19", summary:"文字やロゴの輪郭をサーモカラーで発光。背景と合成する。"},
+  "U19 Tile Scroll": {cat:"motion", input:"ロゴ / 映像", output:["PNG","VIDEO"], collection:"u19", summary:"流れるロゴタイルでシーンをつなぐ。ワイプと速度をキーフレームで。"},
+  "U19 HUD Sequence": {cat:"motion", input:"動画", output:["VIDEO"], collection:"u19", summary:"HUDが立ち上がり、映像ウィンドウが開く。動画を差し替えるだけ。"},
+  "Flame Transition": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"サーモカラーの炎でシーンを切り替え。透過レイヤーにも。"},
+  "Effect Stack": {cat:"image", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"14種のエフェクトを重ねる。順序を変え、偶発的な表現を探る。"},
+  "Heatmap Blur": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字をぼかし、伸ばし、熱に変える。配色と動きを編集する。"},
+  "Glass Lab": {cat:"texture", input:"生成 / 画像 / 動画", output:["PNG","VIDEO"], summary:"光の球体を型板ガラス越しに歪ませる。画像・動画の加工にも。"},
+  "Image Switcher": {cat:"motion", input:"画像 / ロゴ", output:["PNG","VIDEO","HTML"], summary:"複数の画像でロゴOPやスライドを制作。テンポと始まり・終わりを調整。"},
+  "Word Switcher": {cat:"type", input:"登録済みSVG", output:["PNG","SVG","VIDEO","HTML"], summary:"登録済みの単語SVGをリズミカルに切り替える。順序・間隔・動きを編集。"},
+  "Wireframe": {cat:"3d", input:"図形", output:["PNG","SVG","VIDEO","HTML"], summary:"ジオメトリックなワイヤーフレーム。線と立体で動きをつくる。"},
+};
+const ENTRIES = TOOLS.flatMap(tool=>{
+  const entry={...tool,...TOOL_META[tool.name],toolName:tool.name};
+  if(tool.name==="Halftone Lab") return [
+    {...entry,name:"Halftone Image",href:tool.href+"?workspace=image",workspace:"画像を加工"},
+    {...entry,name:"Halftone Pattern",cat:"texture",input:"生成",href:tool.href+"?workspace=generate",workspace:"模様を生成",summary:"リップル・シェイプ・波形から、動く網点やASCIIパターンを生成。"}
+  ];
+  if(tool.name==="Heatmap Blur") return [
+    {...entry,name:"Heatmap Type",href:tool.href+"?workspace=type",workspace:"文字を編集"},
+    {...entry,name:"Heatmap Media",cat:"image",input:"画像 / 動画",href:tool.href+"?workspace=media",workspace:"画像・動画を加工",summary:"画像・動画の明るさをヒートマップ配色へ。ブラーとグレインも調整。"}
+  ];
+  return [entry];
 });
-document.getElementById("count").textContent = `${TOOLS.length} tools`;
+const $=id=>document.getElementById(id);
+const state={category:"all",collection:"",query:"",output:""};
+const catalog=$("catalog");
+const nav=$("categoryNav");
+function makeNav(key,name,icon,count){
+  const button=document.createElement("button");
+  button.type="button";button.className="nav-item";button.dataset.category=key;
+  button.innerHTML=`<span class="nav-symbol" aria-hidden="true">${icon}</span><span>${name}</span><span class="nav-count">${count}</span>`;
+  button.addEventListener("click",()=>{state.category=key;state.collection="";update(true);});
+  nav.appendChild(button);
+}
+makeNav("all","すべてのツール","⊞",ENTRIES.length);
+CATEGORIES.forEach(cat=>makeNav(cat.key,cat.name,cat.icon,ENTRIES.filter(t=>t.cat===cat.key).length));
+$("totalCount").textContent=`${TOOLS.length} tools · ${ENTRIES.length} workspaces`;
+function readLocation(){
+  const params=new URLSearchParams(location.search);
+  const category=params.get("category");
+  state.category=CATEGORIES.some(c=>c.key===category)?category:"all";
+  state.collection=params.get("collection")==="u19"?"u19":"";
+  state.query=params.get("q")||"";
+  state.output=["PNG","SVG","VIDEO","HTML"].includes(params.get("output"))?params.get("output"):"";
+  $("search").value=state.query;$("outputFilter").value=state.output;
+}
+function saveLocation(push){
+  const url=new URL(location.href);
+  for(const key of ["category","collection","q","output"])url.searchParams.delete(key);
+  if(state.category!=="all")url.searchParams.set("category",state.category);
+  if(state.collection)url.searchParams.set("collection",state.collection);
+  if(state.query)url.searchParams.set("q",state.query);
+  if(state.output)url.searchParams.set("output",state.output);
+  if(url.href!==location.href)history[push?"pushState":"replaceState"](null,"",url);
+}
+function makeCard(t,index){
+  const a=document.createElement("a");a.className="card";a.href=t.href;
+  a.setAttribute("aria-label",`${t.name} — ${t.workspace||t.input}`);
+  a.innerHTML=`<div class="thumb" aria-hidden="true">${t.thumb}<span class="thumb-index">${String(index+1).padStart(2,"0")}</span><span class="thumb-open">↗</span></div><div class="card-body"><div class="card-title"><h3>${t.name}</h3>${t.collection?'<span class="collection-tag">U19</span>':""}</div><div class="workspace-label">${t.workspace?t.toolName+" / ":""}${t.workspace||t.input}</div><p>${t.summary}</p><div class="card-meta"><span class="input-tag">${t.input}</span><span class="output-tags">${t.output.map(o=>`<span>${o==="VIDEO"?"動画":o}</span>`).join("")}</span></div></div>`;
+  if(t.draw)t.draw(a.querySelector("svg"));
+  // Repeated tool entrances use the same artwork; keep SVG paint IDs unique.
+  const ids=new Map();a.querySelectorAll("svg [id]").forEach(el=>{const id=el.id;ids.set(id,`${id}-${index}`);el.id=ids.get(id);});
+  a.querySelectorAll("svg *").forEach(el=>[...el.attributes].forEach(at=>{let v=at.value;ids.forEach((fresh,old)=>{v=v.replaceAll(`url(#${old})`,`url(#${fresh})`);});if(v!==at.value)el.setAttribute(at.name,v);}));
+  return a;
+}
+function render(){
+  const cat=CATEGORIES.find(c=>c.key===state.category);
+  $("pageTitle").textContent=state.collection?"U19 コレクション":cat?cat.name:"すべてのツール";
+  $("pageDescription").textContent=state.collection?"U19のビジュアルをつくる、3つのワークスペース。":cat?cat.desc:"つくりたい表現から、ワークスペースを選ぶ。";
+  nav.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(!state.collection&&b.dataset.category===state.category)));
+  $("u19Filter").setAttribute("aria-pressed",String(!!state.collection));
+  const words=state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const results=ENTRIES.filter(t=>{
+    const haystack=[t.name,t.toolName,t.summary,t.input,t.workspace,CATEGORIES.find(c=>c.key===t.cat).name,...t.output].join(" ").toLocaleLowerCase();
+    return (state.category==="all"||state.category===t.cat)&&(!state.collection||t.collection===state.collection)&&(!state.output||t.output.includes(state.output))&&words.every(w=>haystack.includes(w));
+  });
+  catalog.replaceChildren();
+  CATEGORIES.forEach(category=>{
+    const entries=results.filter(t=>t.cat===category.key);if(!entries.length)return;
+    const section=document.createElement("section");section.className="category-section";section.setAttribute("aria-label",category.name);
+    section.innerHTML=`<div class="section-heading"><h2>${category.name}</h2><span>${category.english}</span><b>${String(entries.length).padStart(2,"0")}</b></div><div class="tool-grid"></div>`;
+    const grid=section.querySelector(".tool-grid");entries.forEach(t=>grid.appendChild(makeCard(t,ENTRIES.indexOf(t))));catalog.appendChild(section);
+  });
+  $("resultCount").textContent=`${results.length} ワークスペース`;
+  $("emptyState").hidden=results.length>0;
+}
+function update(push=false){saveLocation(push);render();}
+$("search").addEventListener("input",e=>{state.query=e.target.value;update();});
+$("outputFilter").addEventListener("change",e=>{state.output=e.target.value;update(true);});
+$("u19Filter").addEventListener("click",()=>{state.collection=state.collection?"":"u19";state.category="all";update(true);});
+$("clearFilters").addEventListener("click",()=>{Object.assign(state,{category:"all",collection:"",query:"",output:""});$("search").value="";$("outputFilter").value="";update(true);$("search").focus();});
+window.addEventListener("popstate",()=>{readLocation();render();});
+document.addEventListener("keydown",e=>{if(e.key==="/"&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("search").focus();}});
+readLocation();render();
 </script>
 </body>
 </html>

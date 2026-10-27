@@ -6,8 +6,22 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif}button,input,select{font:inherit;color:inherit}button,select{cursor:pointer}button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 11px}button:hover{border-color:var(--line-hover)}button:disabled{opacity:.35;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}input[type=range]{accent-color:var(--accent);width:100%;min-width:0}input[type=checkbox]{accent-color:var(--accent)}input[type=number],select{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:6px 8px;min-width:0}input[type=number]{width:76px}input[type=color]{border:0;width:34px;height:27px;background:none;padding:0}select{max-width:100%}.accent{background:var(--accent);border-color:var(--accent);color:var(--text)}.quiet{background:transparent}#app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100dvh;min-width:1000px}#preview{display:flex;flex-direction:column;min-width:0;padding:24px 30px 18px;gap:16px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.eyebrow{font:10px var(--font-mono);letter-spacing:.12em;color:var(--subtext)}.actions{display:flex;gap:7px;flex-wrap:wrap}.small{padding:5px 9px;font-size:11px}#stageArea{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;border:1px solid var(--line);border-radius:8px;background:var(--panel)}#stageFrame{line-height:0;max-width:100%;max-height:100%;background:repeating-conic-gradient(var(--panel2) 0 25%,var(--line) 0 50%) 0/16px 16px}#view{display:block;max-width:100%;max-height:100%;width:100%;height:100%}#empty{position:absolute;text-align:center;line-height:1.8;color:var(--subtext)}#empty strong{font-size:18px;color:var(--text);display:block}#transport{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px}#transport button{min-width:39px}#time{font:11px var(--font-mono);white-space:nowrap;color:var(--subtext)}#filmstrip{display:flex;gap:8px;overflow-x:auto;min-height:68px;padding:2px}#filmstrip button{padding:3px;flex:0 0 94px;height:64px;position:relative;background:var(--panel2)}#filmstrip img{width:100%;height:100%;object-fit:contain}#filmstrip span{position:absolute;left:6px;bottom:3px;font:10px var(--font-mono);background:var(--panel);padding:1px 4px}#filmstrip .current{border-color:var(--accent)}.preview-footer{display:flex;justify-content:space-between;align-items:center;min-height:30px;color:var(--faint);font:10px var(--font-mono)}#mlab-home{color:var(--subtext);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:5px 10px;letter-spacing:.08em}#panel{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-left:1px solid var(--line)}header{padding:21px 20px 15px;border-bottom:1px solid var(--line)}h1{font:600 15px var(--font-mono);letter-spacing:.1em;margin:0 0 4px}header p{margin:0;color:var(--subtext);font-size:11px}#settings{flex:1;overflow:auto;min-height:0}section,details{padding:17px 20px;border-bottom:1px solid var(--line)}h2,summary{font-size:12px;font-weight:600;margin:0 0 12px}summary{cursor:pointer;margin:0}details[open]>summary{margin-bottom:14px}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.heading h2{margin:0}.counter{font:10px var(--font-mono);color:var(--subtext)}.hint{font-size:11px;line-height:1.65;color:var(--subtext);margin:8px 0 0}.field{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px}.field>label{font-size:11px;color:var(--subtext);flex-shrink:0}.field>select{flex:1}.range{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.range output{font:11px var(--font-mono);text-align:right;min-width:42px}.range input[type=number]{width:70px;text-align:right}.seg{display:flex;gap:5px}.seg button{flex:1;font-size:11px;padding:8px 4px}.seg button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}#dropzone{display:block;width:100%;padding:15px 10px;border:1px dashed var(--line-hover);background:var(--panel2);text-align:center}#dropzone strong{display:block;font-size:12px}#dropzone span{font-size:10px;color:var(--subtext)}#dropzone.dragover{border-color:var(--accent);background:var(--accent-soft)}#assetList{margin-top:10px;max-height:185px;overflow:auto;display:grid;gap:5px}.asset{display:flex;align-items:center;gap:8px;padding:5px;border:1px solid var(--line);border-radius:5px}.asset.selected{border-color:var(--accent)}.asset.disabled{opacity:.45}.asset.dragging{opacity:.3}.asset .thumb{padding:0;width:43px;height:34px;flex-shrink:0}.asset img{width:100%;height:100%;object-fit:contain}.asset .name{flex:1;min-width:0;text-align:left;font-size:10px;border:0;padding:0;background:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asset .order{color:var(--faint);font:10px var(--font-mono);cursor:grab}.asset .small{padding:3px 5px}.asset input{margin:0}.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}.presets button{text-align:left;font-size:12px;padding:10px}.presets small{display:block;color:var(--subtext);font-size:10px;margin-top:3px}.presets [aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent)}#exportBar{padding:13px 20px 15px;border-top:1px solid var(--line);background:var(--panel)}#exportBar>.actions{display:grid;grid-template-columns:1fr 1fr}#exportBar>.actions+.actions{margin-top:6px}#status{min-height:18px;margin:8px 0 0;color:var(--subtext);font-size:10px}dialog{background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--text);width:380px;padding:25px}dialog::backdrop{background:var(--bg);opacity:.8}dialog progress{width:100%;accent-color:var(--accent)}#toast{position:fixed;left:30px;top:76px;max-width:600px;background:var(--panel2);border:1px solid var(--line-hover);border-radius:7px;padding:10px 15px;z-index:20;pointer-events:none;opacity:0;transition:opacity .2s}#toast.show{opacity:1}[hidden]{display:none!important}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<link rel="stylesheet" href="../shared/editor-history.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/numeric-input.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/motion-keyboard.css" data-ml-keyboard>
+<script src="../shared/editor-history.js" data-ml-keyboard></script>
+<script src="../shared/numeric-input.js" data-ml-keyboard></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-motion.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-motion-workbench" data-ml-motion="image-switcher">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"></div><div class="ml-document"><strong>Image Switcher</strong><span class="ml-context">画像を並べて、動きをつくる</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
 <div id="app">
  <main id="preview">
   <div class="topbar"><span class="eyebrow">IMAGE SWITCHER / PREVIEW</span><div class="actions"><button class="small quiet" id="undo" disabled>↶ 戻す</button><button class="small quiet" id="redo" disabled>↷ やり直す</button><button class="small" id="restart">↺ 最初から</button></div></div>
@@ -63,7 +77,19 @@
 const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const DEFAULTS={width:1600,height:900,effect:'cut',hold:.22,transition:.35,scale:32,fit:'contain',background:'#ffffff',transparent:false,loop:false,order:'sequential',firstHold:.9,lastHold:.7,entrance:'reveal',enterTime:.35,ending:'collapse',exitTime:.4,fps:30};
 let config={...DEFAULTS},assets=[],selected=null,samples=true,preset='opening',renderer=null,time=0,playing=false,lastNow=0,busy=false,cancelled=false,ready=false,undoStack=[],redoStack=[];
+/* ML_KEYBOARD_BEGIN:history-vars */
 const images=new Map(),view=$('#view');
+let mlImageHistory=null,mlImageGesture=null;
+/* ML_KEYBOARD_END:history-vars *//* QA_FIX_BEGIN:image-cache-retention */
+
+const mlImagePendingIds=new Set();
+function pruneImageCache(){
+ const keep=new Set(mlImagePendingIds);
+ for(const state of [{assets},...undoStack,...redoStack,mlImageGesture])for(const asset of state?.assets||[])keep.add(asset.id);
+ for(const id of images.keys())if(!keep.has(id))images.delete(id);
+}
+
+/* QA_FIX_END:image-cache-retention */
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3600)}
 function createRenderer(c,items,target){
  const list=items.filter(a=>a.enabled),sequence=c.order==='pingpong'&&list.length>1?list.concat(list.slice(c.loop?1:0,-1).reverse()):list;
@@ -104,11 +130,19 @@ function createRenderer(c,items,target){
 }
 function decodedItems(){return assets.map(a=>({...a,image:images.get(a.id)}))}
 function snapshot(){return{config:{...config},assets:assets.map(a=>({...a})),selected,samples,preset,time}}
-function checkpoint(){undoStack.push(snapshot());if(undoStack.length>30)undoStack.shift();redoStack=[];syncHistory()}
+/* ML_KEYBOARD_BEGIN:checkpoint */
+/* QA_FIX_BEGIN:image-cache-checkpoint */
+function checkpoint(){if(mlImageGesture||mlImageHistory?.isRestoring)return;undoStack.push(snapshot());if(undoStack.length>30)undoStack.shift();redoStack=[];pruneImageCache();syncHistory();mlImageHistory?.refresh()}
+/* QA_FIX_END:image-cache-checkpoint */
+/* ML_KEYBOARD_END:checkpoint */
 function syncHistory(){$('#undo').disabled=busy||!undoStack.length;$('#redo').disabled=busy||!redoStack.length}
 function restore(s){config={...s.config};assets=s.assets.map(a=>({...a}));selected=s.selected;samples=s.samples;preset=s.preset;time=s.time;playing=false;refresh(false)}
 function travel(from,to){if(busy||!from.length)return;to.push(snapshot());restore(from.pop());syncHistory()}
-function refresh(reset=true){if(reset)time=0;renderer=createRenderer(config,decodedItems(),view);time=Math.min(time,renderer.duration);if(!assets.some(a=>a.enabled))playing=false;syncUI();renderAssets();resize();draw();}
+/* ML_KEYBOARD_BEGIN:sync-numbers */
+/* QA_FIX_BEGIN:image-cache-refresh */
+function refresh(reset=true){if(reset)time=0;renderer=createRenderer(config,decodedItems(),view);time=Math.min(time,renderer.duration);if(!assets.some(a=>a.enabled))playing=false;syncUI();renderAssets();resize();draw();window.MLNumberInputs?.refresh();mlImageHistory?.refresh();pruneImageCache();}
+/* QA_FIX_END:image-cache-refresh */
+/* ML_KEYBOARD_END:sync-numbers */
 function resize(){const area=$('#stageArea').getBoundingClientRect(),s=Math.min((area.width-32)/config.width,(area.height-32)/config.height);const frame=$('#stageFrame');frame.style.width=Math.max(1,config.width*s)+'px';frame.style.height=Math.max(1,config.height*s)+'px';const resolution=Math.min(1,Math.max(.1,s)*(window.devicePixelRatio||1));view.width=Math.round(config.width*resolution);view.height=Math.round(config.height*resolution);draw()}
 function draw(){if(!renderer)return;const f=renderer.render(time);$('#seek').max=renderer.duration||1;$('#seek').value=time;$('#time').textContent=time.toFixed(2)+' / '+renderer.duration.toFixed(2)+' s';$('#play').textContent=playing?'Ⅱ 停止':'▶ 再生';$('#empty').hidden=!!f.asset;$('#filmstrip').querySelectorAll('button').forEach(b=>b.classList.toggle('current',b.dataset.id===f.asset?.id));}
 function frame(now){if(playing&&!busy){time+=(now-lastNow)/1000;if(time>=renderer.duration){if(config.loop&&renderer.duration>0)time%=renderer.duration;else{time=renderer.duration;playing=false}}draw()}lastNow=now;requestAnimationFrame(frame)}
@@ -143,11 +177,15 @@ function normalizeConfig(raw={}){const c={...DEFAULTS};for(const key of Object.k
 }
 async function decodeImage(src){if(typeof src!=='string'||!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/i.test(src))throw Error('対応していない画像形式です');const image=new Image();image.src=src;await image.decode();if(!image.naturalWidth||!image.naturalHeight||image.naturalWidth*image.naturalHeight>24000000)throw Error('画像は2400万画素以内にしてください');return image}
 const readData=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('ファイルを読み込めません'));r.readAsDataURL(file)});
+/* QA_FIX_BEGIN:image-cache-import-pins */
 async function addFiles(files){if(busy||!files.length)return;setBusy(true,false);const added=[],fail=[];let area=samples?0:assets.reduce((n,a)=>n+a.width*a.height,0);try{for(const file of files){try{if((samples?0:assets.length)+added.length>=40)throw Error('画像は40枚までです');if(file.size>40*1024*1024)throw Error('1枚40MB以内にしてください');let src=await readData(file);if(!file.type){const ext=file.name.split('.').pop().toLowerCase(),mime={png:'png',jpg:'jpeg',jpeg:'jpeg',webp:'webp',svg:'svg+xml'}[ext];if(mime)src=src.replace(/^data:[^;]*;/,'data:image/'+mime+';')}
- const image=await decodeImage(src),width=image.naturalWidth,height=image.naturalHeight;if(area+width*height>100000000)throw Error('画像の合計が大きすぎます');area+=width*height;const id=crypto.randomUUID();images.set(id,image);added.push({id,name:file.name,src,width,height,enabled:true,x:50,y:50});}catch(e){fail.push(file.name+': '+e.message)}}
- if(added.length){checkpoint();if(samples)assets=[];assets.push(...added);samples=false;selected=added[0].id;playing=false;refresh();toast(added.length+'枚を追加しました'+(fail.length?' / '+fail.length+'枚は読み込めませんでした':''))}if(fail.length)toast(fail.join('\n'));}finally{setBusy(false,false);$('#files').value=''}}
+ const image=await decodeImage(src),width=image.naturalWidth,height=image.naturalHeight;if(area+width*height>100000000)throw Error('画像の合計が大きすぎます');area+=width*height;const id=crypto.randomUUID();mlImagePendingIds.add(id);images.set(id,image);added.push({id,name:file.name,src,width,height,enabled:true,x:50,y:50});}catch(e){fail.push(file.name+': '+e.message)}}
+ if(added.length){checkpoint();if(samples)assets=[];assets.push(...added);samples=false;selected=added[0].id;playing=false;refresh();toast(added.length+'枚を追加しました'+(fail.length?' / '+fail.length+'枚は読み込めませんでした':''))}if(fail.length)toast(fail.join('\n'));}finally{for(const asset of added)mlImagePendingIds.delete(asset.id);pruneImageCache();setBusy(false,false);$('#files').value=''}}
+/* QA_FIX_END:image-cache-import-pins */
 function applyPreset(name){checkpoint();preset=name;Object.assign(config,{firstHold:0,lastHold:0,entrance:'none',ending:'hold',loop:true});if(name==='opening')Object.assign(config,{effect:'cut',hold:.22,scale:32,fit:'contain',firstHold:.9,lastHold:.7,entrance:'reveal',enterTime:.35,ending:'collapse',exitTime:.4,loop:false});if(name==='soft')Object.assign(config,{effect:'fade',hold:1.1,transition:.55,scale:65,fit:'contain'});if(name==='slide')Object.assign(config,{effect:'slideleft',hold:.8,transition:.45,scale:65,fit:'contain'});if(name==='photo')Object.assign(config,{effect:'fade',hold:1.5,transition:.6,scale:100,fit:'cover'});playing=true;lastNow=performance.now();refresh()}
-function setBusy(value,dialog=true){busy=value;$('#settings').inert=value;$('#transport').inert=value;$('#filmstrip').inert=value;document.querySelector('.topbar').inert=value;$('#exportBar').inert=value;syncHistory();if(dialog){if(value){cancelled=false;$('#progress').value=0;$('#exportMessage').textContent='準備しています…';$('#exportDialog').showModal()}else $('#exportDialog').close()}if(!value)syncUI()}
+/* ML_KEYBOARD_BEGIN:busy-status */
+function setBusy(value,dialog=true){busy=value;$('#settings').inert=value;$('#transport').inert=value;$('#filmstrip').inert=value;document.querySelector('.topbar').inert=value;$('#exportBar').inert=value;syncHistory();if(dialog){if(value){cancelled=false;$('#progress').value=0;$('#exportMessage').textContent='準備しています…';$('#exportDialog').showModal()}else $('#exportDialog').close()}if(!value)syncUI();mlImageHistory?.refresh()}
+/* ML_KEYBOARD_END:busy-status */
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 function canvasBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error('画像の書き出しに失敗しました')),'image/png'))}
 function outputRenderer(){const canvas=document.createElement('canvas');canvas.width=config.width;canvas.height=config.height;return{canvas,render:createRenderer({...config},decodedItems(),canvas)}}
@@ -164,7 +202,9 @@ async function exportSequence(){if(busy||!renderer.duration)return;const saved={
 async function exportVideo(){if(busy||!renderer.duration)return;let recorder,stream,timer;const saved={time,playing};playing=false;setBusy(true);try{if(typeof MediaRecorder==='undefined')throw Error('このブラウザでは動画を保存できません。PNG連番を使えます');const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(m=>MediaRecorder.isTypeSupported(m));if(!mime)throw Error('動画の保存形式に対応していません。PNG連番を使えます');const{canvas,render}=outputRenderer();if(!canvas.captureStream)throw Error('動画の保存に対応していません');render.render(0,true);stream=canvas.captureStream(config.fps);recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:Math.min(40000000,Math.max(8000000,config.width*config.height*config.fps*.3))});const chunks=[];const done=new Promise(resolve=>{recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onerror=e=>resolve(Error(e.error?.message||'録画に失敗しました'));recorder.onstop=()=>resolve(null)});recorder.start(200);const start=performance.now();await new Promise((resolve,reject)=>{recorder.addEventListener('error',()=>reject(Error('録画に失敗しました')),{once:true});const update=()=>{if(cancelled){resolve();return}const elapsed=(performance.now()-start)/1000;render.render(Math.min(elapsed,render.duration),true);$('#progress').value=elapsed/render.duration;$('#exportMessage').textContent=Math.min(elapsed,render.duration).toFixed(1)+' / '+render.duration.toFixed(1)+' 秒';if(elapsed>=render.duration){resolve();return}timer=setTimeout(update,1000/config.fps)};update()});if(recorder.state!=='inactive')recorder.stop();const recordError=await done;if(recordError)throw recordError;if(cancelled)return;if(!chunks.length)throw Error('動画を生成できませんでした');download(new Blob(chunks,{type:recorder.mimeType}),mime.startsWith('video/mp4')?'image-switcher.mp4':'image-switcher.webm');toast('動画を保存しました')}catch(e){toast(e.message)}finally{clearTimeout(timer);if(recorder&&recorder.state!=='inactive')recorder.stop();stream?.getTracks().forEach(t=>t.stop());time=saved.time;playing=saved.playing;lastNow=performance.now();setBusy(false);draw()}}
 function bindInputs(){
  const ranges=['hold','transition','scale','focusX','focusY'];ranges.forEach(id=>{$('#'+id).addEventListener('pointerdown',()=>{if(!busy)checkpoint()});$('#'+id).addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)&&!e.repeat)checkpoint()});$('#'+id).oninput=e=>{if(busy)return;const val=+e.target.value;if(id.startsWith('focus')){const a=assets.find(a=>a.id===selected);if(a)a[id==='focusX'?'x':'y']=val}else{config[id]=val;preset=''}refresh(false)}});
- for(const id of ['holdN','transitionN','width','height','firstHold','lastHold','enterTime','exitTime'])$('#'+id).onchange=e=>{if(busy)return;checkpoint();const key=id.endsWith('N')?id.slice(0,-1):id;config=normalizeConfig({...config,[key]:Number(e.target.value)});preset='';refresh(false)};
+/* ML_KEYBOARD_BEGIN:number-handlers */
+ // Permanent numeric bindings below own number edits; range rendering handlers remain unchanged.
+/* ML_KEYBOARD_END:number-handlers */
  for(const id of ['effect','order','fit','entrance','ending','fps','background','transparent','loop'])$('#'+id).onchange=e=>{if(busy)return;checkpoint();config[id]=e.target.type==='checkbox'?e.target.checked:id==='fps'?+e.target.value:e.target.value;preset='';refresh(false)};
  $('#size').onchange=e=>{if(e.target.value==='custom')return;checkpoint();[config.width,config.height]=e.target.value.split('x').map(Number);refresh(false)};
 }
@@ -184,5 +224,112 @@ function sampleSources(){const variations=[
  ];return variations.map((inner,i)=>({name:'Sample '+String(i+1).padStart(2,'0')+'.svg',src:'data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="260" viewBox="0 0 800 260" fill="#111111">'+inner+'</svg>')}))}
 async function init(){for(const sample of sampleSources()){const image=await decodeImage(sample.src),id=crypto.randomUUID();images.set(id,image);assets.push({...sample,id,width:image.naturalWidth,height:image.naturalHeight,enabled:true,x:50,y:50})}selected=assets[0].id;bindInputs();refresh();time=renderer.slots[0].start;draw();ready=true;new ResizeObserver(resize).observe($('#stageArea'));requestAnimationFrame(frame)}
 init().catch(e=>toast(e.message));
+/* ML_KEYBOARD_BEGIN:integration */
+
+(function(){
+ if(!window.MLEditorHistory||!window.MLNumberInputs)return;
+ const authored=s=>JSON.stringify({config:s.config,assets:s.assets,samples:s.samples,preset:s.preset});
+ mlImageHistory=MLEditorHistory.register({name:'Image Switcher',toolbar:false,isBusy:()=>busy||!ready,native:{
+  begin(){mlImageGesture=snapshot();},
+/* QA_FIX_BEGIN:image-cache-gesture-commit */
+  commit(){const before=mlImageGesture;mlImageGesture=null;if(before&&authored(before)!==authored(snapshot())){undoStack.push(before);if(undoStack.length>30)undoStack.shift();redoStack=[];}pruneImageCache();syncHistory();},
+/* QA_FIX_END:image-cache-gesture-commit */
+  cancel(){const before=mlImageGesture;mlImageGesture=null;if(before)restore(before);syncHistory();},
+  undo:()=>travel(undoStack,redoStack),redo:()=>travel(redoStack,undoStack),
+  canUndo:()=>undoStack.length>0,canRedo:()=>redoStack.length>0
+ }});
+ $('#undo').onclick=()=>mlImageHistory.undo();$('#redo').onclick=()=>mlImageHistory.redo();
+ const write=(key,value)=>{if(busy)return;checkpoint();if(key==='focusX'||key==='focusY'){const a=assets.find(a=>a.id===selected);if(a)a[key==='focusX'?'x':'y']=value;}else{config=normalizeConfig({...config,[key]:value});preset='';}refresh(false);};
+ for(const id of ['hold','transition','scale','focusX','focusY']){
+  const pair=id==='hold'?'#holdN':id==='transition'?'#transitionN':null;
+  MLNumberInputs.bind({range:'#'+id,number:pair,readout:id==='scale'?'#scaleValue':null,suffix:['scale','focusX','focusY'].includes(id)?'%':'s',getValue:()=>id.startsWith('focus')?(assets.find(a=>a.id===selected)?.[id==='focusX'?'x':'y']??50):config[id],setValue:v=>write(id,v)});
+ }
+ for(const id of ['width','height','firstHold','lastHold','enterTime','exitTime'])MLNumberInputs.bind({number:'#'+id,integer:['width','height'].includes(id),getValue:()=>config[id],setValue:v=>write(id,v)});
+})();
+
+/* ML_KEYBOARD_END:integration */</script>
+
+<script data-ml-shell="motion">
+
+/* Additive workbench presentation. The original rendering/export script is unchanged. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const app=byId('app');
+  const header=byId('mlMotionToolbar');
+  const home=byId('mlab-home');
+  if(home){home.textContent='↖ MOTION LAB';home.classList.add('ml-home');header.querySelector('.ml-motion-home').append(home);}
+  const rail=document.createElement('aside');rail.id='mlMotionSources';rail.className='ml-motion-sources';rail.setAttribute('aria-label','素材とルック');
+  rail.innerHTML='<div class="ml-motion-eyebrow">SOURCE / 素材</div>';
+  function move(target,...nodes){nodes.filter(Boolean).forEach(node=>target.append(node));}
+  function title(text){const h=document.createElement('div');h.className='ml-motion-eyebrow';h.textContent=text;return h;}
+  function labelControls(root=document){
+    root.querySelectorAll('.prow,.field').forEach(row=>{
+      const label=row.querySelector(':scope > label,:scope > span:first-child');if(!label)return;
+      const text=label.textContent.trim();if(!text)return;
+      row.querySelectorAll('input,select,textarea').forEach(control=>{
+        if(control.hasAttribute('aria-label')||control.labels?.length)return;
+        control.setAttribute('aria-label',text);
+      });
+    });
+    root.querySelectorAll('button[title]').forEach(button=>{if(!button.hasAttribute('aria-label')&&button.textContent.trim().length<4)button.setAttribute('aria-label',button.title);});
+  }
+  function jumpTo(node){
+    if(!node)return;
+    if(node.matches('details'))node.open=true;
+    const details=node.closest('details');if(details)details.open=true;
+    node.classList.remove('collapsed');
+    node.scrollIntoView({block:'nearest',behavior:'auto'});
+    const control=node.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)');if(control)control.focus({preventScroll:true});
+  }
+  function tabs(panel,groups){
+    const nav=document.createElement('nav');nav.className='ml-motion-tabs';nav.setAttribute('aria-label','設定パネル');
+    const wrappers={};
+    for(const [key,label,nodes] of groups){
+      const button=document.createElement('button');button.type='button';button.className='ml-motion-tab';button.dataset.motionTab=key;button.textContent=label;
+      nav.append(button);
+      const group=document.createElement('div');group.className='ml-motion-group';group.id='ml-motion-'+key;wrappers[key]=group;move(group,...nodes);panel.append(group);
+    }
+    panel.prepend(nav);
+    const select=key=>{
+      for(const [name,group]of Object.entries(wrappers))group.hidden=name!==key;
+      nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.motionTab===key)));
+      panel.scrollTop=0;
+    };
+    nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)select(b.dataset.motionTab);});
+    select(groups[0][0]);return select;
+  }
+  function unsupported(stage,message,ids){
+    const note=document.createElement('div');note.className='ml-motion-capability ml-capability';note.setAttribute('role','status');
+    const strong=document.createElement('strong');strong.textContent='この環境ではプレビューできません';
+    const text=document.createElement('p');text.textContent=message;
+    const help=document.createElement('small');help.textContent='設定やファイルは変更されていません。対応ブラウザで同じページを開いてください。';
+    note.append(strong,text,help);stage.append(note);
+    document.body.classList.add('ml-render-unavailable');
+    ids.forEach(id=>{const el=byId(id);if(el){el.disabled=true;el.title=message;}});
+    const exportJump=byId('mlMotionExport');if(exportJump){exportJump.disabled=true;exportJump.title=message;}
+  }
+
+  const panel=byId('panel'),settings=byId('settings');
+  const sections=[...settings.querySelectorAll(':scope > section')];
+  const source=sections[0];source.classList.add('ml-source-section');move(rail,source);app.prepend(rail);
+  panel.querySelector('header').classList.add('ml-legacy-title');
+  const intro=title('INSPECTOR / 調整');panel.prepend(intro);
+  const exportBar=byId('exportBar');
+  byId('mlMotionExport').onclick=()=>jumpTo(exportBar);
+  const sourceGuard=new MutationObserver(()=>{rail.inert=settings.inert;});sourceGuard.observe(settings,{attributes:true,attributeFilter:['inert']});
+  rail.inert=settings.inert;
+  const sourceHint=document.createElement('p');sourceHint.className='ml-motion-tip';sourceHint.textContent='上から順に再生。下のフィルムストリップでも確認できます。';rail.append(sourceHint);
+  byId('dropzone').setAttribute('aria-label','画像を追加。PNG、JPG、WebP、SVG。複数選択可能');
+  byId('play').setAttribute('aria-label','再生・停止');
+  byId('undo').title='取り消す';byId('redo').title='やり直す';
+  const nav=document.createElement('nav');nav.className='ml-motion-shortcuts';nav.setAttribute('aria-label','設定の移動');
+  const targets=[['動き',sections[1]],['配置',byId('size').closest('details')],['作品',byId('saveProject').closest('details')]];
+  targets.forEach(([name,node])=>{const b=document.createElement('button');b.type='button';b.textContent=name;b.onclick=()=>jumpTo(node);nav.append(b);});
+  intro.after(nav);
+
+  labelControls();
+  // Native resize listeners keep the original preview fitting its new workspace.
+  window.dispatchEvent(new Event('resize'));
+})();
 </script>
 </body></html>

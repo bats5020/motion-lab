@@ -47,8 +47,24 @@ input[type=number]:focus{outline:none;border-color:var(--accent)}
 .note{color:var(--faint);font-size:10px;line-height:1.7;white-space:pre-line}
 #status{color:var(--faint);font-size:10px;padding:11px 14px;min-height:34px;line-height:1.6}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/raster-workbench.css">
+<script src="../shared/raster-workbench.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/raster-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/raster-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench raster-workbench" data-raster-tool="grid-stretch">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <div id="stage">
   <canvas id="view" width="16" height="16"></canvas>
@@ -157,6 +173,9 @@ function setSource(img,ow,oh,sample){
   var cap=4000,sc=Math.min(1,cap/Math.max(ow,oh));
   var c=mk(Math.round(ow*sc),Math.round(oh*sc));
   c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+/* ML_KEYBOARD_BEGIN */
+  queueMicrotask(()=>window.MLRasterKeyboard?.boundary('画像の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
   srcFull=c;originalFull=copyCanvas(c);isSample=!!sample;
   var info=(sample?'サンプル画像 ':'')+c.width+'×'+c.height+'px';
   if(sc<1)info+='\n※ 元画像 '+ow+'×'+oh+' を長辺'+cap+'pxに縮小して処理';
@@ -455,6 +474,9 @@ $('autoBtn').addEventListener('click',autoDetect);
 $('rotBtn').addEventListener('click',function(){
   var c=mk(srcFull.height,srcFull.width),x=c.getContext('2d');
   x.translate(c.width,0);x.rotate(Math.PI/2);x.drawImage(srcFull,0,0);
+/* ML_KEYBOARD_BEGIN */
+  queueMicrotask(()=>window.MLRasterKeyboard?.trackCanvas(srcFull));
+/* ML_KEYBOARD_END */
   srcFull=c;state.selMode='random';
   buildPreview();render();
 });
@@ -517,6 +539,25 @@ window.addEventListener('paste',function(e){
 var s0=makeSample();
 setSource(s0,s0.width,s0.height,true);
 status('画像をドロップ / ペースト / アップロードして開始。まずはサンプルで試せます');
+/* ML_KEYBOARD_BEGIN */
+window.MLRasterModel={
+  name:'Grid Stretch',tool:'grid-stretch',
+  capture:function(){return {values:Object.assign({},state,{selRows:Array.from(state.selRows),selCols:Array.from(state.selCols)}),source:srcFull,original:originalFull,sample:isSample,info:$('imgInfo').textContent};},
+  equals:function(a,b){return a.source===b.source&&a.original===b.original&&a.sample===b.sample&&JSON.stringify(a.values)===JSON.stringify(b.values);},
+  restore:function(s){
+    clearTimeout(rt);Object.assign(state,JSON.parse(JSON.stringify(s.values)));state.selRows=new Set(s.values.selRows);state.selCols=new Set(s.values.selCols);
+    srcFull=s.source;originalFull=s.original;isSample=s.sample;$('imgInfo').textContent=s.info;
+    var ranges={rowsN:'rows',colsN:'cols',strength:'strength',balance:'balance',random:'random',feather:'feather',jpgq:'jpgq'};
+    Object.keys(ranges).forEach(function(id){$(id).value=state[ranges[id]];$(id+'V').textContent=state[ranges[id]]+({strength:'%',random:'%',feather:'px',jpgq:'%'}[id]||'');});
+    ['link','grid','notes','manual'].forEach(function(k){$(k).checked=state[k];});$('seed').value=state.seed;
+    $('manualHint').hidden=!state.manual;view.classList.toggle('manual',state.manual);
+    var guide=$('rasterGridGuide');if(guide)guide.textContent=state.manual?'手動選択：クリックで行を選択・解除 / Shift + クリックで列を選択・解除':'画像をドロップ / 強度・方向を調整 / 手動モードで行と列を選択';
+    buildPreview();render();
+  },
+  valueFor:function(r){return state[{rowsN:'rows',colsN:'cols'}[r.id]||r.id];},
+  numbers:function(){return [{integer:true,number:$('seed'),min:1,max:999999,step:1,label:'シード',getValue:function(){return state.seed;},setValue:function(v){state.seed=Math.round(v);$('seed').value=state.seed;requestRender();}}];}
+};
+/* ML_KEYBOARD_END */
 })();
 </script>
 </body>

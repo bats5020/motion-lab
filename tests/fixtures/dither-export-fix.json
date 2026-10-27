@@ -1,0 +1,45 @@
+{
+  "description": "Exact bounded F5 Dither pending conversion/export readiness replacements; restore before original renderer hash check.",
+  "changes": [
+    {
+      "before": "let renderTimer=null;",
+      "after": "let renderTimer=null;\n// Export readiness covers debounce + queued animation frames, not only computation.\nlet ditherRenderRevision=0, ditherRenderPending=false;\nfunction ditherExportReady(){ return !!srcImage && !ditherRenderPending && !!lastSVG; }\nfunction updateDitherExportState(pending){\n  ditherRenderPending=pending;\n  $('#busy').classList.toggle('show',pending);\n  ['#btnDownloadSVG','#btnCopySVG','#btnDownloadPNG'].forEach(id=>$(id).disabled=!ditherExportReady());\n}\nwindow.MLDitherExport={isReady:ditherExportReady};",
+      "count": 1
+    },
+    {
+      "before": "function scheduleRender(){ clearTimeout(renderTimer); renderTimer=setTimeout(render,120); }",
+      "after": "function scheduleRender(){\n  clearTimeout(renderTimer);renderTimer=null;\n  const revision=++ditherRenderRevision;\n  // The old preview can remain visible, but is no longer an exportable result.\n  lastSVG='';updateDitherExportState(!!srcImage);\n  if(srcImage)renderTimer=setTimeout(()=>{renderTimer=null;render(revision);},120);\n}",
+      "count": 1
+    },
+    {
+      "before": "function render(){\n  if(!srcImage) return;",
+      "after": "function render(revision=ditherRenderRevision){\n  if(revision!==ditherRenderRevision)return;\n  if(!srcImage){lastSVG='';updateDitherExportState(false);return;}",
+      "count": 1
+    },
+    {
+      "before": "    if(!srcImage){$('#busy').classList.remove('show');return;}",
+      "after": "    if(revision!==ditherRenderRevision)return;\n    if(!srcImage){lastSVG='';updateDitherExportState(false);return;}",
+      "count": 1
+    },
+    {
+      "before": "    }catch(err){ console.error(err); toast('変換エラー'); }\n    $('#busy').classList.remove('show');",
+      "after": "    }catch(err){ lastSVG='';console.error(err);toast('変換エラー'); }\n    if(revision===ditherRenderRevision)updateDitherExportState(false);",
+      "count": 1
+    },
+    {
+      "before": "if(!lastSVG)return;",
+      "after": "if(!ditherExportReady())return;",
+      "count": 3
+    },
+    {
+      "before": "$('#btnDownloadPNG').onclick=()=>{\n  if(!ditherExportReady())return;\n  const img=new Image();",
+      "after": "$('#btnDownloadPNG').onclick=()=>{\n  if(!ditherExportReady())return;\n  const exportTransparent=state.transBg, exportBackground=state.bg;\n  const img=new Image();",
+      "count": 1
+    },
+    {
+      "before": "if(!state.transBg){ cx.fillStyle=state.bg; cx.fillRect(0,0,c.width,c.height); }",
+      "after": "if(!exportTransparent){ cx.fillStyle=exportBackground; cx.fillRect(0,0,c.width,c.height); }",
+      "count": 1
+    }
+  ]
+}

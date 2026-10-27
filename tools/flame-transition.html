@@ -113,8 +113,22 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<link rel="stylesheet" href="../shared/editor-history.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/numeric-input.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/motion-keyboard.css" data-ml-keyboard>
+<script src="../shared/editor-history.js" data-ml-keyboard></script>
+<script src="../shared/numeric-input.js" data-ml-keyboard></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-motion.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-motion-workbench" data-ml-motion="flame-transition">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"></div><div class="ml-document"><strong>Flame Transition</strong><span class="ml-context">炎で、シーンを切り替える</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
 <div id="app">
@@ -417,23 +431,31 @@ function drawThumb(key){
 }
 
 /* ---------- media input ---------- */
+/* ML_KEYBOARD_BEGIN:media-boundary */
 function loadFile(key,file){
   if(!file) return;
   const isVid=file.type.startsWith("video/")||/\.(mov|mp4|webm|m4v)$/i.test(file.name);
   if(!isVid&&!file.type.startsWith("image/")) return toast("画像または動画ファイルを選んでください");
-  const sc=scenes[key];
-  if(isVideo(sc)) sc.media.pause();
-  if(sc.url) URL.revokeObjectURL(sc.url);
-  const url=URL.createObjectURL(file); sc.url=url;
-  const done=el=>{ sc.media=el; sc.name=file.name; $("name"+key).textContent=file.name; sc.redraw=true; layoutTrack(); syncVideos(true); if(!playing) render(playhead); toast(`シーン${key}を差し替えました`); };
+  const sc=scenes[key], previousURL=sc.url, token=(sc.mlLoadToken||0)+1;sc.mlLoadToken=token;
+  const url=URL.createObjectURL(file);
+  const failed=message=>{URL.revokeObjectURL(url);if(sc.mlLoadToken===token)toast(message);};
+  const done=el=>{
+    if(sc.mlLoadToken!==token){URL.revokeObjectURL(url);return;}
+    // Media is an explicit history boundary; clear history before releasing its old URL.
+    mlFlameAssetBoundary();
+    if(isVideo(sc))sc.media.pause();if(previousURL)URL.revokeObjectURL(previousURL);
+    sc.url=url;sc.media=el;sc.name=file.name;$("name"+key).textContent=file.name;sc.redraw=true;
+    layoutTrack();syncVideos(true);if(!playing)render(playhead);toast(`シーン${key}を差し替えました（設定の履歴をリセット）`);
+  };
   if(isVid){
-    const v=document.createElement("video"); v.src=url; v.muted=true; v.loop=false; v.playsInline=true; v.preload="auto";
+    const v=document.createElement("video");v.src=url;v.muted=true;v.loop=false;v.playsInline=true;v.preload="auto";
     v.addEventListener("loadeddata",()=>done(v),{once:true});
-    v.addEventListener("error",()=>toast("この動画は読み込めませんでした（H.264のMP4かWebMを試してください）"),{once:true});
+    v.addEventListener("error",()=>failed("この動画は読み込めませんでした（H.264のMP4かWebMを試してください）"),{once:true});
   }else{
-    const im=new Image(); im.onload=()=>done(im); im.onerror=()=>toast("画像を読み込めませんでした"); im.src=url;
+    const im=new Image();im.onload=()=>done(im);im.onerror=()=>failed("画像を読み込めませんでした");im.src=url;
   }
 }
+/* ML_KEYBOARD_END:media-boundary */
 for(const key of ["A","B"]){
   $("file"+key).addEventListener("change",e=>{ loadFile(key,e.target.files[0]); e.target.value=""; });
   const d=$("drop"+key);
@@ -446,8 +468,11 @@ for(const key of ["A","B"]){
   st.addEventListener("dragleave",e=>{ if(!st.contains(e.relatedTarget)) ov.classList.remove("on"); });
   st.addEventListener("drop",e=>{e.preventDefault();ov.classList.remove("on");const r=st.getBoundingClientRect();loadFile(e.clientX<r.left+r.width/2?"A":"B",e.dataTransfer.files[0]);});
 }
+/* ML_KEYBOARD_BEGIN:media-reset-boundary */
 $("resetScenes").onclick=()=>{
-  for(const key of ["A","B"]){ const sc=scenes[key]; if(isVideo(sc)) sc.media.pause(); if(sc.url) URL.revokeObjectURL(sc.url); sc.media=null; sc.url=null; sc.redraw=true; $("name"+key).textContent="サンプル"; }
+  if(scenes.A.media||scenes.B.media)mlFlameAssetBoundary();
+  for(const key of ["A","B"]){ const sc=scenes[key]; sc.mlLoadToken=(sc.mlLoadToken||0)+1; if(isVideo(sc)) sc.media.pause(); if(sc.url) URL.revokeObjectURL(sc.url); sc.media=null; sc.url=null; sc.redraw=true; $("name"+key).textContent="サンプル"; }
+/* ML_KEYBOARD_END:media-reset-boundary */
   layoutTrack(); if(!playing) render(playhead); toast("サンプルに戻しました");
 };
 // 動画の時刻：Aは先頭から、Bは切替点から
@@ -883,9 +908,16 @@ $("toCut").onclick=()=>seekTo(tCut());
 $("loopBtn").onclick=()=>{ S.loop=!S.loop; save(); syncBar(); toast(S.loop?"ループ再生":"1回だけ再生"); };
 
 /* ---------- 取り消し／やり直し（⌘Z／⌘⇧Z） ---------- */
+/* ML_KEYBOARD_BEGIN:history-vars */
 const HIST=[], REDO=[]; let histArmed=true, histStable=null, histLast=0;
+let mlFlameHistory=null,mlFlameGesture=null;
+function mlFlameClearHistory(){HIST.length=0;REDO.length=0;mlFlameGesture=null;histStable=JSON.stringify(S);histArmed=true;}
+function mlFlameAssetBoundary(){mlFlameClearHistory();mlFlameHistory?.reset("素材を変更したため、設定の履歴をリセットしました");}
+/* ML_KEYBOARD_END:history-vars */
 function commitHist(){
-  const now=JSON.stringify(S); if(histStable===null){ histStable=now; return; } if(now===histStable) return;
+/* ML_KEYBOARD_BEGIN:history-grouping */
+  const now=JSON.stringify(S); if(histStable===null){ histStable=now; return; } if(mlFlameGesture!==null){histStable=now;return;} if(now===histStable) return;
+/* ML_KEYBOARD_END:history-grouping */
   if(histArmed||performance.now()-histLast>1000){ HIST.push(histStable); if(HIST.length>200) HIST.shift(); REDO.length=0; histArmed=false; }
   histStable=now; histLast=performance.now();
 }
@@ -897,15 +929,22 @@ function syncAllUI(){
   for(const [id,key] of [["matSeg","matB"],["modeSeg","mode"],["exitSeg","exit"],["outSeg","out"],["qSeg","q"]]) syncSeg(id,key);
   for(const id of ["cover","wrap","gmove"]) $(id).checked=!!S[id];
   $("seed").value=S.seed; $("size").value=S.size;
-  dirtyPal=true; buildPresets(); syncDirUI(); drawSamples(); playhead=Math.min(playhead,totalDur()); layoutTrack(); render(playhead); syncBar();
+/* ML_KEYBOARD_BEGIN:sync-numbers */
+  dirtyPal=true; buildPresets(); syncDirUI(); drawSamples(); playhead=Math.min(playhead,totalDur()); layoutTrack(); render(playhead); syncBar(); window.MLNumberInputs?.refresh();
+/* ML_KEYBOARD_END:sync-numbers */
 }
 
 /* ---------- keyboard ---------- */
 const typing=()=>{ const el=document.activeElement; if(!el) return false; if(/TEXTAREA|SELECT/.test(el.tagName)) return true; return el.tagName==="INPUT"&&!["range","checkbox","button","color","file"].includes(el.type); };
 addEventListener("keydown",e=>{
+/* ML_KEYBOARD_BEGIN:keyboard-guard */
+  if(e.defaultPrevented||e.isComposing||e.keyCode===229||recording)return;
   const mod=e.metaKey||e.ctrlKey;
-  if(mod&&e.code==="KeyZ"){ if(typing()) return; e.preventDefault(); e.shiftKey?redo():undo(); return; }
-  if(mod&&e.code==="KeyY"){ e.preventDefault(); redo(); return; }
+  if(mod&&e.code==="KeyZ")
+/* ML_KEYBOARD_END:keyboard-guard */{ if(typing()) return; e.preventDefault(); e.shiftKey?redo():undo(); return; }
+/* ML_KEYBOARD_BEGIN:redo-text-guard */
+  if(mod&&e.code==="KeyY"){ if(typing())return; e.preventDefault(); redo(); return; }
+/* ML_KEYBOARD_END:redo-text-guard */
   if(typing()||recording) return;
   if(mod&&(e.code==="ArrowLeft"||e.code==="ArrowRight")){ e.preventDefault(); stepFrames((e.code==="ArrowLeft"?-1:1)*(e.shiftKey?10:1)); return; }
   if(mod) return;
@@ -1013,31 +1052,42 @@ function makeMp4(samples,desc,w,h,fps){
   return new Blob([ftyp,moov,be32(mdatSize),enc.encode('mdat'),...samples.map(s=>s.data)],{type:'video/mp4'});
 }
 const opaqueMode=()=>S.out==="alpha"?2:0;
+/* QA_FIX_BEGIN:flame-export-single-flight */
+let mlFlameExportPending=null;
 async function exportMp4(){
-  const [w,h]=outSize(), cfg=await pickMp4Config(w,h); if(!cfg) return toast("このブラウザは MP4 の書き出しに対応していません（ロスレスMOVを使ってください）");
-  const N=Math.max(1,Math.round(totalDur()*FPS)), s=beginSession();
-  setBusy(true,"rec"); $("rec").classList.add("rec");
-  const samples=[]; let desc=null, encErr=null;
-  const encoder=new VideoEncoder({ output:(chunk,m)=>{ if(!desc&&m&&m.decoderConfig&&m.decoderConfig.description) desc=new Uint8Array(m.decoderConfig.description); const b=new Uint8Array(chunk.byteLength); chunk.copyTo(b); samples.push({data:b,key:chunk.type==="key",ts:chunk.timestamp}); }, error:e=>{ encErr=e; } });
+  if(mlFlameExportPending){mlFlameExportPending.cancelled=true;if(recording)recording.stop=true;return;}
+  const job={cancelled:false};mlFlameExportPending=job;
+  let s=null,encoder=null;
+  setBusy(true,"rec");$("rec").classList.add("rec");$("rec").textContent="■ 準備中（中止）";
+  mlFlameHistory?.refresh();
   try{
+    const [w,h]=outSize(),cfg=await pickMp4Config(w,h);
+    if(job.cancelled){toast("書き出しを中止しました");return;}
+    if(!cfg){toast("このブラウザは MP4 の書き出しに対応していません（ロスレスMOVを使ってください）");return;}
+    const N=Math.max(1,Math.round(totalDur()*FPS));s=beginSession();
+    const samples=[];let desc=null,encErr=null;
+    encoder=new VideoEncoder({output:(chunk,m)=>{if(!desc&&m&&m.decoderConfig&&m.decoderConfig.description)desc=new Uint8Array(m.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==="key",ts:chunk.timestamp});},error:e=>{encErr=e;}});
     encoder.configure(cfg);
     for(let i=0;i<N;i++){
-      if(s.stop||encErr) break;
-      playhead=i/FPS; await seekScenesExact(playhead); render(playhead,1,opaqueMode()); syncBar();
+      if(s.stop||encErr)break;
+      playhead=i/FPS;await seekScenesExact(playhead);render(playhead,1,opaqueMode());syncBar();
       const frame=new VideoFrame(view,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS),alpha:"discard"});
-      encoder.encode(frame,{keyFrame:i%(FPS*2)===0}); frame.close();
-      while(encoder.encodeQueueSize>6) await new Promise(r=>setTimeout(r,2));
+      try{encoder.encode(frame,{keyFrame:i%(FPS*2)===0});}finally{frame.close();}
+      while(encoder.encodeQueueSize>6&&!s.stop&&!encErr)await new Promise(r=>setTimeout(r,2));
       $("rec").textContent=`■ MP4 書き出し中 ${i+1}/${N}`;
-      if(i%4===0) await new Promise(r=>setTimeout(r,0));
+      if(i%4===0)await new Promise(r=>setTimeout(r,0));
     }
-    await encoder.flush(); encoder.close();
-    if(encErr) throw encErr;
-    if(s.stop) toast("書き出しを中止しました");
-    else{ if(!desc||!samples.length) throw new Error("エンコード結果が空でした"); const blob=makeMp4(samples,desc,w,h,FPS);
-      dl(blob,`flame-transition-${stamp()}_${FPS}fps.mp4`); toast(`MP4を保存しました（${N}フレーム・${(blob.size/1048576).toFixed(1)}MB）`); }
-  }catch(err){ try{ encoder.state!=="closed"&&encoder.close(); }catch(e){} toast("MP4の書き出しに失敗しました："+(err&&err.message||err)); }
-  endSession(s); setBusy(false);
+    await encoder.flush();
+    if(encErr)throw encErr;
+    if(s.stop)toast("書き出しを中止しました");
+    else{if(!desc||!samples.length)throw new Error("エンコード結果が空でした");const blob=makeMp4(samples,desc,w,h,FPS);dl(blob,`flame-transition-${stamp()}_${FPS}fps.mp4`);toast(`MP4を保存しました（${N}フレーム・${(blob.size/1048576).toFixed(1)}MB）`);}
+  }catch(err){toast("MP4の書き出しに失敗しました："+(err&&err.message||err));}
+  finally{
+    try{if(encoder&&encoder.state!=="closed")encoder.close();}catch(_){}
+    try{if(s)endSession(s);}finally{mlFlameExportPending=null;setBusy(false);mlFlameHistory?.refresh();}
+  }
 }
+/* QA_FIX_END:flame-export-single-flight */
 // WebCodecs がない環境：1コマずつ描いて MediaRecorder に渡す
 function pickMime(){
   const [w,h]=outSize(), big=w*h>1920*1088;
@@ -1078,7 +1128,9 @@ async function startRec(){
   }catch(err){ try{ rec&&rec.state!=="inactive"&&rec.stop(); }catch(e){} if(stream) stream.getTracks().forEach(t=>t.stop()); toast("録画を開始できませんでした"); }
   endSession(s); setBusy(false);
 }
-$("rec").onclick=()=>{ if(recording){ recording.stop=true; return; } MP4.ok?exportMp4():startRec(); };
+/* QA_FIX_BEGIN:flame-export-click */
+$("rec").onclick=()=>{if(mlFlameExportPending){mlFlameExportPending.cancelled=true;if(recording)recording.stop=true;$("rec").textContent="中止を待っています…";return;}if(recording){recording.stop=true;return;}return MP4.ok?exportMp4():startRec();};
+/* QA_FIX_END:flame-export-click */
 (async()=>{ try{ MP4.ok=!!(await pickMp4Config(1920,1080)); }catch(e){ MP4.ok=false; } recHint(); })();
 
 /* ---------- boot ---------- */
@@ -1088,6 +1140,101 @@ document.fonts&&document.fonts.ready.then(()=>{ drawSamples(); });
 requestAnimationFrame(t=>{ lastNow=t; loop(t); });
 // テスト・外部操作用
 window.FLT={get state(){return S}, seek:t=>seekTo(t), render:(t,q,a)=>render(t,q,a), pause:()=>{playing=false}, set:(k,v)=>{S[k]=v;syncAllUI();save();}};
+/* ML_KEYBOARD_BEGIN:integration */
+
+(function(){
+ if(!window.MLEditorHistory||!window.MLNumberInputs)return;
+/* QA_FIX_BEGIN:flame-export-history-busy */
+ mlFlameHistory=MLEditorHistory.register({name:'Flame Transition',isBusy:()=>!!recording||!!mlFlameExportPending,native:{
+/* QA_FIX_END:flame-export-history-busy */
+  begin(){mlFlameGesture=JSON.stringify(S);},
+  commit(){const before=mlFlameGesture;mlFlameGesture=null;const after=JSON.stringify(S);if(before!==null&&before!==after){HIST.push(before);if(HIST.length>200)HIST.shift();REDO.length=0;}histStable=after;histArmed=true;},
+  cancel(){const before=mlFlameGesture;mlFlameGesture=null;if(before!==null)restoreState(before);},
+  undo,redo,reset:mlFlameClearHistory,canUndo:()=>HIST.length>0,canRedo:()=>REDO.length>0
+ }});
+ const assetNote=document.createElement('p');assetNote.className='ml-motion-tip';assetNote.textContent='素材の差し替え・サンプルに戻す操作は取り消せません。素材を変更すると設定の履歴もリセットします。';$('resetScenes').parentElement.append(assetNote);
+ const percentages=new Set(['cut','warp','exitDur','ember','linger']);
+ for(const id of Object.keys(fmt))MLNumberInputs.bind({range:$(id),label:$(id).parentElement.querySelector('span')?.textContent.trim()||id,integer:id==='arms',readout:$(id).parentElement.querySelector('.pv'),scale:percentages.has(id)?100:1,suffix:percentages.has(id)?'%':['holdA','trans','holdB'].includes(id)?'s':id==='angle'?'°':'',getValue:()=>S[id],setValue:v=>{if(recording)return;S[id]=v;$(id).value=v;$(id).parentElement.querySelector('.pv').textContent=fmt[id](v);changed(id);}});
+})();
+
+/* ML_KEYBOARD_END:integration */</script>
+
+<script data-ml-shell="motion">
+
+/* Additive workbench presentation. The original rendering/export script is unchanged. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const app=byId('app');
+  const header=byId('mlMotionToolbar');
+  const home=byId('mlab-home');
+  if(home){home.textContent='↖ MOTION LAB';home.classList.add('ml-home');header.querySelector('.ml-motion-home').append(home);}
+  const rail=document.createElement('aside');rail.id='mlMotionSources';rail.className='ml-motion-sources';rail.setAttribute('aria-label','素材とルック');
+  rail.innerHTML='<div class="ml-motion-eyebrow">SOURCE / 素材</div>';
+  function move(target,...nodes){nodes.filter(Boolean).forEach(node=>target.append(node));}
+  function title(text){const h=document.createElement('div');h.className='ml-motion-eyebrow';h.textContent=text;return h;}
+  function labelControls(root=document){
+    root.querySelectorAll('.prow,.field').forEach(row=>{
+      const label=row.querySelector(':scope > label,:scope > span:first-child');if(!label)return;
+      const text=label.textContent.trim();if(!text)return;
+      row.querySelectorAll('input,select,textarea').forEach(control=>{
+        if(control.hasAttribute('aria-label')||control.labels?.length)return;
+        control.setAttribute('aria-label',text);
+      });
+    });
+    root.querySelectorAll('button[title]').forEach(button=>{if(!button.hasAttribute('aria-label')&&button.textContent.trim().length<4)button.setAttribute('aria-label',button.title);});
+  }
+  function jumpTo(node){
+    if(!node)return;
+    if(node.matches('details'))node.open=true;
+    const details=node.closest('details');if(details)details.open=true;
+    node.classList.remove('collapsed');
+    node.scrollIntoView({block:'nearest',behavior:'auto'});
+    const control=node.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)');if(control)control.focus({preventScroll:true});
+  }
+  function tabs(panel,groups){
+    const nav=document.createElement('nav');nav.className='ml-motion-tabs';nav.setAttribute('aria-label','設定パネル');
+    const wrappers={};
+    for(const [key,label,nodes] of groups){
+      const button=document.createElement('button');button.type='button';button.className='ml-motion-tab';button.dataset.motionTab=key;button.textContent=label;
+      nav.append(button);
+      const group=document.createElement('div');group.className='ml-motion-group';group.id='ml-motion-'+key;wrappers[key]=group;move(group,...nodes);panel.append(group);
+    }
+    panel.prepend(nav);
+    const select=key=>{
+      for(const [name,group]of Object.entries(wrappers))group.hidden=name!==key;
+      nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.motionTab===key)));
+      panel.scrollTop=0;
+    };
+    nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)select(b.dataset.motionTab);});
+    select(groups[0][0]);return select;
+  }
+  function unsupported(stage,message,ids){
+    const note=document.createElement('div');note.className='ml-motion-capability ml-capability';note.setAttribute('role','status');
+    const strong=document.createElement('strong');strong.textContent='この環境ではプレビューできません';
+    const text=document.createElement('p');text.textContent=message;
+    const help=document.createElement('small');help.textContent='設定やファイルは変更されていません。対応ブラウザで同じページを開いてください。';
+    note.append(strong,text,help);stage.append(note);
+    document.body.classList.add('ml-render-unavailable');
+    ids.forEach(id=>{const el=byId(id);if(el){el.disabled=true;el.title=message;}});
+    const exportJump=byId('mlMotionExport');if(exportJump){exportJump.disabled=true;exportJump.title=message;}
+  }
+
+  const panel=byId('panel'),sections=[...panel.querySelectorAll(':scope > section')];
+  panel.querySelector('header').classList.add('ml-legacy-title');
+  move(rail,sections[0],title('LOOK / 配色'),sections[4]);app.prepend(rail);
+  const select=tabs(panel,[['edit','見た目',[sections[2],sections[3],sections[5]]],['motion','タイミング',[sections[1]]],['export','書き出し',[sections[6]]]]);
+  byId('mlMotionExport').onclick=()=>{select('export');jumpTo(sections[6]);};
+  byId('play').setAttribute('aria-label','再生・停止');
+  if(!byId('view').getContext('webgl2')){
+    byId('err').classList.remove('on');
+    unsupported(byId('stage'),'WebGL2 が使えないため、描画と書き出しを停止しています。WebGL2 対応のPCブラウザで開いてください。',['play','png','mov','rec']);
+    app.querySelectorAll('input,select,textarea,button:not(.ml-motion-tab)').forEach(el=>el.disabled=true);
+  }
+
+  labelControls();
+  // Native resize listeners keep the original preview fitting its new workspace.
+  window.dispatchEvent(new Event('resize'));
+})();
 </script>
 </body>
 </html>
