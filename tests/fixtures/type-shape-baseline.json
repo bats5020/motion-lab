@@ -6,7 +6,7 @@
   "files": {
     "tools/ascii-wave.html": {
       "inlineScriptsSha256": [
-        "c531bf309906647f19963289cec979c701848533833a6e2eb74bf862d9e3725c"
+        "0aed5a7a1b030b2cbd10024b10c94613e30c8a4319b063841340a2c32e97f9f0"
       ],
       "originalIds": [
         "mlab-home",
@@ -63,7 +63,8 @@
         "preset-grid",
         "btn-random",
         "seed-label"
-      ]
+      ],
+      "featureUpdate": "2026-10-29: single-glyph and grapheme-aware emoji support in the editor and standalone export."
     },
     "tools/warp-type.html": {
       "inlineScriptsSha256": [
