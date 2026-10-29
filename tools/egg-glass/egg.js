@@ -1,4 +1,7 @@
 import * as THREE from './vendor/three.module.js';
+/* ML_KEYBOARD_BEGIN */
+import {setupEggKeyboard} from './keyboard-controls.js';
+/* ML_KEYBOARD_END */
 import { createShellMaps, addPaintWear } from './shell-material.js';
 import { applyFlowMapping } from './flow-mapping.js';
 import { setupLightingControls } from './lighting-controls.js';
@@ -305,4 +308,7 @@ if(globalThis.__eggEmbed){state.uiHidden=true;document.body.classList.add('ui-hi
 renderer.setAnimationLoop(frame);
 document.addEventListener('visibilitychange', () => { previous = performance.now(); renderer.setAnimationLoop(document.hidden ? null : frame); });
 window.__eggStudy = { state, egg, pivot, motionRoot, renderer, material, materials, backdrop, scene, lightingControls,scrollControls,svgBackground,previewViewport,patternControls,logoControls,exportControls };
+/* ML_KEYBOARD_BEGIN */
+window.__eggStudy.keyboardControls=setupEggKeyboard({state,materials,backdrop,lightingControls,scrollControls,previewViewport,patternControls,logoControls,selectSurface,updatePause,resize});
+/* ML_KEYBOARD_END */
 document.documentElement.dataset.ready = 'true';

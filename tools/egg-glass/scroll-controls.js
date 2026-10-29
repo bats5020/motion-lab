@@ -9,6 +9,9 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
   const track=()=>target==='background'?config().background:config();
   const limits=()=>target==='background'?backgroundLimits:transformLimits;
   const storageKey='fennel.egg.scroll.v4',history=[],future=[];
+/* ML_KEYBOARD_BEGIN */
+  let editorHistory=null;
+/* ML_KEYBOARD_END */
   const scrub=document.querySelector('#scroll-preview'),percentInput=document.querySelector('#scroll-percent');
   const atInput=document.querySelector('#keyframe-at'),marks=document.querySelector('#keyframe-marks');
   const select=document.querySelector('#keyframe-select'),status=document.querySelector('#scroll-status');
@@ -20,6 +23,9 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
   const currentKey=()=>track().keyframes.find(key=>Math.abs(key.at-currentPercent())<.05);
   const snapshot=()=>JSON.stringify(project);
   function remember() {
+/* ML_KEYBOARD_BEGIN */
+    if(editorHistory)return;
+/* ML_KEYBOARD_END */
     const value=snapshot();if(history.at(-1)!==value)history.push(value);
     if(history.length>60)history.shift();future.length=0;
   }
@@ -74,8 +80,10 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
     document.querySelector('#scroll-easing').value=pose.easing??'smooth';
     document.querySelector('#keyframe-delete').disabled=!key||track().keyframes.length===1;
     document.querySelector('#keyframe-add').disabled=!!key;
-    document.querySelector('#scroll-undo').disabled=history.length===0;
-    document.querySelector('#scroll-redo').disabled=future.length===0;
+/* ML_KEYBOARD_BEGIN original-base64:ICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJyNzY3JvbGwtdW5kbycpLmRpc2FibGVkPWhpc3RvcnkubGVuZ3RoPT09MDsKICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJyNzY3JvbGwtcmVkbycpLmRpc2FibGVkPWZ1dHVyZS5sZW5ndGg9PT0wOw== */
+    document.querySelector('#scroll-undo').disabled=editorHistory?!editorHistory.canUndo:history.length===0;
+    document.querySelector('#scroll-redo').disabled=editorHistory?!editorHistory.canRedo:future.length===0;
+/* ML_KEYBOARD_END */
     select.replaceChildren(new Option('キーを選択',''));
     for(const item of track().keyframes)select.add(new Option(item.at+'%',item.id));
     select.value=key?.id??'';
@@ -122,6 +130,9 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
   window.addEventListener('scroll',()=>{gizmo?.setEditing(false);if(preview!==null)setPreview(null);},{passive:true});
   document.querySelector('#scroll-easing').addEventListener('change',event=>{remember();const value=event.target.value;setPreview(currentPercent()/100);ensureKey().easing=value;save();force=true;sync();});
   for(const [id,from,to] of [['scroll-undo',history,future],['scroll-redo',future,history]])document.querySelector('#'+id).addEventListener('click',()=>{
+/* ML_KEYBOARD_BEGIN */
+    if(editorHistory){editorHistory[id==='scroll-undo'?'undo':'redo']();return;}
+/* ML_KEYBOARD_END */
     if(!from.length)return;to.push(snapshot());project=JSON.parse(from.pop());save();marks.replaceChildren();refreshProfile();
   });
   document.querySelectorAll('[data-scroll-preset]').forEach(button=>button.addEventListener('click',()=>{
@@ -197,5 +208,24 @@ export function setupScrollControls({root,egg,pivot,camera,renderer,svgBackgroun
     document.querySelector('#hint').textContent=gizmo.editing?'卵をドラッグ：移動 / 赤・緑の矢印：軸を固定 / 右下の角：拡大縮小':preview!==null?`動きのプレビュー ${time}% / ページをスクロールすると連動に戻ります`:motionState.mode==='auto'?'ゆっくり自動回転':motionState.mode==='scroll'?'下にスクロールして移動・拡大縮小・回転':'マウスを動かす / 下にスクロール';
     if(lastTime!==time){sync();lastTime=time;}
   }
-  return {get config(){return config();},get profile(){return profile;},get target(){return target;},update,setPreview,serialize:()=>project,resize:refreshProfile,get preview(){return preview;},gizmo,updateGizmo:gizmo.update};
+/* ML_KEYBOARD_BEGIN original-base64:ICByZXR1cm4ge2dldCBjb25maWcoKXtyZXR1cm4gY29uZmlnKCk7fSxnZXQgcHJvZmlsZSgpe3JldHVybiBwcm9maWxlO30sZ2V0IHRhcmdldCgpe3JldHVybiB0YXJnZXQ7fSx1cGRhdGUsc2V0UHJldmlldyxzZXJpYWxpemU6KCk9PnByb2plY3QscmVzaXplOnJlZnJlc2hQcm9maWxlLGdldCBwcmV2aWV3KCl7cmV0dXJuIHByZXZpZXc7fSxnaXptbyx1cGRhdGVHaXptbzpnaXptby51cGRhdGV9Ow== */
+  function restoreEditor(saved) {
+    gizmo.setEditing(false);
+    project=structuredClone(saved.project);
+    target=saved.target==='background'?'background':'egg';
+    preview=Number.isFinite(saved.preview)?THREE.MathUtils.clamp(saved.preview,0,1):null;
+    motionState.scrollPreview=preview;force=true;history.length=future.length=0;
+    save();marks.replaceChildren();refreshProfile();setPreview(preview);
+  }
+  function useEditorHistory(controller) {
+    editorHistory=controller;history.length=future.length=0;
+    for(const id of ['scroll-undo','scroll-redo'])document.getElementById(id).dataset.mlHistory='true';
+    controller.subscribe(()=>{
+      document.querySelector('#scroll-undo').disabled=!controller.canUndo;
+      document.querySelector('#scroll-redo').disabled=!controller.canRedo;
+    });sync();
+  }
+  return {get config(){return config();},get profile(){return profile;},get target(){return target;},update,setPreview,serialize:()=>project,resize:refreshProfile,get preview(){return preview;},gizmo,updateGizmo:gizmo.update,
+    captureEditor:()=>({project:structuredClone(project),target,preview}),restoreEditor,useEditorHistory};
+/* ML_KEYBOARD_END */
 }

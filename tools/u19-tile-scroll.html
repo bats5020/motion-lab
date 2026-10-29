@@ -128,8 +128,22 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid 
   #tl{flex:1 1 100%;order:5}
 }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<link rel="stylesheet" href="../shared/editor-history.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/numeric-input.css" data-ml-keyboard>
+<link rel="stylesheet" href="../shared/motion-keyboard.css" data-ml-keyboard>
+<script src="../shared/editor-history.js" data-ml-keyboard></script>
+<script src="../shared/numeric-input.js" data-ml-keyboard></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-motion.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-motion-workbench" data-ml-motion="u19-tile-scroll">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"></div><div class="ml-document"><strong>U19 Tile Scroll</strong><span class="ml-context">ロゴの帯で、シーンをつなぐ</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
 
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <div id="app">
@@ -311,7 +325,10 @@ const COLOR_PRESETS = [
 const STORE = "u19-tile-scroll-v7";
 let S = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem(STORE) || "null"); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch(e){}
+/* ML_KEYBOARD_BEGIN:history-var */
 let saveT = 0;
+let mlTileHistory=null;
+/* ML_KEYBOARD_END:history-var */
 const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} }, 250); };
 
 /* ============ time model ============
@@ -484,13 +501,17 @@ function loadScene(which, file){
   const isVid = (file.type || '').startsWith('video') || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
   if (isVid){
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
-    v.addEventListener('loadeddata', () => { scenes[which] = { kind:'video', el:v, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に動画を読み込みました`); }, { once:true });
+    v.addEventListener('loadeddata', () => { /* ML_KEYBOARD_BEGIN:media-video */
+if(mlTileHistory){mlTileHistory.commit();mlTileHistory.transact('シーンを差し替え',()=>{scenes[which]={kind:'video',el:v,name:file.name};});}else{scenes[which]={kind:'video',el:v,name:file.name};}
+/* ML_KEYBOARD_END:media-video */ drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に動画を読み込みました`); }, { once:true });
     v.addEventListener('seeked', () => { sceneDirty = dirty = true; });
     v.addEventListener('error', () => toast('この動画は読み込めませんでした（MP4 / WebM を試してください）'), { once:true });
     v.src = url;
   } else {
     const i = new Image();
-    i.onload = () => { scenes[which] = { kind:'image', el:i, name:file.name }; drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に画像を読み込みました`); };
+    i.onload = () => { /* ML_KEYBOARD_BEGIN:media-image */
+if(mlTileHistory){mlTileHistory.commit();mlTileHistory.transact('シーンを差し替え',()=>{scenes[which]={kind:'image',el:i,name:file.name};});}else{scenes[which]={kind:'image',el:i,name:file.name};}
+/* ML_KEYBOARD_END:media-image */ drawThumbs(); sceneDirty = dirty = true; toast(`シーン${which}に画像を読み込みました`); };
     i.onerror = () => toast('この画像は読み込めませんでした');
     i.src = url;
   }
@@ -860,15 +881,9 @@ function buildRows(){
       r.addEventListener('pointerdown', () => { dragKey = key; });
       r.addEventListener('pointerup', () => { dragKey = null; });
       r.addEventListener('dblclick', () => { S[key] = DEFAULTS[key]; changed(key); });
-      pv.addEventListener('click', () => {
-        const inp = document.createElement('input'); inp.type = 'text'; inp.value = S[key];
-        inp.style.cssText = 'width:52px;flex:0 0 52px;background:var(--panel2);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:10px var(--mono);padding:1px 3px;text-align:right';
-        pv.replaceWith(inp); inp.focus(); inp.select();
-        let closed = false;
-        const done = ok => { if (closed) return; closed = true; if (ok){ const n = parseFloat(inp.value); if (!isNaN(n)){ S[key] = Math.min(max, Math.max(min, n)); changed(key); } } inp.replaceWith(pv); syncUI(); };
-        inp.addEventListener('keydown', e => { if (e.key==='Enter') done(true); if (e.key==='Escape') done(false); e.stopPropagation(); });
-        inp.addEventListener('blur', () => done(true), { once:true });
-      });
+/* ML_KEYBOARD_BEGIN:value-editor */
+      // Permanent MLNumberInputs binding below replaces the temporary value-label editor.
+/* ML_KEYBOARD_END:value-editor */
     }
   }
 }
@@ -908,7 +923,9 @@ function changed(key){
   if (playhead > total()) playhead = 0;
   if (kfEdit(key)) {} else if (S.kfAuto && GEN_KEYS.has(key)) autoKeys();
   if (key === 'pal' || key === 'palRev' || key === 'bg' || key === 'all') lutDirty = true;
-  syncUI(); drawTimeline(); persist(); dirty = true;
+/* ML_KEYBOARD_BEGIN:sync-numbers */
+  syncUI(); drawTimeline(); persist(); dirty = true; window.MLNumberInputs?.refresh();
+/* ML_KEYBOARD_END:sync-numbers */
 }
 
 /* colour */
@@ -1397,6 +1414,106 @@ $('reset').addEventListener('click', () => { S = Object.assign({}, DEFAULTS); au
   playing = true; syncBar();
   window.U19TS = { get state(){ return S; }, seek:t => { playing = false; seekTo(t); }, render:(t,q) => render(t,q), cutTime, total, wipeProgress };
 })().catch(err => toast('起動できませんでした：' + (err && err.message || err)));
+/* ML_KEYBOARD_BEGIN:integration */
+
+(function(){
+ if(!gl||!window.MLEditorHistory||!window.MLNumberInputs)return;
+ const copy=x=>JSON.parse(JSON.stringify(x));
+ const capture=()=>{
+  const model=copy(S);for(const p of KF_PARAMS)if(keyed(p))delete model[p];
+  const selected=[...SEL].map(k=>S.kf.includes(k)?['f',S.kf.indexOf(k)]:['i',S.ikf.indexOf(k)]).filter(x=>x[1]>=0);
+  return{model,selected,playhead,sources:{A:{...scenes.A},B:{...scenes.B}}};
+ };
+ mlTileHistory=MLEditorHistory.register({name:'U19 Tile Scroll',capture,isBusy:()=>!!recording,
+  equals:(a,b)=>JSON.stringify(a.model)===JSON.stringify(b.model)&&['A','B'].every(k=>a.sources[k].el===b.sources[k].el&&a.sources[k].kind===b.sources[k].kind),
+  restore:s=>{
+   playing=false;S=Object.assign({},DEFAULTS,copy(s.model));playhead=Math.min(total(),Math.max(0,s.playhead));
+   for(const key of ['A','B']){if(scenes[key].kind==='video')scenes[key].el.pause();scenes[key]={...s.sources[key]};}
+   SEL.clear();for(const [type,index]of s.selected){const k=(type==='f'?S.kf:S.ikf)[index];if(k)SEL.add(k);}
+   applyKeys(playhead);lutDirty=sceneDirty=dirty=true;lastKB='';syncUI();drawTimeline();syncBar();drawThumbs();persist();
+  }
+ });
+ for(const [key,slider]of Object.entries(sliders))MLNumberInputs.bind({range:slider.r,readout:slider.pv,getValue:()=>S[key],setValue:v=>{if(recording)return;S[key]=v;changed(key);}});
+})();
+
+/* ML_KEYBOARD_END:integration */</script>
+
+<script data-ml-shell="motion">
+
+/* Additive workbench presentation. The original rendering/export script is unchanged. */
+(() => {
+  const byId=id=>document.getElementById(id);
+  const app=byId('app');
+  const header=byId('mlMotionToolbar');
+  const home=byId('mlab-home');
+  if(home){home.textContent='↖ MOTION LAB';home.classList.add('ml-home');header.querySelector('.ml-motion-home').append(home);}
+  const rail=document.createElement('aside');rail.id='mlMotionSources';rail.className='ml-motion-sources';rail.setAttribute('aria-label','素材とルック');
+  rail.innerHTML='<div class="ml-motion-eyebrow">SOURCE / 素材</div>';
+  function move(target,...nodes){nodes.filter(Boolean).forEach(node=>target.append(node));}
+  function title(text){const h=document.createElement('div');h.className='ml-motion-eyebrow';h.textContent=text;return h;}
+  function labelControls(root=document){
+    root.querySelectorAll('.prow,.field').forEach(row=>{
+      const label=row.querySelector(':scope > label,:scope > span:first-child');if(!label)return;
+      const text=label.textContent.trim();if(!text)return;
+      row.querySelectorAll('input,select,textarea').forEach(control=>{
+        if(control.hasAttribute('aria-label')||control.labels?.length)return;
+        control.setAttribute('aria-label',text);
+      });
+    });
+    root.querySelectorAll('button[title]').forEach(button=>{if(!button.hasAttribute('aria-label')&&button.textContent.trim().length<4)button.setAttribute('aria-label',button.title);});
+  }
+  function jumpTo(node){
+    if(!node)return;
+    if(node.matches('details'))node.open=true;
+    const details=node.closest('details');if(details)details.open=true;
+    node.classList.remove('collapsed');
+    node.scrollIntoView({block:'nearest',behavior:'auto'});
+    const control=node.querySelector('button:not(:disabled),input:not(:disabled),select:not(:disabled)');if(control)control.focus({preventScroll:true});
+  }
+  function tabs(panel,groups){
+    const nav=document.createElement('nav');nav.className='ml-motion-tabs';nav.setAttribute('aria-label','設定パネル');
+    const wrappers={};
+    for(const [key,label,nodes] of groups){
+      const button=document.createElement('button');button.type='button';button.className='ml-motion-tab';button.dataset.motionTab=key;button.textContent=label;
+      nav.append(button);
+      const group=document.createElement('div');group.className='ml-motion-group';group.id='ml-motion-'+key;wrappers[key]=group;move(group,...nodes);panel.append(group);
+    }
+    panel.prepend(nav);
+    const select=key=>{
+      for(const [name,group]of Object.entries(wrappers))group.hidden=name!==key;
+      nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.motionTab===key)));
+      panel.scrollTop=0;
+    };
+    nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)select(b.dataset.motionTab);});
+    select(groups[0][0]);return select;
+  }
+  function unsupported(stage,message,ids){
+    const note=document.createElement('div');note.className='ml-motion-capability ml-capability';note.setAttribute('role','status');
+    const strong=document.createElement('strong');strong.textContent='この環境ではプレビューできません';
+    const text=document.createElement('p');text.textContent=message;
+    const help=document.createElement('small');help.textContent='設定やファイルは変更されていません。対応ブラウザで同じページを開いてください。';
+    note.append(strong,text,help);stage.append(note);
+    document.body.classList.add('ml-render-unavailable');
+    ids.forEach(id=>{const el=byId(id);if(el){el.disabled=true;el.title=message;}});
+    const exportJump=byId('mlMotionExport');if(exportJump){exportJump.disabled=true;exportJump.title=message;}
+  }
+
+  const panel=byId('panel'),sections=[...panel.querySelectorAll(':scope > section')];
+  panel.querySelector('header').classList.add('ml-legacy-title');
+  move(rail,sections[0],title('LOOK / 配色'),sections[4]);app.prepend(rail);
+  const select=tabs(panel,[['edit','見た目',[sections[2],sections[6],sections[7]]],['motion','動き',[sections[1],sections[3],sections[5]]],['export','書き出し',[sections[8],sections[9]]]]);
+  byId('mlMotionExport').onclick=()=>{select('export');jumpTo(sections[8]);};
+  byId('play').setAttribute('aria-label','再生・停止');
+  const view=byId('view');
+  if(!view.getContext('webgl2')){
+    unsupported(byId('stage'),'WebGL2 が使えないため、描画と書き出しを停止しています。WebGL2 対応のPCブラウザで開いてください。',['play','png','mov','zip','rec']);
+    app.querySelectorAll('input,select,textarea,button:not(.ml-motion-tab)').forEach(el=>el.disabled=true);
+  }
+
+  labelControls();
+  // Native resize listeners keep the original preview fitting its new workspace.
+  window.dispatchEvent(new Event('resize'));
+})();
 </script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+/* Export workflow: one ordered surface, native renderers and callbacks. */
+dialog.ml-export-dialog{box-sizing:border-box;width:min(560px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 32px);padding:0;border:1px solid #4a5059;border-radius:5px;background:#202329;color:#e8ebef;box-shadow:0 24px 90px #0009;font:12px/1.5 Arial,sans-serif;overflow:auto;color-scheme:dark}
+dialog.ml-export-dialog::backdrop{background:#000a}
+.ml-export-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#202329;border-bottom:1px solid #3a4049}
+.ml-export-head small{font-size:10px;color:#9da6b4;letter-spacing:.08em}.ml-export-head h2{margin:3px 0 0;font-size:17px;font-weight:600;color:#f0f2f6}
+.ml-export-dialog button,.ml-export-dialog input,.ml-export-dialog select{font-family:Arial,sans-serif;max-width:100%;box-sizing:border-box}
+.ml-export-dialog select,.ml-export-dialog input[type=number],.ml-export-dialog input[type=text]{padding:7px 8px;background:#2b3038;color:#e8ebef;border:1px solid #505866;border-radius:3px;min-width:0}
+.ml-export-dialog select{width:100%}.ml-export-dialog input[type=range]{min-width:50px;max-width:100%;accent-color:#80a9e6}
+.ml-export-dialog button{cursor:pointer;border:1px solid #515967;border-radius:3px;background:#2d333d;color:#e8ebef;padding:7px 10px;font-size:12px}
+.ml-export-dialog button:disabled,.ml-export-dialog select:disabled,.ml-export-dialog fieldset:disabled{opacity:.55;cursor:not-allowed}
+.ml-export-dialog :focus-visible{outline:2px solid #8fb9f2;outline-offset:3px}
+.ml-export-close{font-size:22px!important;line-height:1;padding:4px 9px!important}.ml-export-settings,.ml-export-primary{border:0;padding:0;margin:0;min-width:0}
+.ml-export-section{margin:0!important;padding:15px 20px!important;border-bottom:1px solid #363c45!important;background:none!important;min-width:0}
+.ml-export-section h3{margin:0 0 9px;color:#aeb7c4;font-size:11px;font-weight:600;letter-spacing:.04em}
+.ml-export-field,.ml-export-readout{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;margin:8px 0}.ml-export-label{color:#bfc6d0;min-width:74px}.ml-export-field>input:not([type=range]),.ml-export-field>select{flex:1}.ml-export-field .ml-export-note,.ml-export-readout .ml-export-note{flex-basis:100%;margin:0}
+.ml-export-note{font-size:11px!important;line-height:1.65!important;color:#a6b0be!important;margin:7px 0 0!important;overflow-wrap:anywhere}
+.ml-export-constraints{margin:8px 0 0;padding-left:16px;color:#e8c187;font-size:11px;line-height:1.6}.ml-export-constraints li+li{margin-top:5px}
+.ml-export-group{min-width:0}.ml-export-section .prow,.ml-export-section .row{max-width:100%;min-width:0}.ml-export-section .prow>input{min-width:0}.ml-export-section .seg{display:flex;flex-wrap:wrap;gap:3px}
+.ml-export-section .sub,.ml-export-section .hint{font-size:11px;line-height:1.6}.ml-export-section #sizeBlock{min-width:0}.ml-export-section #customWH input{width:100px}
+.ml-export-status{padding:12px 20px;font-size:11px;background:#252b34;color:#b9cbe4;white-space:pre-line;overflow-wrap:anywhere;border-bottom:1px solid #3a4049}
+.ml-export-footer{padding:14px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#202329;position:sticky;bottom:0;z-index:2;border-top:1px solid #3a4049}.ml-export-primary{margin-left:auto}.ml-export-primary button{min-width:140px;background:#8ab2ed!important;color:#152235!important;border-color:#8ab2ed!important;font-weight:600}.ml-export-secondary{display:flex;gap:6px;flex-wrap:wrap}.ml-export-secondary button{font-size:11px}.ml-export-dialog [hidden]{display:none!important}
+@media(max-width:600px){dialog.ml-export-dialog{max-height:calc(100dvh - 16px);width:calc(100vw - 16px)}.ml-export-head,.ml-export-section,.ml-export-footer{padding:12px 14px!important}.ml-export-footer{position:static}.ml-export-primary{flex:1}.ml-export-primary button{width:100%;min-width:0}.ml-export-field{gap:6px}.ml-export-label{min-width:64px}}
+@media(prefers-reduced-motion:reduce){.ml-export-dialog *{scroll-behavior:auto!important;transition:none!important}}
+
+.ml-export-secondary-action{border:0;padding:0;margin:0;min-width:0}

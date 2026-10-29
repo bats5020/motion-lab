@@ -107,8 +107,24 @@
     pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4);}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/raster-workbench.css">
+<script src="../shared/raster-workbench.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/raster-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/raster-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench raster-workbench" data-raster-tool="pixel-gradient">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
  onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
@@ -821,6 +837,32 @@ syncUI();
 render();
 renderColorList();
 genVariations();
+/* ML_KEYBOARD_BEGIN */
+window.MLRasterModel={
+  name:'Pixel Gradient',tool:'pixel-gradient',
+  capture:()=>JSON.parse(JSON.stringify(state)),
+  equals:(a,b)=>JSON.stringify({...a,selected:null})===JSON.stringify({...b,selected:null}),
+  restore:s=>{
+    state=JSON.parse(JSON.stringify(s));syncUI();render();renderColorList();
+    const hints={mesh:'Mesh: 色の点を自由に配置。点の位置で色が混ざります。',linear:'Linear: 軸の両端（四角ハンドル）で向きを、菱形で色の位置を調整。',radial:'Radial: 中心と半径ハンドルで広がりを調整。',conic:'Conic: 中心の周りを一周するグラデーション。'};
+    $('#typeHint').textContent=hints[state.type]||'';
+  },
+  numbers:()=>['w','h'].map(k=>({integer:true,number:$('#res'+k.toUpperCase()),min:60,max:4000,step:10,label:k==='w'?'キャンバス幅 px':'キャンバス高さ px',getValue:()=>state.res[k],setValue:v=>{state.res[k]=Math.round(v);const key=`${state.res.w}x${state.res.h}`;$('#aspectSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.val===key));render();}})),
+  setRange:(r,v)=>{
+    r.value=v;const twin=r.id?$('#'+r.id.slice(0,-1)+'N'):null;if(twin)twin.value=v;
+    const key={meshPowR:'meshPower',pxR:'size',postR:'posterize',grainR:'grain'}[r.id];
+    if(key){if(key==='meshPower')state.meshPower=v;else state.pixel[key]=v;}
+    else{const card=r.closest('.color-card');if(card?.parentElement){const i=[...card.parentElement.children].indexOf(card);currentColors()[i][r.dataset.k]=v;}}
+    render();
+  },
+  valueFor:r=>{
+    const key={meshPowR:'meshPower',pxR:'size',postR:'posterize',grainR:'grain'}[r.id];
+    if(key)return key==='meshPower'?state.meshPower:state.pixel[key];
+    const card=r.closest('.color-card');if(card?.parentElement){const i=[...card.parentElement.children].indexOf(card);return currentColors()[i]?.[r.dataset.k];}
+    return +r.value;
+  }
+};
+/* ML_KEYBOARD_END */
 </script>
 </body>
 </html>

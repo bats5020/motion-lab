@@ -215,8 +215,20 @@ details>summary:hover{color:var(--text)}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/material-workbench.css">
+<script src="../shared/workbench.js"></script>
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<script src="../shared/editor-history.js"></script>
+<script src="../shared/numeric-input.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-material-native.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench ml-material" data-material-tool="thermal-flow">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 <div id="app">
   <main id="stage">
@@ -1313,6 +1325,17 @@ function mkRange(lbl,min,max,st,val,cb){
   row.append(ce('span',null,lbl),inp,pv);
   return{row,set:v=>{inp.value=v;pv.textContent=fmtv(+v)}};
 }
+/* ML_KEYBOARD_BEGIN:range-model */
+const mlThermalMkRange=mkRange;
+mkRange=function(lbl,min,max,st,val,cb){
+  const ctl=mlThermalMkRange(lbl,min,max,st,val,cb),inp=ctl.row.querySelector('input'),pv=ctl.row.querySelector('.pv');
+  let raw=val;const originalSet=ctl.set;
+  ctl.set=v=>{raw=Number(v);originalSet(v);window.MLNumberInputs?.getBinding(inp)?.refresh();};
+  inp.addEventListener('input',()=>{raw=Number(inp.value);});
+  inp.mlNumeric={label:lbl,getValue:()=>raw,setValue:v=>{raw=v;inp.value=v;pv.textContent=fmtv(v);cb(v);redraw();}};
+  return ctl;
+};
+/* ML_KEYBOARD_END:range-model */
 function mkSeg(opts,val,cb){
   const seg=ce('div','seg');
   const btns={};
@@ -2328,6 +2351,9 @@ function restoreRecord(o,refresh=true){
 function historyEntry(){return{json:JSON.stringify(stateRecord()),image:_maskImg,playback:{time:playback.time,playing:playback.playing},frameTime:_frameTime,anim:clone(_animT)}}
 function syncHistoryUI(){
   $('#btnUndo').disabled=!UNDO.length;$('#btnRedo').disabled=!REDO.length;
+/* ML_KEYBOARD_BEGIN:history-status */
+  window.MLThermalHistory?.refresh();
+/* ML_KEYBOARD_END:history-status */
 }
 function pushUndo(){
   if(_thumbRendering)return;
@@ -3374,6 +3400,48 @@ buildLut();
 refreshAll();
 requestAnimationFrame(loop);
 renderLookThumbnails();
+/* ML_KEYBOARD_BEGIN:integration */
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!window.MLEditorHistory||document.body.dataset.graphicsStatus==='unavailable')return;
+  let gesture=null;
+  const equal=(a,b)=>a.json===b.json&&a.image===b.image;
+  const restore=entry=>{_maskImg=entry.image;restoreRecord(JSON.parse(entry.json),false);Object.assign(playback,entry.playback,{last:performance.now()});_frameTime=entry.frameTime;_animT=clone(entry.anim);buildLut();refreshAll();redraw();};
+  const finish=cancel=>{
+    if(!gesture)return;
+    const before=gesture;gesture=null;const after=historyEntry();
+    UNDO.splice(0,UNDO.length,...before.undo);REDO.splice(0,REDO.length,...before.redo);
+    if(cancel)restore(before.entry);
+    else if(!equal(before.entry,after)){UNDO.push(before.entry);if(UNDO.length>60)UNDO.shift();REDO.length=0;}
+    document.querySelectorAll('input').forEach(i=>i._u=false);syncHistoryUI();
+  };
+  const controller=MLEditorHistory.register({name:'Thermal Flow',toolbar:false,isBusy:()=>_recording,native:{
+    begin(){gesture={entry:historyEntry(),undo:UNDO.slice(),redo:REDO.slice()};},
+    commit(){finish(false);},cancel(){finish(true);},undo,redo,
+    canUndo:()=>UNDO.length>0,canRedo:()=>REDO.length>0,
+    reset(){UNDO.length=0;REDO.length=0;gesture=null;syncHistoryUI();}
+  }});
+  window.MLThermalHistory=controller;
+  for(const [id,action]of [['btnUndo','undo'],['btnRedo','redo']]){
+    const button=$( '#'+id );button.dataset.mlHistory='true';
+    button.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();controller[action]();},true);
+  }
+  controller.subscribe(c=>{$('#btnUndo').disabled=!c.canUndo;$('#btnRedo').disabled=!c.canRedo;});
+  const bind=()=>{
+    for(const inp of document.querySelectorAll('input[type=range]')){
+      if(MLNumberInputs.getBinding(inp)||!inp.mlNumeric)continue;
+      const opts={range:inp,readout:inp.parentElement.querySelector('.pv'),...inp.mlNumeric};
+      if(inp===UI.frameMoment?.row.querySelector('input')){opts.scale=()=>state.motion.loopSec/100;opts.suffix='s';}
+      MLNumberInputs.bind(opts);
+    }
+  };
+  bind();
+  MLNumberInputs.bind({number:$('#seed'),min:0,max:4294967295,step:1,integer:true,getValue:()=>state.seed,setValue:v=>applyRandom(v)});
+  for(const [input,key]of [[UI.customW,'w'],[UI.customH,'h']])MLNumberInputs.bind({number:input,step:1,integer:true,getValue:()=>state.canvas[key],commitEvents:['change']});
+  const observer=new MutationObserver(bind);observer.observe(document.body,{childList:true,subtree:true});
+  document.body.insertAdjacentHTML('beforeend','<span class="ml-history-status">数値は直接入力・↑↓で調整。Shiftは10倍。⌘ / Ctrl Zで取り消し。</span>');
+});
+/* ML_KEYBOARD_END:integration */
 </script>
+<script src="../shared/material-workbench.js"></script>
 </body>
 </html>

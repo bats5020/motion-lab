@@ -130,8 +130,24 @@
     .stagecol{min-height:55vh}
   }
 </style>
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/raster-workbench.css">
+<script src="../shared/raster-workbench.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/editor-history.css">
+<link rel="stylesheet" href="../shared/numeric-input.css">
+<link rel="stylesheet" href="../shared/raster-keyboard.css">
+<script src="../shared/editor-history.js" defer></script>
+<script src="../shared/numeric-input.js" defer></script>
+<script src="../shared/raster-keyboard.js" defer></script>
+<!-- ML_KEYBOARD_ASSETS_END -->
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<script src="../shared/export-raster.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
 </head>
-<body>
+<body class="ml-workbench raster-workbench" data-raster-tool="halftone-lab">
 <a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s"
  onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
 
@@ -411,6 +427,9 @@ function ingest(img){
   const x = original.getContext('2d');
   x.fillStyle='#fff'; x.fillRect(0,0,w,h);
   x.drawImage(img,0,0,w,h);
+/* ML_KEYBOARD_BEGIN */
+  queueMicrotask(()=>window.MLRasterKeyboard?.boundary('画像の読み込みで編集履歴を開始しました'));
+/* ML_KEYBOARD_END */
   setSource('image');
 }
 const s2l = v => { const c=v/255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
@@ -1383,7 +1402,28 @@ $('btnCode').onclick=()=>{
 loadPresets(); renderPresetList();
 window.addEventListener('resize',fitView);
 const _shared=parseShareHash();
-demo(_shared ? ()=>{ Object.assign(state,_shared); syncUI(); sizesDirty(); } : null);
+const _workspace=new URLSearchParams(location.search).get('workspace');
+const _entryState=_shared||(_workspace==='generate'?{source:'ripple'}:_workspace==='image'?{source:'image'}:null);
+demo(_entryState ? ()=>{ Object.assign(state,_entryState); syncUI(); sizesDirty(); } : null);
+/* ML_KEYBOARD_BEGIN */
+window.MLRasterModel={
+  name:'Halftone Lab',tool:'halftone-lab',
+  capture:()=>({values:JSON.parse(JSON.stringify(state)),duration:$('recDur').value,presets:JSON.parse(JSON.stringify(memPresets))}),
+  restore:s=>{
+    const keepView=state.source===s.values.source&&state.workRes===s.values.workRes,position=[vx,vy,vz];
+    clearTimeout(wrTimer);Object.assign(state,JSON.parse(JSON.stringify(s.values)));$('recDur').value=s.duration;
+    if(JSON.stringify(memPresets)!==JSON.stringify(s.presets)){memPresets=JSON.parse(JSON.stringify(s.presets));persistPresets();renderPresetList();}
+    syncUI();sizesDirty();
+    if(keepView){[vx,vy,vz]=position;applyView();}
+  },
+  valueFor:r=>state[r.id],
+  setRange:(r,v)=>{
+    state[r.id]=v;r.value=v;const out=$(r.id+'V');if(out)out.textContent=fmts[r.id](v);
+    if(r.id==='workRes'){clearTimeout(wrTimer);wrTimer=setTimeout(rebuildWorking,250);}
+    else{if(!state.animOn)render(lastT);sizesDirty();}
+  },isBusy:()=>recActive
+};
+/* ML_KEYBOARD_END */
 </script>
 </body>
 </html>

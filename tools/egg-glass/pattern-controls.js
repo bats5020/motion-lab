@@ -19,6 +19,9 @@ function imageStore(value) {
 export async function setupPatternControls({material,originalTexture,renderer,selectSurface,lightingControls,scrollControls}) {
   const panel=document.querySelector('#pattern-panel'),status=document.querySelector('#pattern-status'),uniforms=material.userData.flowUniforms;
   let settings=defaults(),customTexture=null,imageData=null,imageName='',revision=0;
+/* ML_KEYBOARD_BEGIN */
+  let assetBusy=0;
+/* ML_KEYBOARD_END */
   const params=new URLSearchParams(globalThis.__eggInitialSearch??location.search);
   try {
     const saved=JSON.parse(params.get('pattern')??localStorage.getItem(storageKey)??'null');
@@ -123,6 +126,9 @@ export async function setupPatternControls({material,originalTexture,renderer,se
     if(!['image/png','image/jpeg','image/webp'].includes(file.type)){status.textContent='PNG・JPEG・WebPを選んでください。';return;}
     if(file.size>20*1024*1024){status.textContent='20MB以下の画像を選んでください。';return;}
     status.textContent='画像を読み込んでいます…';
+/* ML_KEYBOARD_BEGIN */
+    assetBusy++;let assetChanged=false;
+/* ML_KEYBOARD_END */
     try {
       const bitmap=await createImageBitmap(file);
       const scale=Math.min(1,2048/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');
@@ -131,10 +137,22 @@ export async function setupPatternControls({material,originalTexture,renderer,se
       const data=canvas.toDataURL('image/png');if(token!==revision)return;
       await loadImage(data,file.name,token);if(token!==revision)return;
       settings.source='image';settings.recolor=false;edit();
+/* ML_KEYBOARD_BEGIN */
+      assetChanged=true;
+/* ML_KEYBOARD_END */
       try{await imageStore({data,name:file.name});}catch{status.textContent='画像の自動保存に失敗しました。画像を残すにはHTMLで保存してください。';}
     }catch{status.textContent='画像を読み込めませんでした。別のPNG・JPEG・WebPを選んでください。';}
+/* ML_KEYBOARD_BEGIN */
+    finally{assetBusy=Math.max(0,assetBusy-1);if(assetChanged)document.dispatchEvent(new CustomEvent('egg-asset-boundary',{detail:{kind:'pattern'}}));}
+/* ML_KEYBOARD_END */
   });
   apply();
   if(!globalThis.__eggEmbed&&params.get('panel')==='pattern')document.querySelector('#pattern-open').click();
-  return {serialize:()=>structuredClone(settings),get image(){return imageData?{data:imageData,name:imageName}:null;}};
+/* ML_KEYBOARD_BEGIN original-base64:ICByZXR1cm4ge3NlcmlhbGl6ZTooKT0+c3RydWN0dXJlZENsb25lKHNldHRpbmdzKSxnZXQgaW1hZ2UoKXtyZXR1cm4gaW1hZ2VEYXRhP3tkYXRhOmltYWdlRGF0YSxuYW1lOmltYWdlTmFtZX06bnVsbDt9fTs= */
+  function restoreEditor(saved) {
+    if(saved.source==='image'&&!customTexture)throw new Error('履歴の画像が利用できません');
+    settings=structuredClone(saved);revision++;apply(true);
+  }
+  return {serialize:()=>structuredClone(settings),restoreEditor,get busy(){return assetBusy>0;},get image(){return imageData?{data:imageData,name:imageName}:null;}};
+/* ML_KEYBOARD_END */
 }
