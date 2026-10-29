@@ -16,7 +16,7 @@ function exporter(tool,options={}){
   $:button,exBtn:button('exBtn'),setBusy:(busy)=>{log.busy=busy;if(!busy)button('rec').classList.remove('rec');},toast:m=>log.toasts.push(m),
   beginSession:()=>{log.starts++;env.recording={stop:false,head:0,wasPlaying:true};return env.recording;},endSession:()=>{log.ends++;env.recording=null;},
   seekScenesExact:async()=>{},render:()=>{log.frames++;},syncBar(){},makeMp4:()=>({size:100}),dl:()=>{log.saves++;},saveFile:async()=>{if(options.saveFailure)throw Error('save failed');log.saves++;},
-  play(){},boot:()=>{log.starts++;},mt:{startTime:()=>0},gsap:{globalTimeline:{pause:()=>{log.paused++;},resume:()=>{log.resumed++;}}},
+  play(){},boot:()=>{log.starts++;},mt:{startTime:()=>0,totalDuration:()=>0},frameOnly:false,gsap:{globalTimeline:{pause:()=>{log.paused++;},resume:()=>{log.resumed++;}}},
   clip:{readyState:4,src:'blob:ready',duration:0},stepTo:async()=>{log.frames++;},performance:{now:()=>10000},requestAnimationFrame:fn=>queueMicrotask(fn),setTimeout:fn=>queueMicrotask(fn),Uint8Array,Blob,
   VideoFrame:class{close(){log.closedFrames++;}},
   VideoEncoder:class{

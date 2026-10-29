@@ -49,6 +49,11 @@
   .pbtn:disabled { opacity: .4; cursor: default; }
   .pbtn.primary { background: var(--accent, #4f5cff); border-color: var(--accent, #4f5cff); color: #fff; }
   .pbtn.primary.rec { background: #3a1216; border-color: #ff5a5a; color: #ffb3b3; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .seg button { padding: 8px 6px; border: 1px solid var(--line, #2a2a31); border-radius: 6px; background: var(--panel2, #1c1c21); color: var(--subtext, #9a9aa6); font: 600 11.5px/1.35 system-ui, -apple-system, sans-serif; cursor: pointer; }
+  .seg button small { display: block; margin-top: 2px; font-weight: 400; font-size: 10px; color: var(--faint, #6a6a74); }
+  .seg button[aria-pressed="true"] { border-color: var(--accent, #4f5cff); background: var(--accent-soft, rgba(79,92,255,.14)); color: var(--text, #e6e6ef); }
+  .seg button:disabled { opacity: .4; cursor: default; }
   .meta { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; background: #0f0f12; color: var(--subtext, #9a9aa6); font: 11px/1.6 var(--font-mono, ui-monospace, monospace); word-break: break-all; }
   .meta b { color: var(--text, #e6e6ef); font-weight: 600; }
   #stage {
@@ -174,7 +179,14 @@
     <p class="hint" style="margin-top:8px">プレビューに動画をドロップしても差し替えできます。窓（1770×996・16:9）にトリミングで収まります。</p>
   </section>
   <section>
-    <h2>02 — 確認・書き出し</h2>
+    <h2>02 — 始まり方</h2>
+    <div class="seg" role="group" aria-label="始まり方">
+      <button type="button" id="modeOpen" aria-pressed="true">オープニングあり<small>HUDが立ち上がり窓が開く</small></button>
+      <button type="button" id="modeFrame" aria-pressed="false">HUDのみ<small>最初から窓が開いた状態</small></button>
+    </div>
+  </section>
+  <section>
+    <h2>03 — 確認・書き出し</h2>
     <button class="pbtn" id="replayBtn" type="button">↻ 最初から再生（R）</button>
     <button class="pbtn primary" id="exBtn" type="button" title="1920×1080・30fps の MP4 を書き出す（コマ送りで描画）">● MP4を書き出す</button>
     <p class="meta" id="exInfo">1920×1080・30fps・H.264</p>
@@ -341,6 +353,7 @@
     gsap.set(cta, { clipPath: 'inset(0% 100% 0% 0%)', opacity: 1, x: 0, clearProps: 'backgroundColor,color' });
   }
 
+  let frameOnly = false; // 02 — 始まり方
   function boot() {
     reset();
     tl = gsap.timeline();
@@ -405,6 +418,7 @@
     s2 = buildScene2();
     mt = gsap.timeline();
     mt.add(tl, 0).call(startTC, null, 3.05).add(s2, 3.4).call(startAmbient, null, 3.4 + 1.3);
+    if (frameOnly) mt.progress(1); // HUDのみ：開ききった状態から。TC・映像・矢印の脈打ちは0秒から
   }
 
   /* ---------- idle: running timecode, blinking dot, small glitches ---------- */
@@ -632,9 +646,10 @@
         clip.src=URL.createObjectURL(blob);clip.load();await ready;
       }
       if(job.cancelled)return;
-      const dur=3.4+(Number.isFinite(clip.duration)?clip.duration:3.87)+0.5,N=Math.round(dur*FPS);
+      const clipDur=Number.isFinite(clip.duration)?clip.duration:3.87;
+      const dur=frameOnly?clipDur:3.4+clipDur+0.5,N=Math.round(dur*FPS);
       Object.assign(EX,{on:true,stop:false,t:0,tcAt:null,clipAt:null});
-      g=gsap.globalTimeline;g.pause();boot();const g0=mt.startTime();
+      g=gsap.globalTimeline;g.pause();boot();const g0=frameOnly?mt.startTime()+mt.totalDuration():mt.startTime();
       const samples=[];let desc=null,encErr=null;const chunks=[];
       if(cfg){
         encoder=new VideoEncoder({output:(chunk,meta)=>{if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description)desc=new Uint8Array(meta.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==='key',ts:chunk.timestamp});},error:e=>{encErr=e;}});encoder.configure(cfg);
@@ -660,7 +675,7 @@
       if(encoder){await encoder.flush();if(encErr)throw encErr;}
       else{if(rec.state!=='inactive')rec.stop();await stopped;}
       if(EX.stop||job.cancelled||!ok)return;
-      const name=`u19-hud-sequence-${stamp()}_${FPS}fps`;
+      const name=`u19-hud-sequence${frameOnly?'-hud':''}-${stamp()}_${FPS}fps`;
       if(encoder){if(!desc||!samples.length)throw Error('MP4のエンコード結果が空でした');await saveFile(makeMp4(samples,desc,W,H,FPS),name+'.mp4');}
       else{const blob=new Blob(chunks,{type:mime.split(';')[0]});if(!blob.size)throw Error('録画データが空でした');await saveFile(blob,name+(mime.startsWith('video/mp4')?'.mp4':'.webm'));}
     }catch(err){if(!job.cancelled)toast('書き出しに失敗しました：'+((err&&err.message)||err));}
@@ -682,7 +697,9 @@
   function showInfo() {
     const d = Number.isFinite(clip.duration) ? clip.duration : 0;
     clipInfo.innerHTML = `<b>${clipName.replace(/[<>&]/g, '')}</b><br>${clip.videoWidth || '–'}×${clip.videoHeight || '–'}・${d.toFixed(2)}秒`;
-    exInfo.textContent = `1920×1080・30fps・H.264 ／ 尺 ${(3.4 + d + 0.5).toFixed(1)}秒（HUD 3.4秒 ＋ 映像 ＋ 0.5秒）`;
+    exInfo.textContent = frameOnly
+      ? `1920×1080・30fps・H.264 ／ 尺 ${d.toFixed(1)}秒（映像の長さ）`
+      : `1920×1080・30fps・H.264 ／ 尺 ${(3.4 + d + 0.5).toFixed(1)}秒（HUD 3.4秒 ＋ 映像 ＋ 0.5秒）`;
   }
   clip.addEventListener('loadedmetadata', showInfo);
   if (clip.readyState >= 1) showInfo();
@@ -728,11 +745,20 @@
   fileIn.addEventListener('change', () => { if (fileIn.files[0]) setClip(fileIn.files[0]); fileIn.value = ''; });
   resetBtn.addEventListener('click', () => resetClip(false));
   $('#replayBtn').addEventListener('click', () => { if (!EX.on) play(); });
+  const modeBtns = { open: $('#modeOpen'), frame: $('#modeFrame') };
+  function setMode(frame) {
+    if (EX.on || EX.pending) return;
+    frameOnly = frame;
+    modeBtns.open.setAttribute('aria-pressed', String(!frame)); modeBtns.frame.setAttribute('aria-pressed', String(frame));
+    showInfo(); play();
+  }
+  modeBtns.open.addEventListener('click', () => setMode(false));
+  modeBtns.frame.addEventListener('click', () => setMode(true));
   vp.addEventListener('dragover', (e) => { e.preventDefault(); vp.classList.add('drop'); });
   vp.addEventListener('dragleave', () => vp.classList.remove('drop'));
   vp.addEventListener('drop', (e) => { e.preventDefault(); vp.classList.remove('drop'); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setClip(f); });
   // lock the panel while exporting
-  new MutationObserver(() => { const on = exBtn.classList.contains('rec'); [pickBtn, $('#replayBtn')].forEach((b) => (b.disabled = on)); resetBtn.disabled = on || !userURL; }).observe(exBtn, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => { const on = exBtn.classList.contains('rec'); [pickBtn, $('#replayBtn'), modeBtns.open, modeBtns.frame].forEach((b) => (b.disabled = on)); resetBtn.disabled = on || !userURL; }).observe(exBtn, { attributes: true, attributeFilter: ['class'] });
 
   /* ---------- start / replay ---------- */
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -818,18 +844,19 @@
   const panel=byId('panel'),sections=[...panel.querySelectorAll(':scope > section')];
   panel.querySelector('header').classList.add('ml-legacy-title');
   const intro=title('WORKFLOW / 作業の流れ');panel.prepend(intro);
-  sections[0].querySelector('h2').textContent='01 — 映像を選ぶ';sections[1].querySelector('h2').textContent='02 — 確認して書き出す';
+  const exportSection=sections[sections.length-1];
+  sections[0].querySelector('h2').textContent='01 — 映像を選ぶ';exportSection.querySelector('h2').textContent='03 — 確認して書き出す';
   const strip=document.createElement('ol');strip.className='ml-hud-sequence';strip.setAttribute('aria-label','シーケンスの構成');
   [['01','HUD','3.4秒'],['02','差し替え映像','選んだ動画の長さ'],['03','余韻','0.5秒']].forEach(([n,name,time])=>{const li=document.createElement('li');li.innerHTML='<span>'+n+'</span><strong>'+name+'</strong><small>'+time+'</small>';strip.append(li);});
   byId('preview').append(strip);
-  byId('mlMotionExport').onclick=()=>jumpTo(sections[1]);
+  byId('mlMotionExport').onclick=()=>jumpTo(exportSection);
   const note=document.createElement('p');note.className='ml-motion-tip';note.textContent='このツールは完成済みのHUDに映像を差し替える専用エディタです。HUD自体の形や順番は固定です。';panel.append(note);
   if(typeof window.gsap==='undefined')unsupported(byId('stageArea'),'アニメーションライブラリを読み込めませんでした。接続を確認してページを再読み込みしてください。',['exBtn','replayBtn','pickBtn','resetBtn']);
   else if(!('VideoEncoder' in window)){
     // The original exporter can fall back to MediaRecorder; do not disable that supported route.
     const canRecord=!!(window.MediaRecorder&&document.createElement('canvas').captureStream&&['video/mp4;codecs=avc1.640028','video/mp4','video/webm;codecs=vp9','video/webm'].some(type=>MediaRecorder.isTypeSupported(type)));
     const note=document.createElement('p');note.className='ml-motion-tip';note.setAttribute('role','status');
-    note.textContent=canRecord?'WebCodecs が使えないため、このブラウザに対応した録画方式・形式で書き出します。':'このブラウザは動画書き出しに対応していません。プレビューは利用できます。';sections[1].append(note);
+    note.textContent=canRecord?'WebCodecs が使えないため、このブラウザに対応した録画方式・形式で書き出します。':'このブラウザは動画書き出しに対応していません。プレビューは利用できます。';exportSection.append(note);
     if(!canRecord){byId('exBtn').disabled=true;byId('mlMotionExport').disabled=true;}
   }
 
