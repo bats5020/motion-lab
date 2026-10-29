@@ -120,7 +120,7 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
     </section>
     <section><h2><b>05</b>書き出し</h2>
       <div class="btnrow"><button class="btn" id="btnPng">PNG保存</button><button class="btn" id="btnCopy">コピー</button></div>
-      <div class="btnrow"><button class="btn" id="btnRec">&#9679; WebM録画</button></div>
+      <div class="btnrow"><button class="btn" id="btnRec">&#9679; 動画録画</button></div>
       <div id="recDurRow"></div>
       <div class="btnrow"><button class="btn" id="btnUrl">設定URLコピー</button></div>
       <div class="hint">設定URLを開くと同じ状態が再現されます</div>
@@ -643,28 +643,42 @@ $('#btnCopy').addEventListener('click',()=>{
 });
 let _rec=null,_recIv=0,_recTo=0;
 $('#btnRec').addEventListener('click',()=>{
-  if(_rec){_rec.stop();return}
+  if(_rec){if(_rec.state!=='inactive')_rec.stop();return}
   const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
   const mime=window.MediaRecorder&&mimes.find(m=>MediaRecorder.isTypeSupported(m));
-  if(!mime){toast('この環境は録画に対応していません');return}
-  const stream=view.captureStream(60);
-  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:10e6});
-  const chunks=[];
-  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  rec.onstop=()=>{
+  if(!mime||!view.captureStream){toast('この環境は録画に対応していません');return}
+  let stream,rec,failed=false;
+  const cleanup=()=>{
     clearInterval(_recIv);clearTimeout(_recTo);
+    if(stream)stream.getTracks().forEach(t=>t.stop());
     _rec=null;
-    $('#btnRec').innerHTML='&#9679; WebM録画';
-    download(new Blob(chunks,{type:mime.split(';')[0]}),'glass-lab_'+state.seed+'.webm');
-    toast('WebMを保存しました');
+    $('#btnRec').innerHTML='&#9679; 動画録画';
   };
-  rec.start(250);_rec=rec;
+  try{
+    stream=view.captureStream(60);
+    rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:10e6});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    rec.onerror=()=>{failed=true;cleanup();toast('録画に失敗しました。設定を下げて再試行してください');};
+    rec.onstop=()=>{
+      if(failed)return;
+      cleanup();
+      if(!chunks.length){toast('録画データがありません。再試行してください');return}
+      const type=(rec.mimeType||mime).split(';')[0];
+      const ext=type==='video/mp4'?'mp4':'webm';
+      download(new Blob(chunks,{type}),'glass-lab_'+state.seed+'.'+ext);
+      toast(ext.toUpperCase()+'を保存しました');
+    };
+    rec.start(250);_rec=rec;
+  }catch(e){
+    failed=true;cleanup();toast('録画を開始できませんでした。設定を下げて再試行してください');return;
+  }
   const dur=+(UI.recDur?document.querySelector('#recDurRow select').value:6)||6;
   let left=dur;
   const lbl=()=>{$('#btnRec').textContent='録画中… '+left+'s（クリックで停止）'};
   lbl();
   _recIv=setInterval(()=>{left--;if(left>0&&_rec)lbl()},1000);
-  _recTo=setTimeout(()=>{if(_rec)_rec.stop()},dur*1000);
+  _recTo=setTimeout(()=>{if(_rec&&_rec.state!=='inactive')_rec.stop()},dur*1000);
 });
 /* ============ media input ============ */
 function loadMediaFile(f){

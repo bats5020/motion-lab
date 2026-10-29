@@ -335,7 +335,7 @@
     <div class="seclabel">アニメ書き出し</div>
     <div class="btnrow">
       <select id="recDur" style="width:84px;flex:none"><option value="3">3秒</option><option value="5" selected>5秒</option><option value="8">8秒</option></select>
-      <button class="btn" id="btnRec" style="flex:1">● WebM録画</button>
+      <button class="btn" id="btnRec" style="flex:1">● 動画録画</button>
     </div>
 
     <div class="seclabel">書き出し</div>
@@ -1133,25 +1133,40 @@ $('btnRec').onclick=()=>{
   if(recActive || !exReady()) return;
   const mimes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
   const mime=(window.MediaRecorder && mimes.find(m=>MediaRecorder.isTypeSupported(m)));
-  if(!mime){ alert('この環境は録画に対応していません'); return; }
+  if(!mime||!view.captureStream){ alert('この環境は録画に対応していません'); return; }
   const dur=+$('recDur').value*1000;
   const wasAnim=state.animOn;
-  if(!needLoop()){ state.animOn=true; $('animOn').checked=true; }
-  kick();
-  const stream=view.captureStream(30);
-  const rec=new MediaRecorder(stream,{mimeType:mime, videoBitsPerSecond:8e6});
-  const chunks=[];
-  rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
-  rec.onstop=()=>{
-    dl(new Blob(chunks,{type:mime.split(';')[0]}), `halftone-lab_${state.effect}.webm`);
-    $('btnRec').textContent='● WebM録画'; recActive=false;
-    if(!wasAnim){ state.animOn=false; $('animOn').checked=false; kick(); }
+  let stream,rec,iv=0,timeout=0,failed=false;
+  const cleanup=()=>{
+    clearInterval(iv);clearTimeout(timeout);
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    $('btnRec').textContent='● 動画録画'; recActive=false;
+    state.animOn=wasAnim; $('animOn').checked=wasAnim; kick();
   };
-  rec.start(250); recActive=true;
+  try{
+    if(!needLoop()){state.animOn=true;$('animOn').checked=true;}
+    kick();
+    stream=view.captureStream(30);
+    rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8e6});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    rec.onerror=()=>{failed=true;cleanup();alert('録画に失敗しました。設定を下げて再試行してください');};
+    rec.onstop=()=>{
+      if(failed)return;
+      cleanup();
+      if(!chunks.length){alert('録画データがありません。再試行してください');return}
+      const type=(rec.mimeType||mime).split(';')[0];
+      const ext=type==='video/mp4'?'mp4':'webm';
+      dl(new Blob(chunks,{type}), `halftone-lab_${state.effect}.${ext}`);
+    };
+    rec.start(250);recActive=true;
+  }catch(e){
+    failed=true;cleanup();alert('録画を開始できませんでした。設定を下げて再試行してください');return;
+  }
   let left=Math.round(dur/1000);
   $('btnRec').textContent=`録画中… ${left}s`;
-  const iv=setInterval(()=>{ left--; if(left>0) $('btnRec').textContent=`録画中… ${left}s`; },1000);
-  setTimeout(()=>{ clearInterval(iv); rec.stop(); }, dur);
+  iv=setInterval(()=>{left--;if(left>0)$('btnRec').textContent=`録画中… ${left}s`;},1000);
+  timeout=setTimeout(()=>{if(rec.state!=='inactive')rec.stop();},dur);
 };
 
 const effWrap=$('effects');
