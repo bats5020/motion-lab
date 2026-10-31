@@ -32,7 +32,7 @@
     </div>
     <div class="catalog-content" id="catalog"></div>
     <div class="empty-state" id="emptyState" hidden><span aria-hidden="true">⌕</span><h2>一致するツールがありません</h2><p>検索語や書き出し形式を変えてみてください。</p><button id="clearFilters" type="button">フィルターをリセット</button></div>
-    <footer class="library-footer"><span>19 TOOLS / 21 WORKSPACES</span><span>同じツールでも、目的に合わせた入口を用意しています。</span></footer>
+    <footer class="library-footer"><span>20 TOOLS / 22 WORKSPACES</span><span>同じツールでも、目的に合わせた入口を用意しています。</span></footer>
   </main>
 </div>
 
@@ -342,6 +342,12 @@ const TOOLS = [
     thumb:`<svg viewBox="0 0 120 66" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="10" width="66" height="42" rx="2" fill="#1c1c21" stroke="#3d3d46"/><rect x="29" y="15" width="66" height="42" rx="2" fill="#e6e6ef"/><path d="M44 44V29l8 10 8-10v15m7-15v15m7-15h14m-7 0v15" fill="none" stroke="#141417" stroke-width="3"/><path d="m12 30-4 4 4 4m91-8 4 4-4 4" fill="none" stroke="#4f5cff" stroke-width="1.5"/></svg>`
   },
   {
+    cat:"motion", name:"Showcase Reel",
+    desc:"デザインや映像を3Dのカードに並べ、ループするショーケース動画に。テンプレートとスタイルを選んで素材を差し替えるだけ。",
+    href:"tools/showcase-reel.html",
+    thumb:`<svg viewBox="0 0 120 66" xmlns="http://www.w3.org/2000/svg"><g transform="translate(60 33) skewX(-24) rotate(-14) scale(1 .62)"><rect x="-58" y="-40" width="34" height="22" rx="3" fill="#2c2f36"/><rect x="-18" y="-40" width="34" height="22" rx="3" fill="#e6e6ef"/><rect x="22" y="-40" width="34" height="22" rx="3" fill="#2c2f36"/><rect x="-58" y="-12" width="34" height="22" rx="3" fill="#e6e6ef"/><rect x="-18" y="-12" width="34" height="22" rx="3" fill="#4f5cff"/><rect x="22" y="-12" width="34" height="22" rx="3" fill="#e6e6ef"/><rect x="-58" y="16" width="34" height="22" rx="3" fill="#2c2f36"/><rect x="-18" y="16" width="34" height="22" rx="3" fill="#e6e6ef"/><rect x="22" y="16" width="34" height="22" rx="3" fill="#2c2f36"/></g></svg>`
+  },
+  {
     cat:"motion", name:"Word Switcher",
     desc:"単語／SVGを切り替えるモーショングラフィック",
     href:"tools/word-switcher.html",
@@ -393,6 +399,7 @@ const TOOL_META = {
   "Effect Stack": {cat:"image", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"14種のエフェクトを重ねる。順序を変え、偶発的な表現を探る。"},
   "Heatmap Blur": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字をぼかし、伸ばし、熱に変える。配色と動きを編集する。"},
   "Glass Lab": {cat:"texture", input:"生成 / 画像 / 動画", output:["PNG","VIDEO"], summary:"光の球体を型板ガラス越しに歪ませる。画像・動画の加工にも。"},
+  "Showcase Reel": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"作品を3Dのカードに並べて流す。テンプレートとスタイルを選んで、ループ動画に。"},
   "Image Switcher": {cat:"motion", input:"画像 / ロゴ", output:["PNG","VIDEO","HTML"], summary:"複数の画像でロゴOPやスライドを制作。テンポと始まり・終わりを調整。"},
   "Word Switcher": {cat:"type", input:"登録済みSVG", output:["PNG","SVG","VIDEO","HTML"], summary:"登録済みの単語SVGをリズミカルに切り替える。順序・間隔・動きを編集。"},
   "Wireframe": {cat:"3d", input:"図形", output:["PNG","SVG","VIDEO","HTML"], summary:"ジオメトリックなワイヤーフレーム。線と立体で動きをつくる。"},

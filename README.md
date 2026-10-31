@@ -30,6 +30,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [Heatmap Blur](tools/heatmap-blur.html) | motion | 4点グラデ（キーフレーム）のブラーマップでテキスト／炎／模様／画像を部分的にぼかし（動画にはプリセット配色のグラデーションマップをかける）、文字を1〜2字ずつ横に伸ばしながら輝度をヒートマップ配色に置換（AEの Compound Blur + Camera Lens Blur + Colorama 構成の再現）。配色・ブラー・動き・グレインを調整、PNG／1ループ動画書き出し |
 | [Glass Lab](tools/glass-lab.html) | motion | グロー球体を型板ガラス越しに歪ませる fluted glass シェーダー（WebGL）。画像・動画ソース、プリセット＋ランダマイズ、動画録画、設定URL共有 |
 | [ASCII Wave](tools/ascii-wave.html) | motion | 流体ノイズをASCII文字で描くアニメーション背景。カーソルインタラクション＋コード書き出し |
+| [Showcase Reel](tools/showcase-reel.html) | motion | デザイン・映像を3Dカードに並べたループのショーケース動画。テンプレート9種（タイルウォール／マーキー／カスケード／リング／フライスルー／デッキ／フォーカス／展開／ファン）×スタイル6種、ブラウザ／スマホのフレーム、カメラはドラッグとホイールで直接操作。MP4（H.264・コマ送り・モーションブラー可）／PNG／PNG連番ZIP、720p〜4K・6比率（[設計メモ](docs/showcase-reel.md)） |
 | [Image Switcher](tools/image-switcher.html) | motion | 複数画像でロゴOP・スライドを制作。中央揃え、テンポ・開始／終了の演出、動画／透過PNG／連番ZIP／単体HTML／作品JSON（[使い方・検証](docs/image-switcher.md)） |
 | [Word Switcher](tools/word-switcher.html) | motion | 単語／SVGを切り替えるモーショングラフィック |
 | [Warp Type](tools/warp-type.html) | motion | テキストをノイズで歪ませるジェネレーター。プリセット・PNG／WebM書き出し |

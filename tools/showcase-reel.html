@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>Showcase Reel — MOTION LAB</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<link rel="stylesheet" href="../shared/workbench.css">
+<link rel="stylesheet" href="../shared/motion-workbench.css">
+<script src="../shared/workbench.js"></script>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
+<style>
+/* Showcase Reel — layout specific to this tool. Shared tokens come from tokens.css / workbench.css. */
+body[data-ml-motion="showcase-reel"] #app{grid-template-columns:236px minmax(0,1fr) 316px}
+#reelCenter{display:flex;flex-direction:column;min-width:0;min-height:0;background:#17191b}
+#reelStage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;padding:28px;background-image:radial-gradient(#303338 .65px,transparent .65px);background-size:14px 14px;overflow:hidden;touch-action:none;cursor:grab}
+#reelStage.dragging{cursor:grabbing}
+#reelStage.dragover::after{content:"ここにドロップして素材を追加";position:absolute;inset:14px;border:1px dashed var(--accent);border-radius:6px;background:rgba(82,140,224,.12);display:flex;align-items:center;justify-content:center;color:#dfe8f6;font-size:13px;pointer-events:none}
+#view{display:block;background:#000}
+#stageHint{position:absolute;right:14px;bottom:10px;font:9px/1.4 var(--ml-mono);color:#7d848e;pointer-events:none}
+#transport{display:flex;align-items:center;gap:10px;padding:9px 13px;border-top:1px solid #353a42;background:#202326}
+#transport button{background:#30343a;border:1px solid #444a52;border-radius:3px;color:#e3e8ef;font-size:11px;height:28px;min-width:30px;padding:0 9px;cursor:pointer}
+#transport button:hover{border-color:#69727e}
+#seek{flex:1;min-width:60px}
+#time{font:10px var(--ml-mono);color:#b7bfca;white-space:nowrap;min-width:108px;text-align:right}
+#stageMeta{display:flex;justify-content:space-between;padding:6px 13px;font:9px var(--ml-mono);color:#858d97;background:#1d2024;border-top:1px solid #30353b}
+.rs-sec{padding:14px 12px;border-bottom:1px solid #35383e}
+.rs-sec>h2{font:600 11px/1.5 var(--ml-ui);color:#d4d9df;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+.rs-sec>h2 small{font:9px var(--ml-mono);color:#8a919b;font-weight:400}
+#templateGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.tpl{display:flex;flex-direction:column;gap:5px;padding:4px 4px 6px;background:#26292d;border:1px solid #393d43;border-radius:5px;color:#c9d0d9;cursor:pointer;text-align:left;font-size:10px;min-width:0}
+.tpl:hover{border-color:#5a616b}
+.tpl[aria-pressed=true]{border-color:var(--accent);background:rgba(82,140,224,.14);color:#eef3fa}
+.tpl canvas{width:100%;aspect-ratio:16/10;border-radius:3px;background:#111;display:block}
+.tpl span{padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#styleChips{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 7px;border:1px solid #393d43;border-radius:4px;background:#26292d;color:#c9d0d9;font-size:10px;cursor:pointer;min-width:0}
+.chip i{width:14px;height:14px;border-radius:3px;flex:0 0 14px;box-shadow:inset 0 0 0 1px #ffffff22}
+.chip[aria-pressed=true]{border-color:var(--accent);background:rgba(82,140,224,.14);color:#eef3fa}
+#drop{display:block;width:100%;padding:13px 8px;border:1px dashed #4a5059;border-radius:4px;background:#24272b;color:#d6dce4;text-align:center;cursor:pointer;font-size:11px}
+#drop small{display:block;color:#8d949e;font-size:9px;margin-top:3px}
+#drop:hover{border-color:var(--accent)}
+#mediaList{display:grid;gap:5px;margin-top:9px}
+.media{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:7px;padding:4px;border:1px solid #363a40;border-radius:4px;background:#222428}
+.media img,.media canvas{width:40px;height:28px;object-fit:cover;border-radius:2px;background:#111;display:block}
+.media .nm{font-size:10px;color:#cfd5dd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media .nm small{display:block;font:8px var(--ml-mono);color:#858c96}
+.media .ops{display:flex;gap:2px}
+.media .ops button{background:none;border:1px solid transparent;color:#9aa2ad;font-size:10px;padding:2px 4px;border-radius:3px;cursor:pointer}
+.media .ops button:hover{border-color:#4b515a;color:#e3e8ef}
+.media .ops button:disabled{opacity:.3}
+.hint{font-size:10px;color:#929aa4;line-height:1.65;margin:8px 0 0}
+#panel details{border-bottom:1px solid #35383e;padding:0}
+#panel summary{padding:13px 14px;font:600 11px/1.5 var(--ml-ui);color:#d4d9df;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+#panel summary::-webkit-details-marker{display:none}
+#panel summary::after{content:"＋";color:#7e8691;font-weight:400}
+#panel details[open] summary::after{content:"－"}
+#panel .body{padding:0 14px 14px}
+.row{display:grid;grid-template-columns:86px minmax(0,1fr) 50px;align-items:center;gap:8px;margin-top:9px}
+.row.wide{grid-template-columns:86px minmax(0,1fr)}
+.row>label{font-size:10px;color:#afb6c1}
+.row input[type=range]{width:100%;min-width:0;height:2px}
+.row input[type=number]{width:50px;background:#2d3035;border:1px solid #3c4047;border-radius:3px;color:#d4dbe5;font:10px var(--ml-mono);padding:3px 4px;text-align:right}
+.row select,.row input[type=text]{width:100%;min-width:0;background:#2d3035;border:1px solid #3b4048;border-radius:3px;color:#d4dbe5;font-size:10px;padding:5px 6px;min-height:27px}
+.row input[type=color]{width:100%;height:24px;border:1px solid #3b4048;border-radius:3px;background:#2d3035;padding:1px 2px}
+.row input[type=checkbox]{justify-self:start}
+.row[hidden]{display:none}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.btns button,.btn{background:#30343a;border:1px solid #484e56;border-radius:4px;color:#e7ebf1;font-size:11px;padding:7px 8px;cursor:pointer}
+.btns button:hover,.btn:hover{border-color:#69727e}
+.btns .primary{background:var(--accent);border-color:var(--accent);color:#fff;grid-column:1/-1}
+#status{font-size:10px;color:#97a0ab;min-height:15px;margin-top:9px}
+#exportDialog{background:#202123;border:1px solid #3a3e44;border-radius:10px;color:#e6eaf0;width:380px;padding:22px}
+#exportDialog::backdrop{background:#0b0c0dcc}
+#exportDialog h2{font-size:14px;margin:0 0 8px}
+#exportDialog p{font-size:11px;color:#a9b1bc;margin:0 0 12px}
+#exportDialog progress{width:100%;accent-color:var(--accent)}
+#toast{position:fixed;left:50%;top:62px;transform:translateX(-50%);background:#2a2d32;border:1px solid #4a5059;border-radius:6px;padding:8px 14px;font-size:11px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+@media(max-width:1180px) and (min-width:821px){body[data-ml-motion="showcase-reel"] #app{grid-template-columns:200px minmax(0,1fr) 292px}#templateGrid{grid-template-columns:1fr 1fr}}
+@media(max-width:820px){#reelCenter{order:1;height:52dvh;min-height:320px}#templateGrid{grid-template-columns:repeat(4,1fr)}#styleChips{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body class="ml-workbench ml-motion-workbench" data-ml-motion="showcase-reel">
+<header id="mlMotionToolbar" class="ml-toolbar"><div class="ml-motion-home"><a href="../index.html" id="mlab-home" class="ml-home">↖ MOTION LAB</a></div><div class="ml-document"><strong>Showcase Reel</strong><span class="ml-context">デザインを、見せるための動きに</span></div><div class="ml-toolbar-actions"><span class="ml-motion-local">ブラウザ内で処理</span><button id="undo" class="ml-button" type="button" title="元に戻す (⌘Z)" disabled>↶</button><button id="redo" class="ml-button" type="button" title="やり直す (⇧⌘Z)" disabled>↷</button><button id="mlMotionExport" class="ml-button ml-primary" type="button">書き出し ↗</button></div></header>
+
+<div id="app">
+ <aside class="ml-motion-sources" id="mlMotionSources" aria-label="テンプレートと素材">
+  <section class="rs-sec"><h2>01 テンプレート <small id="tplName"></small></h2><div id="templateGrid" role="group" aria-label="テンプレート"></div><p class="hint" id="tplDesc"></p></section>
+  <section class="rs-sec"><h2>02 スタイル</h2><div id="styleChips" role="group" aria-label="スタイル"></div></section>
+  <section class="rs-sec"><h2>03 素材 <small id="mediaCount"></small></h2>
+   <button id="drop" type="button">＋ 画像・動画を追加<small>PNG / JPG / WebP / SVG / MP4 / WebM・ドロップ可</small></button>
+   <input id="files" type="file" accept="image/*,video/*" multiple hidden>
+   <div id="mediaList"></div>
+   <p class="hint" id="mediaHint">いまはサンプル素材です。自分のデザインを追加すると置き換わります。素材は外部に送信しません。</p>
+  </section>
+ </aside>
+
+ <main id="reelCenter">
+  <div id="reelStage"><canvas id="view" aria-label="プレビュー"></canvas><span id="stageHint">ドラッグ: 角度 / ホイール: ズーム / ダブルクリック: カメラを戻す</span></div>
+  <div id="transport"><button id="play" type="button" aria-label="再生 / 一時停止">❚❚</button><button id="restart" type="button" title="最初から">↺</button><input id="seek" type="range" min="0" max="1" step="0.0001" value="0" aria-label="再生位置"><span id="time">0.00 / 0.00 s</span></div>
+  <div id="stageMeta"><span id="dims"></span><span id="loopInfo"></span></div>
+ </main>
+
+ <aside id="panel" aria-label="パラメータ">
+  <details open data-sec="layout"><summary>レイアウト</summary><div class="body"></div></details>
+  <details open data-sec="camera"><summary>カメラ</summary><div class="body"></div></details>
+  <details data-sec="card"><summary>カード</summary><div class="body"></div></details>
+  <details data-sec="shadow"><summary>影</summary><div class="body"></div></details>
+  <details data-sec="bg"><summary>背景</summary><div class="body"></div></details>
+  <details data-sec="text"><summary>テキスト</summary><div class="body"></div></details>
+  <details data-sec="finish"><summary>仕上げ</summary><div class="body"></div></details>
+  <details open data-sec="export" id="exportSec"><summary>書き出し</summary><div class="body"></div>
+   <div class="body"><div class="btns"><button class="primary" id="exVideo" type="button">動画を書き出す（MP4）</button><button id="exPng" type="button">今のフレームをPNG</button><button id="exSeq" type="button">PNG連番 ZIP</button><button id="saveJson" type="button">設定を保存</button><button id="loadJson" type="button">設定を読み込む</button></div><input id="jsonFile" type="file" accept=".json,application/json" hidden><p id="status" role="status"></p><p class="hint">MP4はコマ送りで描画してからエンコードするので、重い設定でもコマ落ちしません。設定ファイルには素材を含みません。</p></div>
+  </details>
+ </aside>
+</div>
+<dialog id="exportDialog"><h2>書き出しています</h2><p id="exportMsg"></p><progress id="exportProg" max="1" value="0"></progress><div class="btns"><button id="exCancel" type="button">中止</button></div></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   Showcase Reel — turn still designs / clips into a looping 3D showcase.
+   One WebGL2 renderer: background → cards (shadow + rounded card) → text → finish.
+   World units: the short side of the canvas is always 1000 units, so a preview
+   and a 4K export look identical.
+================================================================== */
+const $=s=>document.querySelector(s);
+const D2R=Math.PI/180, TAU=Math.PI*2;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+const mod=(a,n)=>((a%n)+n)%n, fract=x=>x-Math.floor(x);
+const hash=i=>fract(Math.sin(i*127.1+311.7)*43758.5453);
+const EASES={
+  expo:t=>{const a=Math.pow(2,-11),r=t<.5?Math.pow(2,20*t-10)/2:(2-Math.pow(2,-20*t+10))/2;return t<=0?0:t>=1?1:(r-a)/(1-2*a);},
+  cubic:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,
+  back:t=>{const c1=1.70158,c2=c1*1.525;return t<.5?(Math.pow(2*t,2)*((c2+1)*2*t-c2))/2:(Math.pow(2*t-2,2)*((c2+1)*(t*2-2)+c2)+2)/2;},
+  sine:t=>-(Math.cos(Math.PI*t)-1)/2,
+  linear:t=>t
+};
+const hex2rgb=h=>{const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];};
+const ratioOf=(r,fallback)=>{if(r==='auto')return fallback;const [a,b]=r.split(':').map(Number);return a/b;};
+
+/* ---------------- parameters ---------------- */
+const BASE={
+  template:'wall',style:'midnight',
+  size:330,gap:28,ratio:'16:10',speed:1,loop:12,hold:2.4,trans:.8,ease:'expo',count:12,rows:3,alt:true,angle:40,depth:7000,spread:420,
+  tiltX:0,tiltY:0,tiltZ:0,zoom:1,fov:38,drift:0,fog:.35,
+  radius:14,frame:'none',frameColor:'#16171a',border:0,borderColor:'#ffffff',borderA:.18,
+  shadow:.45,shadowBlur:46,shadowY:18,shadowColor:'#000000',
+  bgMode:'linear',bg1:'#0d0e12',bg2:'#1b1e2b',bgAngle:90,pattern:'none',patternOp:.12,
+  title:'',subtitle:'',textPos:'bottom-left',textColor:'#ffffff',textSize:56,
+  grain:.15,vignette:.35,
+  aspect:'16:9',quality:1080,fps:30,loops:1,mblur:1
+};
+const TEMPLATES={
+  wall:{name:'タイルウォール',desc:'傾けた面いっぱいにカードを敷き詰め、列ごとに逆方向へ流す。',
+    uses:['size','gap','ratio','speed','loop','alt'],
+    defaults:{size:330,gap:28,ratio:'16:10',speed:1,loop:12,alt:true,tiltX:-38,tiltY:0,tiltZ:-22,zoom:1,fov:38,drift:2,fog:.35}},
+  marquee:{name:'マーキー',desc:'横に長い帯を数段、交互の向きに流し続ける。',
+    uses:['size','gap','ratio','speed','loop','rows'],
+    defaults:{size:380,gap:26,ratio:'16:10',speed:1,loop:12,rows:3,tiltX:-12,tiltY:14,tiltZ:-7,zoom:1,fov:38,drift:1.5,fog:.2}},
+  cascade:{name:'カスケード',desc:'縦の列が異なる速さで落ちていく。ポスターや縦長UI向き。',
+    uses:['size','gap','ratio','speed','loop'],
+    defaults:{size:270,gap:24,ratio:'4:5',speed:1,loop:14,tiltX:-10,tiltY:-16,tiltZ:0,zoom:1,fov:38,drift:1.5,fog:.25}},
+  carousel:{fit:true,name:'リング',desc:'カードを円環に並べ、ゆっくり回転させる。',
+    uses:['size','gap','ratio','speed','loop','count'],
+    defaults:{size:330,gap:40,ratio:'16:10',speed:1,loop:12,count:10,tiltX:-10,tiltY:0,tiltZ:0,zoom:1.3,fov:34,drift:2,fog:.55}},
+  tunnel:{name:'フライスルー',desc:'奥から手前へカードが飛んでくる。カメラが中を進む感覚。',
+    uses:['size','ratio','speed','loop','count','depth','spread'],
+    defaults:{size:340,ratio:'16:10',speed:1,loop:12,count:34,depth:7000,spread:520,tiltX:0,tiltY:0,tiltZ:0,zoom:1,fov:50,drift:3,fog:.75}},
+  deck:{fit:true,name:'デッキ',desc:'重ねたカードを1枚ずつ後ろへ送る。1枚ずつ見せたいときに。',
+    uses:['size','ratio','hold','trans','ease'],
+    defaults:{size:640,ratio:'auto',hold:2.4,trans:.8,ease:'expo',tiltX:-14,tiltY:22,tiltZ:0,zoom:1,fov:34,drift:1.5,fog:.2}},
+  focus:{fit:true,name:'フォーカス',desc:'中央の1枚を大きく見せ、左右に次の作品を控えさせて送る。',
+    uses:['size','gap','ratio','hold','trans','ease','angle'],
+    defaults:{size:720,gap:40,ratio:'auto',hold:2.2,trans:.75,ease:'expo',angle:40,tiltX:-4,tiltY:0,tiltZ:0,zoom:1,fov:34,drift:1.2,fog:.45}},
+  spread:{name:'展開',desc:'中央の束からグリッドへ広がり、また束に戻る。',
+    uses:['size','gap','ratio','loop','count','ease'],
+    defaults:{size:300,gap:30,ratio:'16:10',loop:8,count:12,ease:'expo',tiltX:-20,tiltY:12,tiltZ:-4,zoom:1,fov:36,drift:2,fog:.25}},
+  fan:{fit:true,name:'ファン',desc:'手札のように扇状に広げ、1枚ずつ持ち上げる。',
+    uses:['size','ratio','speed','loop','count','angle'],
+    defaults:{size:300,ratio:'4:5',speed:1,loop:9,count:9,angle:9,tiltX:-8,tiltY:0,tiltZ:0,zoom:1,fov:34,drift:1.5,fog:.2}}
+};
+const STYLES={
+  midnight:{name:'ミッドナイト',sw:['#0d0e12','#1b1e2b'],v:{bgMode:'linear',bg1:'#0d0e12',bg2:'#1b1e2b',bgAngle:90,pattern:'none',shadow:.5,shadowBlur:46,shadowY:18,shadowColor:'#000000',border:1.2,borderColor:'#ffffff',borderA:.12,radius:14,frameColor:'#16171a',grain:.15,vignette:.35,textColor:'#ffffff'}},
+  paper:{name:'ペーパー',sw:['#efeee9','#dedcd4'],v:{bgMode:'radial',bg1:'#f4f3ef',bg2:'#d9d7cf',bgAngle:90,pattern:'dots',patternOp:.14,shadow:.22,shadowBlur:54,shadowY:26,shadowColor:'#2a2620',border:0,borderColor:'#000000',borderA:.1,radius:12,frameColor:'#ffffff',grain:.12,vignette:.1,textColor:'#1a1a1a'}},
+  iris:{name:'アイリス',sw:['#3b2cff','#c86bff'],v:{bgMode:'linear',bg1:'#2a1fd6',bg2:'#d68cff',bgAngle:35,pattern:'none',shadow:.4,shadowBlur:60,shadowY:30,shadowColor:'#12063a',border:1.5,borderColor:'#ffffff',borderA:.28,radius:18,frameColor:'#ffffff',grain:.2,vignette:.2,textColor:'#ffffff'}},
+  ember:{name:'エンバー',sw:['#ff5a1f','#2a0d06'],v:{bgMode:'radial',bg1:'#ff6a2b',bg2:'#1d0804',bgAngle:90,pattern:'none',shadow:.55,shadowBlur:50,shadowY:22,shadowColor:'#140300',border:0,borderColor:'#ffffff',borderA:.2,radius:10,frameColor:'#120806',grain:.22,vignette:.4,textColor:'#fff4ea'}},
+  mint:{name:'ミント',sw:['#cdf5e2','#7fd8c0'],v:{bgMode:'linear',bg1:'#e2fbef',bg2:'#86d9c4',bgAngle:120,pattern:'grid',patternOp:.1,shadow:.25,shadowBlur:44,shadowY:20,shadowColor:'#0b3b30',border:0,borderColor:'#000000',borderA:.1,radius:16,frameColor:'#ffffff',grain:.1,vignette:.08,textColor:'#0d2a24'}},
+  studio:{name:'スタジオ',sw:['#2b2d31','#55585e'],v:{bgMode:'radial',bg1:'#4a4d53',bg2:'#151619',bgAngle:90,pattern:'grid',patternOp:.06,shadow:.6,shadowBlur:40,shadowY:16,shadowColor:'#000000',border:1,borderColor:'#ffffff',borderA:.08,radius:8,frameColor:'#1c1d20',grain:.18,vignette:.45,textColor:'#f2f2f2'}}
+};
+const ALL_LAYOUT=['size','gap','ratio','speed','loop','hold','trans','ease','count','rows','alt','angle','depth','spread'];
+const CONTROLS=[
+  /* layout */
+  {sec:'layout',k:'size',label:'カードの大きさ',type:'range',min:80,max:1400,step:1},
+  {sec:'layout',k:'gap',label:'間隔',type:'range',min:0,max:200,step:1},
+  {sec:'layout',k:'ratio',label:'カード比率',type:'select',opts:[['auto','素材に合わせる'],['16:10','16:10'],['16:9','16:9'],['4:3','4:3'],['1:1','1:1'],['4:5','4:5'],['9:16','9:16']]},
+  {sec:'layout',k:'speed',label:'速さ',type:'range',min:1,max:5,step:1,unit:'×'},
+  {sec:'layout',k:'loop',label:'1ループ',type:'range',min:3,max:40,step:.5,unit:'s'},
+  {sec:'layout',k:'hold',label:'1枚の時間',type:'range',min:.6,max:8,step:.1,unit:'s'},
+  {sec:'layout',k:'trans',label:'送りの時間',type:'range',min:.15,max:3,step:.05,unit:'s'},
+  {sec:'layout',k:'ease',label:'イージング',type:'select',opts:[['expo','エクスポ（キレ）'],['cubic','キュービック'],['back','バック（反動）'],['sine','サイン（柔らか）'],['linear','リニア']]},
+  {sec:'layout',k:'count',label:'枚数',type:'range',min:3,max:48,step:1},
+  {sec:'layout',k:'rows',label:'段数',type:'range',min:1,max:7,step:1},
+  {sec:'layout',k:'alt',label:'交互に逆走',type:'check'},
+  {sec:'layout',k:'angle',label:'開き角',type:'range',min:0,max:80,step:1,unit:'°'},
+  {sec:'layout',k:'depth',label:'奥行き',type:'range',min:1500,max:16000,step:50},
+  {sec:'layout',k:'spread',label:'広がり',type:'range',min:0,max:1200,step:5},
+  /* camera */
+  {sec:'camera',k:'tiltX',label:'傾き X',type:'range',min:-80,max:80,step:.5,unit:'°'},
+  {sec:'camera',k:'tiltY',label:'傾き Y',type:'range',min:-80,max:80,step:.5,unit:'°'},
+  {sec:'camera',k:'tiltZ',label:'回転 Z',type:'range',min:-90,max:90,step:.5,unit:'°'},
+  {sec:'camera',k:'zoom',label:'ズーム',type:'range',min:.2,max:4,step:.01,unit:'×'},
+  {sec:'camera',k:'fov',label:'画角',type:'range',min:10,max:90,step:1,unit:'°'},
+  {sec:'camera',k:'drift',label:'ゆらぎ',type:'range',min:0,max:12,step:.1,unit:'°'},
+  {sec:'camera',k:'fog',label:'奥のフェード',type:'range',min:0,max:1,step:.01},
+  /* card */
+  {sec:'card',k:'radius',label:'角丸',type:'range',min:0,max:120,step:1},
+  {sec:'card',k:'frame',label:'フレーム',type:'select',opts:[['none','なし'],['browser','ブラウザ'],['phone','スマートフォン']]},
+  {sec:'card',k:'frameColor',label:'フレーム・地色',type:'color'},
+  {sec:'card',k:'border',label:'縁取り',type:'range',min:0,max:12,step:.1},
+  {sec:'card',k:'borderColor',label:'縁取りの色',type:'color'},
+  {sec:'card',k:'borderA',label:'縁取りの濃さ',type:'range',min:0,max:1,step:.01},
+  /* shadow */
+  {sec:'shadow',k:'shadow',label:'濃さ',type:'range',min:0,max:1,step:.01},
+  {sec:'shadow',k:'shadowBlur',label:'ぼかし',type:'range',min:0,max:200,step:1},
+  {sec:'shadow',k:'shadowY',label:'落ちる距離',type:'range',min:-100,max:150,step:1},
+  {sec:'shadow',k:'shadowColor',label:'影の色',type:'color'},
+  /* background */
+  {sec:'bg',k:'bgMode',label:'種類',type:'select',opts:[['solid','単色'],['linear','線形グラデーション'],['radial','円形グラデーション']]},
+  {sec:'bg',k:'bg1',label:'色 1',type:'color'},
+  {sec:'bg',k:'bg2',label:'色 2',type:'color'},
+  {sec:'bg',k:'bgAngle',label:'角度',type:'range',min:0,max:360,step:1,unit:'°'},
+  {sec:'bg',k:'pattern',label:'パターン',type:'select',opts:[['none','なし'],['dots','ドット'],['grid','グリッド']]},
+  {sec:'bg',k:'patternOp',label:'パターンの濃さ',type:'range',min:0,max:.6,step:.01},
+  /* text */
+  {sec:'text',k:'title',label:'タイトル',type:'text',ph:'例: Selected Works'},
+  {sec:'text',k:'subtitle',label:'サブ',type:'text',ph:'例: 2026 — Portfolio'},
+  {sec:'text',k:'textPos',label:'位置',type:'select',opts:[['bottom-left','左下'],['top-left','左上'],['center','中央'],['bottom-center','下中央']]},
+  {sec:'text',k:'textSize',label:'文字サイズ',type:'range',min:16,max:200,step:1},
+  {sec:'text',k:'textColor',label:'文字色',type:'color'},
+  /* finish */
+  {sec:'finish',k:'grain',label:'グレイン',type:'range',min:0,max:1,step:.01},
+  {sec:'finish',k:'vignette',label:'周辺減光',type:'range',min:0,max:1,step:.01},
+  /* export */
+  {sec:'export',k:'aspect',label:'比率',type:'select',opts:[['16:9','16:9 横'],['1:1','1:1 正方形'],['4:5','4:5 縦（フィード）'],['9:16','9:16 縦（ストーリー）'],['4:3','4:3'],['21:9','21:9 シネマ']]},
+  {sec:'export',k:'quality',label:'画質',type:'select',opts:[['720','720p'],['1080','1080p'],['1440','1440p'],['2160','4K (2160p)']],num:true},
+  {sec:'export',k:'fps',label:'FPS',type:'select',opts:[['24','24'],['30','30'],['60','60']],num:true},
+  {sec:'export',k:'loops',label:'ループ回数',type:'select',opts:[['1','1回'],['2','2回'],['3','3回'],['4','4回'],['6','6回']],num:true},
+  {sec:'export',k:'mblur',label:'モーションブラー',type:'select',opts:[['1','なし'],['4','弱（4サンプル）'],['8','強（8サンプル）']],num:true}
+];
+
+/* ---------------- loop length & layouts ---------------- */
+function loopLength(p,N){
+  if(p.template==='deck')return Math.max(N,3)*p.hold;
+  if(p.template==='focus')return Math.max(N,1)*p.hold;
+  return p.loop;
+}
+/* Continuous belts. Each line moves a whole number of pattern periods per loop, so the
+   last frame meets the first frame exactly (media assignment repeats every P cards). */
+function belts(t,c,o){
+  const p=c.p,N=c.N,r=ratioOf(p.ratio,c.aspect(0)),w=p.size,h=w/r,g=p.gap;
+  const along=o.axis==='y'?h+g:w+g, across=o.axis==='y'?w+g:h+g;
+  const P=Math.max(N,3), u=t/c.L, reach=c.reach, out=[];
+  let lines=[];
+  if(o.lines){for(let l=0;l<o.lines;l++)lines.push({l,pos:(l-(o.lines-1)/2)*across});}
+  else{const n=Math.ceil(reach/across)+1;for(let l=-n;l<=n;l++)lines.push({l,pos:l*across});}
+  const span=Math.ceil(reach/along)+2;
+  for(const {l,pos} of lines){
+    const s=o.dir(l)*o.mult(l)*p.speed*P*u, off=o.offset(l);
+    const base=Math.floor(-s-off);
+    for(let j=base-span;j<=base+span;j++){
+      const a=(j+s+off)*along, m=mod(mod(j,P)+mod(l,9973)*2,N);
+      out.push(o.axis==='y'?{m,x:pos,y:a,z:0,w,h}:{m,x:a,y:pos,z:0,w,h});
+      if(out.length>2400)return out;
+    }
+  }
+  return out;
+}
+const LAYOUTS={
+  wall:(t,c)=>belts(t,c,{axis:'y',dir:l=>c.p.alt&&mod(l,2)?-1:1,mult:()=>1,offset:l=>mod(l,2)*.5}),
+  marquee:(t,c)=>belts(t,c,{axis:'x',lines:c.p.rows,dir:l=>l%2?1:-1,mult:()=>1,offset:l=>hash(l)*.9}),
+  cascade:(t,c)=>belts(t,c,{axis:'y',dir:()=>-1,mult:l=>mod(l,2)?2:1,offset:l=>hash(l+4)}),
+  carousel(t,c){
+    const p=c.p,N=c.N,r=ratioOf(p.ratio,c.aspect(0)),w=p.size,h=w/r;
+    const M=N*Math.max(1,Math.ceil(Math.max(p.count,3)/N)), R=Math.max(M*(w+p.gap)/TAU,w*.6);
+    const rot=TAU*(N/M)*p.speed*(t/c.L), out=[];
+    for(let i=0;i<M;i++){const a=TAU*i/M+rot;out.push({m:i%N,x:R*Math.sin(a),y:0,z:R*Math.cos(a)-R,ry:a,w,h,dim:(1-Math.cos(a))*.18});}
+    return out;
+  },
+  tunnel(t,c){
+    const p=c.p,N=c.N,M=Math.max(4,p.count),out=[];
+    for(let i=0;i<M;i++){
+      const r=ratioOf(p.ratio,c.aspect(i)),w=p.size,h=w/r;
+      const f=fract(i/M+p.speed*t/c.L), th=i*2.39996+.4, rad=p.spread*(.85+.5*hash(i));
+      const x=Math.cos(th)*rad*(c.Wd/c.Hd)*.8, y=Math.sin(th)*rad;
+      const a=clamp(f/.14,0,1)*(1-clamp((f-.86)/.14,0,1));
+      out.push({m:i%N,x,y,z:-p.depth+f*(p.depth+c.dist*.5),rz:(hash(i+7)-.5)*.35,ry:-x/(c.Wd)*.5,rx:y/c.Hd*.5,w,h,a});
+    }
+    return out;
+  },
+  deck(t,c){
+    const p=c.p,N=c.N,Nn=Math.max(N,3),T=p.hold,ph=t/T,cur=mod(Math.floor(ph),Nn),local=fract(ph);
+    const tr=clamp(p.trans/T,.05,.95), e=EASES[p.ease](clamp((local-(1-tr))/tr,0,1)), out=[];
+    const rank=(r,i)=>({x:-r*30,y:r*46,z:-r*110,s:1-r*.04,rz:(hash(i)-.5)*.09*(r>0?1:.4)});
+    for(let i=0;i<Nn;i++){
+      const ratio=ratioOf(p.ratio,c.aspect(i)), maxH=c.Hd*.72*(p.size/640);
+      let ww=p.size,h=ww/ratio;if(h>maxH){h=maxH;ww=h*ratio;}
+      const r=mod(i-cur,Nn);
+      let q;
+      if(r===0){const a=rank(0,i),b=rank(Nn-1,i),k=Math.sin(Math.PI*e);
+        q={x:lerp(a.x,b.x,e)+k*ww*.82,y:lerp(a.y,b.y,e)+k*h*.12,z:lerp(a.z,b.z,clamp((e-.35)/.3,0,1)),s:lerp(a.s,b.s,e),rz:lerp(a.rz,b.rz,e)-k*.22,ry:k*.35};}
+      else{const a=rank(r,i),b=rank(r-1,i);q={x:lerp(a.x,b.x,e),y:lerp(a.y,b.y,e),z:lerp(a.z,b.z,e),s:lerp(a.s,b.s,e),rz:lerp(a.rz,b.rz,e)};}
+      const rr=r===0?e*(Nn-1):r-e;
+      out.push({m:i%N,...q,w:ww,h,dim:clamp(rr*.09,0,.8)});
+    }
+    return out;
+  },
+  focus(t,c){
+    const p=c.p,N=c.N,Nn=Math.max(N,1),T=p.hold,ph=t/T,cur=Math.floor(ph),local=fract(ph);
+    const tr=clamp(p.trans/T,.05,.95), e=EASES[p.ease](clamp((local-(1-tr))/tr,0,1)), pos=cur+e, out=[];
+    const bob=Math.sin(TAU*t/T)*6;
+    for(let k=-4;k<=4;k++){
+      const idx=Math.round(pos)+k, s=idx-pos, m=mod(idx,Nn), ratio=ratioOf(p.ratio,c.aspect(m));
+      let w=p.size,h=w/ratio; if(h>c.Hd*.72){h=c.Hd*.72;w=h*ratio;}
+      const as=Math.abs(s), sp=p.size*.62+p.gap;
+      out.push({m,x:Math.sign(s)*Math.min(as,1)*sp+Math.sign(s)*Math.max(as-1,0)*sp*.42,y:bob*(1-Math.min(as,1)),z:-Math.min(as,1)*p.size*.42-Math.max(as-1,0)*p.size*.18,ry:-clamp(s,-1,1)*p.angle*D2R,w,h,dim:Math.min(as,2)*.22,a:1-clamp(as-2.2,0,1)});
+    }
+    return out;
+  },
+  spread(t,c){
+    const p=c.p,N=c.N,M=Math.max(2,p.count),r=ratioOf(p.ratio,c.aspect(0)),u=t/c.L,E=EASES[p.ease];
+    let w=p.size,h=w/r;
+    const cols=Math.max(1,Math.round(Math.sqrt(M*(c.Wd/c.Hd)/r))), rows=Math.ceil(M/cols);
+    const fit=Math.min(c.Wd*.84/(cols*(w+p.gap)),c.Hd*.84/(rows*(h+p.gap)))*(p.size/300);
+    w*=fit;h*=fit;const g=p.gap*fit,out=[];
+    for(let i=0;i<M;i++){
+      const st=i/M*.24, open=E(clamp((u-.06-st*.5)/.28,0,1)), close=E(clamp((u-.58-st*.5)/.28,0,1)), k=open*(1-close);
+      const col=i%cols,row=Math.floor(i/cols), inRow=row===rows-1?M-row*cols:cols;
+      const gx=(col-(inRow-1)/2)*(w+g), gy=-(row-(rows-1)/2)*(h+g);
+      const px=(hash(i)-.5)*w*.3, py=(hash(i+3)-.5)*h*.3, prz=(hash(i+9)-.5)*.7;
+      out.push({m:i%N,x:lerp(px,gx,k),y:lerp(py,gy,k),z:i*1.5+Math.sin(Math.PI*k)*160,rz:lerp(prz,0,k),w,h});
+    }
+    return out;
+  },
+  fan(t,c){
+    const p=c.p,N=c.N,M=Math.max(2,p.count),r=ratioOf(p.ratio,c.aspect(0)),w=p.size,h=w/r,out=[];
+    const R=h*2.4, step=p.angle*D2R, sway=Math.sin(TAU*t/c.L)*.025;
+    for(let i=0;i<M;i++){
+      const a=(i-(M-1)/2)*step+sway, ph=mod(t/c.L*M*p.speed-i,M), lift=ph<1.6?Math.sin(Math.PI*ph/1.6):0, L=EASES.sine(lift);
+      out.push({m:i%N,x:Math.sin(a)*R,y:Math.cos(a)*R-R-h*.05+L*h*.2,z:i*2+L*90,rz:-a,s:1+L*.05,w,h});
+    }
+    return out;
+  }
+};
+
+/* ---------------- matrices (column-major) ---------------- */
+const M4={
+  mul(a,b){const o=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];}return o;},
+  persp(f,asp,n,fa){const t=1/Math.tan(f/2),o=new Float32Array(16);o[0]=t/asp;o[5]=t;o[10]=(fa+n)/(n-fa);o[11]=-1;o[14]=2*fa*n/(n-fa);return o;},
+  trs(x,y,z,rx,ry,rz,s){
+    const cx=Math.cos(rx),sx=Math.sin(rx),cy=Math.cos(ry),sy=Math.sin(ry),cz=Math.cos(rz),sz=Math.sin(rz);
+    // R = Ry * Rx * Rz
+    const m00=cy*cz+sy*sx*sz, m01=-cy*sz+sy*sx*cz, m02=sy*cx;
+    const m10=cx*sz, m11=cx*cz, m12=-sx;
+    const m20=-sy*cz+cy*sx*sz, m21=sy*sz+cy*sx*cz, m22=cy*cx;
+    return new Float32Array([m00*s,m10*s,m20*s,0, m01*s,m11*s,m21*s,0, m02*s,m12*s,m22*s,0, x,y,z,1]);
+  },
+  global(tx,ty,tz,zoom){ // Rx * Ry * Rz * S
+    const A=M4.trs(0,0,0,tx,0,0,1),B=M4.trs(0,0,0,0,ty,0,1),C=M4.trs(0,0,0,0,0,tz,zoom);return M4.mul(A,M4.mul(B,C));
+  }
+};
+function xf(m,x,y,z){return [m[0]*x+m[4]*y+m[8]*z+m[12],m[1]*x+m[5]*y+m[9]*z+m[13],m[2]*x+m[6]*y+m[10]*z+m[14],m[3]*x+m[7]*y+m[11]*z+m[15]];}
+
+/* ---------------- WebGL renderer ---------------- */
+const VS=`#version 300 es
+in vec2 aPos;uniform mat4 uMVP;uniform vec2 uSize;uniform float uExpand;out vec2 vLocal;
+void main(){vec2 p=aPos*(uSize+vec2(uExpand*2.));vLocal=p;gl_Position=uMVP*vec4(p,0.,1.);}`;
+const VS_FULL=`#version 300 es
+in vec2 aPos;out vec2 vUv;void main(){vUv=aPos+.5;gl_Position=vec4(aPos*2.,0.,1.);}`;
+const FS_CARD=`#version 300 es
+precision highp float;in vec2 vLocal;out vec4 o;
+uniform vec2 uSize;uniform float uRadius,uAlpha,uDim,uAspect,uBorder,uBorderA,uMode,uBlur,uShadow;
+uniform vec3 uFog,uBorderC,uFrameC,uShadowC;uniform int uFrame;uniform sampler2D uTex;
+float sdR(vec2 p,vec2 b,float r){r=min(r,min(b.x,b.y));vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
+void main(){
+ vec2 hs=uSize*.5;float d=sdR(vLocal,hs,uRadius);
+ if(uMode>.5){float a=1.-smoothstep(-uBlur*.5,uBlur+.001,d);a*=a*uShadow*uAlpha;o=vec4(uShadowC*a,a);return;}
+ float aa=max(fwidth(d),1e-4);float cov=1.-smoothstep(-aa*.5,aa*.5,d);if(cov<=0.)discard;
+ vec2 st=vLocal/uSize+.5;if(!gl_FrontFacing)st.x=1.-st.x;
+ vec4 cr=vec4(0.,0.,1.,1.);vec3 col=uFrameC;bool content=true;float edge=1.;
+ if(uFrame==1){
+  float hb=clamp(uSize.x*.045,8.,64.),hbs=hb/uSize.y;cr.w=1.-hbs;
+  if(st.y>1.-hbs){content=false;vec2 bp=vec2(vLocal.x+hs.x,vLocal.y-(hs.y-hb*.5));float r=hb*.15;
+   for(int i=0;i<3;i++){float dd=length(bp-vec2(hb*.62+float(i)*hb*.5,0.))-r;col=mix(col,uFrameC+vec3(.17),1.-smoothstep(-aa,aa,dd));}
+   float pd=sdR(bp-vec2(hs.x,0.),vec2(uSize.x*.19,hb*.22),hb*.22);col=mix(col,uFrameC+vec3(.07),1.-smoothstep(-aa,aa,pd));}
+ }
+ if(uFrame==2){float bz=uSize.x*.04;cr=vec4(bz/uSize.x,bz/uSize.y,1.-bz/uSize.x,1.-bz/uSize.y);
+  float di=sdR(vLocal,hs-vec2(bz),max(uRadius-bz,uRadius*.55));edge=1.-smoothstep(-aa,aa,di);if(edge<=0.)content=false;}
+ if(content){
+  vec2 c=(st-cr.xy)/(cr.zw-cr.xy);float ca=(cr.z-cr.x)*uSize.x/((cr.w-cr.y)*uSize.y);
+  if(uAspect>ca)c.x=.5+(c.x-.5)*ca/uAspect;else c.y=.5+(c.y-.5)*uAspect/ca;
+  vec4 tx=texture(uTex,vec2(c.x,1.-c.y));vec3 cc=mix(uFrameC,tx.rgb,tx.a);
+  if(uFrame==2){float bz=uSize.x*.04;float pd=sdR(vLocal-vec2(0.,hs.y-bz*2.),vec2(uSize.x*.075,bz*.34),bz*.34);cc=mix(cc,vec3(0.),1.-smoothstep(-aa,aa,pd));}
+  col=mix(col,cc,edge);
+ }
+ if(uBorder>0.){float b=smoothstep(-uBorder-aa*.5,-uBorder+aa*.5,d);col=mix(col,uBorderC,b*uBorderA);}
+ if(!gl_FrontFacing)col*=.5;
+ col=mix(col,uFog,uDim);float a=cov*uAlpha;o=vec4(col*a,a);
+}`;
+const FS_BG=`#version 300 es
+precision highp float;out vec4 o;uniform vec2 uRes;uniform vec3 uC1,uC2,uPat;uniform float uAng,uUnit,uPatOp;uniform int uMode,uPattern;
+float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+void main(){vec2 p=gl_FragCoord.xy/uRes;float ar=uRes.x/uRes.y;vec2 q=(p-.5)*vec2(ar,1.);float k=0.;
+ if(uMode==1){vec2 dd=vec2(cos(uAng),sin(uAng));float ext=.5*(abs(dd.x)*ar+abs(dd.y));k=clamp(dot(q,dd)/ext*.5+.5,0.,1.);}
+ else if(uMode==2){k=clamp(length(q)/(.5*length(vec2(ar,1.))),0.,1.);}
+ vec3 col=mix(uC1,uC2,k);
+ if(uPattern>0){vec2 g=(gl_FragCoord.xy-uRes*.5)/uUnit;float cell=40.,px=1./uUnit,m=0.;
+  if(uPattern==1){vec2 f=mod(g,cell)-cell*.5;m=1.-smoothstep(-px,px,length(f)-1.8);}
+  else{vec2 f=mod(g+cell*.5,cell);vec2 a=min(f,cell-f);m=1.-smoothstep(-px,px,min(a.x,a.y)-.5);}
+  col=mix(col,uPat,m*uPatOp);}
+ col+=(h(gl_FragCoord.xy)-.5)/255.;o=vec4(col,1.);}`;
+const FS_POST=`#version 300 es
+precision highp float;in vec2 vUv;out vec4 o;uniform int uMode;uniform float uAmt,uSeed,uUnit;uniform vec2 uRes;uniform sampler2D uTex;
+float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+void main(){
+ if(uMode==0){o=texture(uTex,vec2(vUv.x,1.-vUv.y));return;}
+ float ar=uRes.x/uRes.y;vec2 q=(vUv-.5)*vec2(ar,1.);
+ if(uMode==1){float v=smoothstep(.3,1.05,length(q)/(.5*length(vec2(ar,1.))))*uAmt*.85;o=vec4(0.,0.,0.,v);return;}
+ float n=h(floor(gl_FragCoord.xy/max(1.,uUnit*1.4))+uSeed);float a=uAmt*.2;o=vec4(vec3(n)*a,a);}`;
+
+class Renderer{
+  constructor(canvas){
+    this.canvas=canvas;
+    const gl=canvas.getContext('webgl2',{alpha:false,antialias:true,premultipliedAlpha:true,preserveDrawingBuffer:false});
+    if(!gl)throw Error('WebGL2 unavailable');
+    this.gl=gl;this.textures=new Map();this.frame=0;
+    this.aniso=gl.getExtension('EXT_texture_filter_anisotropic');
+    this.pCard=this.program(VS,FS_CARD);this.pBg=this.program(VS_FULL,FS_BG);this.pPost=this.program(VS_FULL,FS_POST);
+    this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
+    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-.5,-.5,.5,-.5,-.5,.5,.5,.5]),gl.STATIC_DRAW);
+    for(const p of [this.pCard,this.pBg,this.pPost]){const loc=gl.getAttribLocation(p.prog,'aPos');if(loc>=0){gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);}}
+    this.textTex=gl.createTexture();this.textKey='';
+    this.white=this.solidTex([255,255,255,255]);
+  }
+  program(vs,fs){
+    const gl=this.gl,mk=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
+    const prog=gl.createProgram();gl.attachShader(prog,mk(gl.VERTEX_SHADER,vs));gl.attachShader(prog,mk(gl.FRAGMENT_SHADER,fs));gl.bindAttribLocation(prog,0,'aPos');gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));
+    const cache={};return {prog,u:n=>n in cache?cache[n]:(cache[n]=gl.getUniformLocation(prog,n))};
+  }
+  solidTex(rgba){const gl=this.gl,t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(rgba));return t;}
+  texFor(src){
+    const gl=this.gl;let e=this.textures.get(src.id);
+    if(!e){e={tex:gl.createTexture(),ready:false,frame:-1};this.textures.set(src.id,e);}
+    const isVideo=src.kind==='video';
+    if(e.ready&&!isVideo)return e.tex;
+    if(isVideo&&(e.frame===this.frame||src.el.readyState<2))return e.ready?e.tex:this.white;
+    gl.bindTexture(gl.TEXTURE_2D,e.tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+    try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src.el);}catch(_){return this.white;}
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    if(isVideo){gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);}
+    else{gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);if(this.aniso)gl.texParameterf(gl.TEXTURE_2D,this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));}
+    e.ready=true;e.frame=this.frame;return e.tex;
+  }
+  forget(ids){for(const [id,e] of this.textures)if(!ids.has(id)){this.gl.deleteTexture(e.tex);this.textures.delete(id);}}
+  textTexture(p,W,H){
+    const key=[p.title,p.subtitle,p.textPos,p.textSize,p.textColor,W,H].join('|');
+    if(!p.title&&!p.subtitle)return null;
+    if(key!==this.textKey){
+      const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),U=Math.min(W,H)/1000;
+      const ts=p.textSize*U,ss=ts*.42,pad=70*U,font='-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif';
+      g.fillStyle=p.textColor;g.textBaseline='alphabetic';
+      const center=p.textPos==='center'||p.textPos==='bottom-center';g.textAlign=center?'center':'left';
+      const x=center?W/2:pad;const block=(p.title?ts:0)+(p.subtitle?ss*1.6:0);
+      let y=p.textPos==='top-left'?pad+ts*.9:p.textPos==='center'?H/2-block/2+ts*.85:H-pad-(p.subtitle?ss*1.6:0);
+      g.shadowColor='rgba(0,0,0,.25)';g.shadowBlur=ts*.3;
+      if(p.title){g.font=`700 ${ts}px ${font}`;g.fillText(p.title,x,y);}
+      if(p.subtitle){g.globalAlpha=.75;g.font=`500 ${ss}px ${font}`;g.fillText(p.subtitle,x,(p.title?y+ss*1.6:y));g.globalAlpha=1;}
+      const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,this.textTex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      this.textKey=key;
+    }
+    return this.textTex;
+  }
+  render(p,t,W,H,sources,opts={}){
+    const gl=this.gl;this.frame++;
+    if(this.canvas.width!==W)this.canvas.width=W;if(this.canvas.height!==H)this.canvas.height=H;
+    gl.viewport(0,0,W,H);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.bindVertexArray(this.vao);
+    const U=Math.min(W,H)/1000,Wd=W/U,Hd=H/U,N=sources.length;
+    const c1=hex2rgb(p.bg1),c2=hex2rgb(p.bg2);
+    /* background */
+    gl.disable(gl.BLEND);gl.useProgram(this.pBg.prog);const b=this.pBg;
+    gl.uniform2f(b.u('uRes'),W,H);gl.uniform3fv(b.u('uC1'),c1);gl.uniform3fv(b.u('uC2'),c2);gl.uniform1f(b.u('uAng'),p.bgAngle*D2R);
+    gl.uniform1i(b.u('uMode'),({solid:0,linear:1,radial:2})[p.bgMode]||0);gl.uniform1i(b.u('uPattern'),({none:0,dots:1,grid:2})[p.pattern]||0);
+    const lum=c1[0]*.3+c1[1]*.59+c1[2]*.11;gl.uniform3fv(b.u('uPat'),lum>.5?[0,0,0]:[1,1,1]);gl.uniform1f(b.u('uPatOp'),p.patternOp);gl.uniform1f(b.u('uUnit'),U);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+    if(N){
+      const L=loopLength(p,N),tt=mod(t,L),fov=p.fov*D2R,dist=(Hd/2)/Math.tan(fov/2);
+      const reach=Math.hypot(Wd,Hd)*.62/p.zoom*(1+2.2*Math.max(Math.abs(Math.sin(p.tiltX*D2R)),Math.abs(Math.sin(p.tiltY*D2R))));
+      const ctx={p,N,Wd,Hd,L,dist,reach:Math.min(reach,Math.hypot(Wd,Hd)*3.2/p.zoom),aspect:i=>sources[mod(i,N)].aspect};
+      const inst=(LAYOUTS[p.template]||LAYOUTS.wall)(tt,ctx);
+      const ph=TAU*tt/L,dx=p.drift*Math.sin(ph),dy=p.drift*Math.cos(ph);
+      /* object-style templates are composed for 16:9; shrink them for square / portrait frames */
+      const fitK=(TEMPLATES[p.template]||{}).fit?Math.min(1,Math.sqrt((Wd/Hd)/(16/9))):1;
+      const G=M4.global((p.tiltX+dx)*D2R,(p.tiltY+dy)*D2R,p.tiltZ*D2R,p.zoom*fitK);
+      const V=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,-dist,1]);
+      const VG=M4.mul(V,G),PVG=M4.mul(M4.persp(fov,Wd/Hd,dist*.02,dist*40),VG);
+      const fog=hex2rgb(p.bgMode==='solid'?p.bg1:'#000000').map((v,i)=>p.bgMode==='solid'?v:(c1[i]+c2[i])/2);
+      const list=[];
+      for(const q of inst){
+        if(q.a!==undefined&&q.a<=0.001)continue;
+        const s=q.s||1,m=M4.mul(PVG,M4.trs(q.x,q.y,q.z||0,q.rx||0,q.ry||0,q.rz||0,s));
+        const hw=q.w*.6,hh=q.h*.6;let out=[0,0,0,0,0],behind=0;
+        for(const [cx,cy] of [[-hw,-hh],[hw,-hh],[-hw,hh],[hw,hh]]){const v=xf(m,cx,cy,0);if(v[3]<=1e-3){behind++;continue;}if(v[0]>v[3])out[0]++;if(v[0]<-v[3])out[1]++;if(v[1]>v[3])out[2]++;if(v[1]<-v[3])out[3]++;}
+        if(behind||out.slice(0,4).some(n=>n===4))continue;
+        const vz=xf(VG,q.x,q.y,q.z||0)[2];
+        list.push({q,m,vz,s});
+      }
+      list.sort((a,b)=>a.vz-b.vz);
+      const P=this.pCard;gl.useProgram(P.prog);gl.activeTexture(gl.TEXTURE0);gl.uniform1i(P.u('uTex'),0);
+      gl.uniform1f(P.u('uRadius'),p.radius);gl.uniform1f(P.u('uBorder'),p.border);gl.uniform1f(P.u('uBorderA'),p.borderA);
+      gl.uniform3fv(P.u('uBorderC'),hex2rgb(p.borderColor));gl.uniform3fv(P.u('uFrameC'),hex2rgb(p.frameColor));gl.uniform3fv(P.u('uShadowC'),hex2rgb(p.shadowColor));
+      gl.uniform3fv(P.u('uFog'),fog);gl.uniform1i(P.u('uFrame'),({none:0,browser:1,phone:2})[p.frame]||0);
+      gl.uniform1f(P.u('uBlur'),p.shadowBlur);gl.uniform1f(P.u('uShadow'),p.shadow);
+      for(const it of list){
+        const q=it.q,src=sources[mod(q.m,N)],alpha=q.a===undefined?1:q.a;
+        const depthDim=p.fog*clamp((-it.vz-dist)/(dist*3),0,1);
+        const dim=clamp((q.dim||0)+depthDim,0,.96);
+        gl.uniform2f(P.u('uSize'),q.w,q.h);gl.uniform1f(P.u('uAlpha'),alpha);
+        if(p.shadow>0){
+          const off=p.shadowY;const sm=M4.mul(it.m,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,-off,-.5,1]));
+          gl.uniformMatrix4fv(P.u('uMVP'),false,sm);gl.uniform1f(P.u('uExpand'),p.shadowBlur*1.1);gl.uniform1f(P.u('uMode'),1);
+          gl.uniform1f(P.u('uAlpha'),alpha*(1-dim*.6));gl.drawArrays(gl.TRIANGLE_STRIP,0,4);gl.uniform1f(P.u('uAlpha'),alpha);
+        }
+        gl.bindTexture(gl.TEXTURE_2D,this.texFor(src));
+        gl.uniformMatrix4fv(P.u('uMVP'),false,it.m);gl.uniform1f(P.u('uExpand'),0);gl.uniform1f(P.u('uMode'),0);
+        gl.uniform1f(P.u('uAspect'),src.aspect);gl.uniform1f(P.u('uDim'),dim);
+        gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      }
+      this.lastCount=list.length;
+    }
+    /* text + finish */
+    const pp=this.pPost;gl.useProgram(pp.prog);gl.uniform2f(pp.u('uRes'),W,H);gl.uniform1f(pp.u('uUnit'),U);gl.uniform1i(pp.u('uTex'),0);
+    const tex=opts.noText?null:this.textTexture(p,W,H);
+    if(tex){gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(pp.u('uMode'),0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
+    if(p.vignette>0){gl.uniform1i(pp.u('uMode'),1);gl.uniform1f(pp.u('uAmt'),p.vignette);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
+    if(p.grain>0){gl.uniform1i(pp.u('uMode'),2);gl.uniform1f(pp.u('uAmt'),p.grain);gl.uniform1f(pp.u('uSeed'),opts.seed??(this.frame%97)*1.37);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
+  }
+  dispose(){const x=this.gl.getExtension('WEBGL_lose_context');if(x)x.loseContext();}
+}
+
+/* ---------------- sample designs (procedural, original) ---------------- */
+function makeSamples(){
+  const pal=[['#f5f3ee','#151515','#ff5b2e'],['#101418','#e9eef5','#4f7cff'],['#e8ff5a','#121212','#121212'],['#1d1b2e','#f2eefe','#a98bff'],['#ffffff','#1a1a1a','#00b37e'],['#0f0f10','#f5f5f5','#ff3d7f']];
+  const words=['Northwind','Atlas UI','LOUD/26','Halcyon','Fieldnote','Prism'];
+  return pal.map(([bg,fg,ac],i)=>{
+    const c=document.createElement('canvas');c.width=1600;c.height=1000;const g=c.getContext('2d');
+    const F='-apple-system,"Segoe UI","Noto Sans JP",sans-serif',rr=(x,y,w,h,r)=>{g.beginPath();g.roundRect(x,y,w,h,r);g.fill();};
+    g.fillStyle=bg;g.fillRect(0,0,1600,1000);
+    g.fillStyle=fg;g.globalAlpha=.9;g.font=`600 30px ${F}`;g.fillText(words[i],70,82);
+    g.globalAlpha=.45;for(let k=0;k<4;k++)rr(1000+k*130,62,90,14,7);g.globalAlpha=1;
+    if(i===0){g.font=`800 190px ${F}`;g.fillText('Make it',70,420);g.fillText('move.',70,600);g.fillStyle=ac;g.beginPath();g.arc(1220,560,250,0,TAU);g.fill();g.fillStyle=fg;rr(70,700,260,70,35);}
+    if(i===1){g.globalAlpha=.08;rr(70,140,300,800,18);g.globalAlpha=1;for(let k=0;k<3;k++){g.globalAlpha=.08;rr(410+k*380,140,350,220,18);g.globalAlpha=1;g.font=`700 64px ${F}`;g.fillText(['82%','1.4k','36'][k],450+k*380,290);}
+      g.fillStyle=ac;for(let k=0;k<14;k++){const h=120+((k*53)%9)*38;rr(430+k*80,920-h,46,h,8);}}
+    if(i===2){g.font=`900 420px ${F}`;g.fillText('LOUD',40,560);g.font=`900 260px ${F}`;g.fillText('/26',820,900);g.fillRect(70,620,700,14);}
+    if(i===3){for(let k=0;k<6;k++){const x=70+(k%3)*500,y=150+Math.floor(k/3)*410;g.fillStyle=k%2?ac:fg;g.globalAlpha=k%2?1:.1;rr(x,y,460,370,30);g.globalAlpha=1;g.fillStyle=k%2?bg:fg;g.font=`600 34px ${F}`;g.fillText(['Inbox','Focus','Notes','Plan','Pulse','Sync'][k],x+36,y+70);}}
+    if(i===4){const gr=g.createLinearGradient(0,0,1600,1000);gr.addColorStop(0,'#d9f7ea');gr.addColorStop(1,'#7bd6b5');g.fillStyle=gr;rr(70,140,860,780,28);g.fillStyle=fg;g.font=`700 92px ${F}`;g.fillText('Fieldnote',990,330);g.globalAlpha=.4;for(let k=0;k<6;k++)rr(990,390+k*48,480-(k%3)*90,16,8);g.globalAlpha=1;g.fillStyle=ac;rr(990,760,240,74,37);}
+    if(i===5){for(let k=0;k<5;k++){g.fillStyle=k===2?ac:fg;g.globalAlpha=k===2?1:.12;g.beginPath();g.arc(300+k*250,520,200-k*12,0,TAU);g.fill();}g.globalAlpha=1;g.fillStyle=fg;g.font=`300 120px ${F}`;g.fillText('Prism',70,920);}
+    return {id:'sample'+i,kind:'image',el:c,aspect:1.6,name:'サンプル '+(i+1),sample:true,thumb:c};
+  });
+}
+
+/* ---------------- state ---------------- */
+const STORE='ml-showcase-reel:v1';
+let P={...BASE,...TEMPLATES.wall.defaults};
+try{const saved=JSON.parse(localStorage.getItem(STORE)||'null');if(saved&&typeof saved==='object')P=sanitize({...P,...saved});}catch(_){}
+let sources=makeSamples(), time=0, playing=true, last=performance.now(), busy=false, cancelled=false, dirtyThumbs=true;
+let undoStack=[], redoStack=[], committed=JSON.stringify(P);
+const view=$('#view');
+let R=null;
+try{R=new Renderer(view);}catch(e){console.warn(e);}
+if(!R){window.MLWorkbench?.requireGraphics({canvas:document.createElement('canvas'),context:'webgl2',stage:'#reelStage',controls:'#app'});document.body.classList.add('ml-render-unavailable');}
+
+function sanitize(p){
+  const out={...BASE};
+  for(const k of Object.keys(BASE)){
+    if(!(k in p))continue;const v=p[k],d=BASE[k];
+    if(typeof d==='number'){const n=Number(v);if(Number.isFinite(n)){const c=CONTROLS.find(x=>x.k===k);out[k]=c&&c.type==='range'?clamp(n,c.min,c.max):n;}}
+    else if(typeof d==='boolean')out[k]=!!v;
+    else if(typeof v==='string'){const c=CONTROLS.find(x=>x.k===k);
+      if(c&&c.type==='select'&&!c.opts.some(o=>o[0]===v))continue;
+      if(c&&c.type==='color'&&!/^#[0-9a-f]{6}$/i.test(v))continue;
+      out[k]=v.slice(0,200);}
+  }
+  if(!TEMPLATES[out.template])out.template='wall';if(!STYLES[out.style])out.style='midnight';
+  for(const k of ['quality','fps','mblur','loops']){const c=CONTROLS.find(x=>x.k===k);if(!c.opts.some(o=>Number(o[0])===out[k]))out[k]=BASE[k];}
+  return out;
+}
+
+/* ---------------- UI build ---------------- */
+const inputs={};
+for(const c of CONTROLS){
+  const host=document.querySelector(`#panel details[data-sec="${c.sec}"] .body`);
+  const row=document.createElement('div');row.className='row'+(c.type==='range'?'':' wide');row.dataset.k=c.k;
+  const id='in_'+c.k,lab=document.createElement('label');lab.htmlFor=id;lab.textContent=c.label;row.append(lab);
+  let el;
+  if(c.type==='range'){
+    el=document.createElement('input');el.type='range';el.min=c.min;el.max=c.max;el.step=c.step;
+    const num=document.createElement('input');num.type='number';num.min=c.min;num.max=c.max;num.step=c.step;num.setAttribute('aria-label',c.label+'（数値）');
+    num.addEventListener('input',()=>{const v=Number(num.value);if(Number.isFinite(v)){set(c.k,clamp(v,c.min,c.max));el.value=P[c.k];}});
+    num.addEventListener('change',commit);
+    el.addEventListener('input',()=>{set(c.k,Number(el.value));num.value=fmt(P[c.k]);});
+    row.append(el,num);row._num=num;
+  }else if(c.type==='select'){
+    el=document.createElement('select');for(const [v,l] of c.opts){const o=document.createElement('option');o.value=v;o.textContent=l;el.append(o);}
+    el.addEventListener('input',()=>set(c.k,c.num?Number(el.value):el.value));row.append(el);
+  }else if(c.type==='check'){
+    el=document.createElement('input');el.type='checkbox';el.addEventListener('input',()=>set(c.k,el.checked));row.append(el);
+  }else{
+    el=document.createElement('input');el.type=c.type==='color'?'color':'text';if(c.ph)el.placeholder=c.ph;if(c.type==='text')el.maxLength=120;
+    el.addEventListener('input',()=>set(c.k,el.value));row.append(el);
+  }
+  el.id=id;el.addEventListener('change',commit);inputs[c.k]={el,row,c};host.append(row);
+}
+function fmt(v){return Math.round(v*100)/100;}
+function syncInputs(){
+  const uses=TEMPLATES[P.template].uses;
+  for(const k in inputs){const {el,row,c}=inputs[k];
+    if(c.type==='check')el.checked=!!P[k];else el.value=String(P[k]);
+    if(row._num)row._num.value=fmt(P[k]);
+    if(c.sec==='layout')row.hidden=!uses.includes(k);}
+  inputs.bgAngle.row.hidden=P.bgMode!=='linear';inputs.bg2.row.hidden=P.bgMode==='solid';inputs.patternOp.row.hidden=P.pattern==='none';
+  inputs.borderColor.row.hidden=inputs.borderA.row.hidden=!(P.border>0);
+  document.querySelectorAll('.tpl').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===P.template)));
+  document.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===P.style)));
+  $('#tplName').textContent=TEMPLATES[P.template].name;$('#tplDesc').textContent=TEMPLATES[P.template].desc;
+  updateMeta();
+}
+function set(k,v){P[k]=v;if(['bgMode','pattern','border'].includes(k))syncInputs();if(['style','bg1','bg2','bgMode','radius','frame','frameColor','border','shadow','ratio'].includes(k))dirtyThumbs=true;updateMeta();save();}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(P));}catch(_){}}
+function commit(){const s=JSON.stringify(P);if(s===committed)return;undoStack.push(committed);if(undoStack.length>100)undoStack.shift();redoStack=[];committed=s;updateHistory();}
+function updateHistory(){$('#undo').disabled=!undoStack.length;$('#redo').disabled=!redoStack.length;}
+function restoreState(s){P=sanitize(JSON.parse(s));committed=s;syncInputs();save();dirtyThumbs=true;updateHistory();}
+$('#undo').onclick=()=>{if(!undoStack.length)return;redoStack.push(committed);restoreState(undoStack.pop());};
+$('#redo').onclick=()=>{if(!redoStack.length)return;undoStack.push(committed);restoreState(redoStack.pop());};
+
+/* templates + styles */
+const tplGrid=$('#templateGrid'),thumbCanvases={};
+for(const [k,t] of Object.entries(TEMPLATES)){
+  const b=document.createElement('button');b.type='button';b.className='tpl';b.dataset.k=k;b.title=t.desc;
+  const cv=document.createElement('canvas');cv.width=208;cv.height=130;thumbCanvases[k]=cv;
+  const s=document.createElement('span');s.textContent=t.name;b.append(cv,s);
+  b.onclick=()=>{P={...P,...TEMPLATES[k].defaults,template:k};time=0;syncInputs();save();commit();};
+  tplGrid.append(b);
+}
+for(const [k,s] of Object.entries(STYLES)){
+  const b=document.createElement('button');b.type='button';b.className='chip';b.dataset.k=k;
+  const i=document.createElement('i');i.style.background=`linear-gradient(135deg,${s.sw[0]},${s.sw[1]})`;b.append(i,document.createTextNode(s.name));
+  b.onclick=()=>{P={...P,...s.v,style:k};syncInputs();save();commit();dirtyThumbs=true;};
+  $('#styleChips').append(b);
+}
+
+/* thumbnails: small second renderer, re-rendered when media or look changes */
+let thumbR=null,thumbTimer=0;
+function renderThumbs(){
+  if(!R)return;
+  try{if(!thumbR)thumbR=new Renderer(document.createElement('canvas'));}catch(_){return;}
+  for(const [k,t] of Object.entries(TEMPLATES)){
+    const p={...P,...t.defaults,template:k,title:'',subtitle:'',grain:0};
+    thumbR.render(p,loopLength(p,sources.length)*.3,416,260,sources,{noText:true});
+    const g=thumbCanvases[k].getContext('2d');g.drawImage(thumbR.canvas,0,0,208,130);
+  }
+  dirtyThumbs=false;
+}
+
+/* ---------------- media ---------------- */
+const mediaList=$('#mediaList');
+function renderMediaList(){
+  mediaList.replaceChildren();
+  sources.forEach((s,i)=>{
+    const row=document.createElement('div');row.className='media';
+    const th=s.kind==='video'?document.createElement('canvas'):document.createElement('img');
+    if(s.kind==='video'){th.width=80;th.height=56;try{th.getContext('2d').drawImage(s.el,0,0,80,56);}catch(_){}}
+    else if(s.thumb instanceof HTMLCanvasElement){th.src=s.thumb.toDataURL('image/jpeg',.6);}else th.src=s.url;
+    th.alt='';
+    const nm=document.createElement('div');nm.className='nm';nm.textContent=s.name;const meta=document.createElement('small');meta.textContent=(s.kind==='video'?'VIDEO · ':'IMAGE · ')+s.aspect.toFixed(2);nm.append(meta);
+    const ops=document.createElement('div');ops.className='ops';
+    const mk=(txt,label,fn,dis)=>{const b=document.createElement('button');b.type='button';b.textContent=txt;b.setAttribute('aria-label',label);b.title=label;b.disabled=!!dis;b.onclick=fn;ops.append(b);};
+    mk('↑','前へ',()=>{[sources[i-1],sources[i]]=[sources[i],sources[i-1]];afterMedia();},i===0);
+    mk('↓','後へ',()=>{[sources[i+1],sources[i]]=[sources[i],sources[i+1]];afterMedia();},i===sources.length-1);
+    mk('✕','削除',()=>{const [r]=sources.splice(i,1);if(r.url)URL.revokeObjectURL(r.url);if(!sources.length)sources=makeSamples();afterMedia();});
+    row.append(th,nm,ops);mediaList.append(row);
+  });
+  const own=sources.some(s=>!s.sample);
+  $('#mediaCount').textContent=sources.length+' 点';
+  $('#mediaHint').textContent=own?'並び順がそのままカードの順番になります。素材はこのブラウザの中だけで扱います。':'いまはサンプル素材です。自分のデザインを追加すると置き換わります。素材は外部に送信しません。';
+}
+function afterMedia(){renderMediaList();dirtyThumbs=true;if(R)R.forget(new Set(sources.map(s=>s.id)));updateMeta();}
+let mediaSeq=0;
+async function addFiles(files){
+  const list=[...files].filter(f=>/^(image|video)\//.test(f.type));
+  if(!list.length){toast('画像または動画ファイルを選んでください');return;}
+  const added=[];
+  for(const f of list){
+    try{
+      const url=URL.createObjectURL(f),id='m'+(++mediaSeq);
+      if(f.type.startsWith('video/')){
+        const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';v.src=url;
+        await new Promise((res,rej)=>{v.onloadeddata=res;v.onerror=()=>rej(Error('decode'));setTimeout(()=>rej(Error('timeout')),15000);});
+        if(playing)v.play().catch(()=>{});
+        added.push({id,kind:'video',el:v,url,aspect:v.videoWidth/v.videoHeight||1.6,name:f.name});
+      }else{
+        const img=new Image();img.decoding='async';img.src=url;await img.decode();
+        let el=img,w=img.naturalWidth||1600,h=img.naturalHeight||1000;
+        const maxSide=3072;if(Math.max(w,h)>maxSide||f.type==='image/svg+xml'){const k=Math.min(maxSide/Math.max(w,h),f.type==='image/svg+xml'?2048/Math.max(w,h):1);const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);el=c;}
+        added.push({id,kind:'image',el,url,aspect:w/h,name:f.name});
+      }
+    }catch(e){toast(f.name+' を読み込めませんでした');}
+  }
+  if(!added.length)return;
+  if(sources.every(s=>s.sample))sources=[];
+  sources.push(...added);afterMedia();toast(added.length+' 点を追加しました');
+}
+$('#drop').onclick=()=>$('#files').click();
+$('#files').onchange=e=>{addFiles(e.target.files);e.target.value='';};
+for(const target of [$('#reelStage'),$('#mlMotionSources')]){
+  target.addEventListener('dragover',e=>{if([...e.dataTransfer.types].includes('Files')){e.preventDefault();$('#reelStage').classList.add('dragover');}});
+  target.addEventListener('dragleave',e=>{if(!target.contains(e.relatedTarget))$('#reelStage').classList.remove('dragover');});
+  target.addEventListener('drop',e=>{e.preventDefault();$('#reelStage').classList.remove('dragover');addFiles(e.dataTransfer.files);});
+}
+
+/* ---------------- preview + transport ---------------- */
+function outDims(p=P,short=p.quality){
+  const [a,b]=p.aspect.split(':').map(Number),r=a/b;
+  return r>=1?{W:Math.round(short*r/2)*2,H:short}:{W:short,H:Math.round(short/r/2)*2};
+}
+function previewDims(){
+  const st=$('#reelStage'),pad=28,bw=Math.max(50,st.clientWidth-pad*2),bh=Math.max(50,st.clientHeight-pad*2);
+  const {W,H}=outDims(P,1000),r=W/H;let w=bw,h=w/r;if(h>bh){h=bh;w=h*r;}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  view.style.width=Math.round(w)+'px';view.style.height=Math.round(h)+'px';
+  return {W:Math.max(2,Math.round(w*dpr)),H:Math.max(2,Math.round(h*dpr))};
+}
+function updateMeta(){
+  const {W,H}=outDims(),L=loopLength(P,sources.length);
+  $('#dims').textContent=`${P.aspect} · 書き出し ${W}×${H} · ${P.fps}fps`;
+  $('#loopInfo').textContent=`1ループ ${L.toFixed(2)}s`+(P.template==='deck'||P.template==='focus'?'（素材数 × 1枚の時間）':'');
+}
+function frame(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;
+  if(R&&!busy){
+    const L=loopLength(P,sources.length);
+    if(playing)time=mod(time+dt,L);
+    const {W,H}=previewDims();
+    R.render(P,time,W,H,sources);
+    $('#seek').value=String(time/L);$('#time').textContent=`${time.toFixed(2)} / ${L.toFixed(2)} s`;
+    if(dirtyThumbs){clearTimeout(thumbTimer);dirtyThumbs=false;thumbTimer=setTimeout(renderThumbs,250);}
+  }
+  requestAnimationFrame(frame);
+}
+function setPlaying(v){playing=v;$('#play').textContent=v?'❚❚':'▶';for(const s of sources)if(s.kind==='video'){if(v)s.el.play().catch(()=>{});else s.el.pause();}}
+$('#play').onclick=()=>setPlaying(!playing);
+$('#restart').onclick=()=>{time=0;};
+$('#seek').addEventListener('input',e=>{time=Number(e.target.value)*loopLength(P,sources.length);if(playing)setPlaying(false);});
+
+/* direct manipulation: drag = tilt, wheel = zoom, double-click = reset camera */
+let drag=null;const stage=$('#reelStage');
+stage.addEventListener('pointerdown',e=>{if(e.button!==0||busy)return;drag={x:e.clientX,y:e.clientY,tx:P.tiltX,ty:P.tiltY};stage.setPointerCapture(e.pointerId);stage.classList.add('dragging');});
+stage.addEventListener('pointermove',e=>{if(!drag)return;P.tiltY=clamp(drag.ty+(e.clientX-drag.x)*.25,-80,80);P.tiltX=clamp(drag.tx+(e.clientY-drag.y)*.25,-80,80);syncCamera();});
+const endDrag=()=>{if(!drag)return;drag=null;stage.classList.remove('dragging');save();commit();};
+stage.addEventListener('pointerup',endDrag);stage.addEventListener('pointercancel',endDrag);
+let wheelTimer=0;
+stage.addEventListener('wheel',e=>{e.preventDefault();P.zoom=clamp(P.zoom*Math.exp(-e.deltaY*.0012),.2,4);syncCamera();clearTimeout(wheelTimer);wheelTimer=setTimeout(()=>{save();commit();},300);},{passive:false});
+stage.addEventListener('dblclick',()=>{const d=TEMPLATES[P.template].defaults;for(const k of ['tiltX','tiltY','tiltZ','zoom','fov','drift'])P[k]=d[k];syncInputs();save();commit();});
+function syncCamera(){for(const k of ['tiltX','tiltY','zoom']){inputs[k].el.value=P[k];inputs[k].row._num.value=fmt(P[k]);}}
+
+document.addEventListener('keydown',e=>{
+  if(document.querySelector('dialog[open]'))return;
+  const typing=/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)&&!['range','checkbox'].includes(e.target.type);
+  const mod_=e.metaKey||e.ctrlKey;
+  if(mod_&&e.key.toLowerCase()==='z'&&!typing){e.preventDefault();(e.shiftKey?$('#redo'):$('#undo')).click();return;}
+  if(typing)return;
+  if(e.code==='Space'&&e.target.tagName!=='BUTTON'){e.preventDefault();setPlaying(!playing);}
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){if(e.target.type==='range')return;e.preventDefault();setPlaying(false);time=mod(time+(e.key==='ArrowRight'?1:-1)/P.fps,loopLength(P,sources.length));}
+});
+
+/* ---------------- export ---------------- */
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2600);}
+function status(msg){$('#status').textContent=msg;}
+function baseName(){return 'showcase-reel-'+P.template+'-'+P.aspect.replace(':','x');}
+const inClaude=!!(window.claude&&window.claude.use);
+async function saveFile(blob,name){
+  if(inClaude){try{const dl=await window.claude.use('downloads');await dl.save({filename:name,data:blob});toast(name+' を保存しました');return;}catch(e){toast('保存できませんでした');return;}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast(name+' を保存しました');
+}
+async function seekVideos(t){
+  for(const s of sources){if(s.kind!=='video')continue;const v=s.el;v.pause();const d=v.duration||1,target=mod(t,d);
+    if(Math.abs(v.currentTime-target)<.004&&v.readyState>=2)continue;
+    await new Promise(res=>{let done=false;const fin=()=>{if(done)return;done=true;v.removeEventListener('seeked',fin);res();};v.addEventListener('seeked',fin);v.currentTime=target;setTimeout(fin,2000);});}
+}
+/* Render one output frame (optionally motion-blurred) and return a canvas holding it. */
+function exportFrame(ER,acc,t,W,H,fps,seed){
+  const S=P.mblur;
+  if(S<=1){ER.render(P,t,W,H,sources,{seed});return ER.canvas;}
+  const g=acc.getContext('2d');
+  for(let i=0;i<S;i++){ER.render(P,t+((i+.5)/S-.5)*.5/fps,W,H,sources,{seed});g.globalAlpha=1/(i+1);g.drawImage(ER.canvas,0,0);}
+  g.globalAlpha=1;return acc;
+}
+function openProgress(msg){cancelled=false;busy=true;$('#exportMsg').textContent=msg;$('#exportProg').value=0;const d=$('#exportDialog');if(!d.open)d.showModal();}
+function closeProgress(){busy=false;const d=$('#exportDialog');if(d.open)d.close();setPlaying(playing);}
+$('#exCancel').onclick=()=>{cancelled=true;};
+$('#exportDialog').addEventListener('cancel',e=>{e.preventDefault();cancelled=true;});
+
+/* MP4 (H.264 via WebCodecs) — same box writer as the other MOTION LAB motion tools */
+const enc=new TextEncoder();
+function joinBytes(...parts){const arrays=parts.map(p=>typeof p==='string'?enc.encode(p):p),out=new Uint8Array(arrays.reduce((n,a)=>n+a.length,0));let i=0;for(const a of arrays){out.set(a,i);i+=a.length;}return out;}
+function be32(...v){const out=new Uint8Array(v.length*4),dv=new DataView(out.buffer);v.forEach((n,i)=>dv.setUint32(i*4,n));return out;}
+function be16(...v){const out=new Uint8Array(v.length*2),dv=new DataView(out.buffer);v.forEach((n,i)=>dv.setUint16(i*2,n));return out;}
+function atom(type,...parts){const data=joinBytes(...parts);return joinBytes(be32(data.length+8),type,data);}
+async function pickMp4Config(w,h,fps){
+  if(!('VideoEncoder' in window))return null;
+  const bitrate=Math.round(Math.min(90e6,Math.max(8e6,w*h*fps*.16)));
+  for(const codec of ['avc1.640034','avc1.640033','avc1.64002a','avc1.640028','avc1.4d0033','avc1.4d0028','avc1.42e033','avc1.42e028']){
+    const cfg={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
+    try{const r=await VideoEncoder.isConfigSupported(cfg);if(r.supported)return cfg;}catch(_){}
+  }
+  return null;
+}
+function makeMp4(samples,desc,w,h,fps){
+  const N=samples.length,matrix=be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000);
+  const ftyp=atom('ftyp','isom',be32(512),'isom','iso2','avc1','mp41');
+  const pts=samples.map(s=>Math.round(s.ts*fps/1e6)),D=Math.max(0,...samples.map((s,i)=>i-pts[i])),reorder=pts.some((p,i)=>p!==i);
+  const build=off=>{
+    const avc1=atom('avc1',new Uint8Array(6),be16(1),be16(0,0),be32(0,0,0),be16(w,h),be32(0x00480000,0x00480000,0),be16(1),new Uint8Array(32),be16(0x18,0xffff),atom('avcC',desc),atom('colr','nclx',be16(1,1,1),new Uint8Array([0])));
+    const keys=[];samples.forEach((s,i)=>{if(s.key)keys.push(i+1);});
+    const parts=[atom('stsd',be32(0,1),avc1),atom('stts',be32(0,1,N,1))];
+    if(reorder)parts.push(atom('ctts',be32(0,N),...samples.map((s,i)=>be32(1,pts[i]-i+D))));
+    parts.push(atom('stss',be32(0,keys.length),be32(...keys)),atom('stsc',be32(0,1,1,N,1)),atom('stsz',be32(0,0,N),be32(...samples.map(s=>s.data.length))),atom('stco',be32(0,1,off)));
+    const stbl=atom('stbl',...parts);
+    const mdia=atom('mdia',atom('mdhd',be32(0,0,0,fps,N),be16(0x55c4,0)),atom('hdlr',be32(0,0),'vide',new Uint8Array(12),'VideoHandler\0'),atom('minf',atom('vmhd',be32(1),be16(0,0,0,0)),atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1)))),stbl));
+    const edts=reorder?atom('edts',atom('elst',be32(0,1,N,D,0x10000))):new Uint8Array(0);
+    const trak=atom('trak',atom('tkhd',be32(3,0,0,1,0,N),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536)),edts,mdia);
+    return atom('moov',atom('mvhd',be32(0,0,0,fps,N,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2)),trak);
+  };
+  const mdatSize=samples.reduce((n,s)=>n+s.data.length,8),moov0=build(0),moov=build(ftyp.length+moov0.length+8);
+  return new Blob([ftyp,moov,be32(mdatSize),enc.encode('mdat'),...samples.map(s=>s.data)],{type:'video/mp4'});
+}
+const tick=()=>new Promise(r=>setTimeout(r,0));
+async function exportVideo(){
+  if(busy||!R)return;
+  const {W,H}=outDims(),fps=P.fps,L=loopLength(P,sources.length),frames=Math.round(L*fps)*P.loops;
+  const wasPlaying=playing;setPlaying(false);
+  openProgress(`${W}×${H} · ${fps}fps · ${(frames/fps).toFixed(1)}秒`);
+  let ER=null;
+  try{
+    const ec=document.createElement('canvas');ER=new Renderer(ec);
+    const acc=document.createElement('canvas');acc.width=W;acc.height=H;
+    const cfg=await pickMp4Config(W,H,fps);
+    if(cfg){
+      const samples=[];let desc=null,err=null;
+      const encoder=new VideoEncoder({output:(chunk,meta)=>{if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description)desc=new Uint8Array(meta.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==='key',ts:chunk.timestamp});},error:e=>{err=e;}});
+      encoder.configure(cfg);
+      for(let f=0;f<frames;f++){
+        if(cancelled||err)break;
+        const t=f/fps;await seekVideos(t);
+        const src=exportFrame(ER,acc,t,W,H,fps,(f%97)*1.37);
+        const vf=new VideoFrame(src,{timestamp:Math.round(f*1e6/fps),duration:Math.round(1e6/fps)});
+        encoder.encode(vf,{keyFrame:f%(fps*2)===0});vf.close();
+        while(encoder.encodeQueueSize>6)await new Promise(r=>setTimeout(r,4));
+        if(f%3===0){$('#exportProg').value=f/frames;$('#exportMsg').textContent=`${f+1} / ${frames} フレーム · ${W}×${H}`;await tick();}
+      }
+      if(!cancelled&&!err){await encoder.flush();}
+      try{encoder.close();}catch(_){}
+      if(err)throw err;
+      if(cancelled){toast('書き出しを中止しました');return;}
+      if(!desc||!samples.length)throw Error('エンコード結果が空でした');
+      await saveFile(makeMp4(samples,desc,W,H,fps),baseName()+'.mp4');
+    }else{
+      /* fallback: real-time MediaRecorder (WebM) */
+      const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+      if(!mime)throw Error('このブラウザでは動画を書き出せません（Chrome / Edge / Safari 最新版を使ってください）');
+      const out=P.mblur>1?acc:ec;ER.render(P,0,W,H,sources);
+      const stream=out.captureStream(0),track=stream.getVideoTracks()[0],chunks=[];
+      const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:Math.min(40e6,W*H*fps*.12)});
+      rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      const stopped=new Promise(r=>rec.onstop=r);rec.start();
+      const t0=performance.now();
+      for(let f=0;f<frames;f++){
+        if(cancelled)break;const t=f/fps;await seekVideos(t);exportFrame(ER,acc,t,W,H,fps,(f%97)*1.37);track.requestFrame&&track.requestFrame();
+        const wait=t0+(f+1)*1000/fps-performance.now();await new Promise(r=>setTimeout(r,Math.max(0,wait)));
+        $('#exportProg').value=f/frames;$('#exportMsg').textContent=`${f+1} / ${frames} フレーム（リアルタイム録画）`;
+      }
+      rec.stop();await stopped;track.stop();
+      if(cancelled){toast('書き出しを中止しました');return;}
+      const blob=new Blob(chunks,{type:mime.split(';')[0]});if(!blob.size)throw Error('録画データが空でした');
+      await saveFile(blob,baseName()+(mime.startsWith('video/mp4')?'.mp4':'.webm'));
+    }
+    status(`動画を書き出しました（${W}×${H}・${frames}フレーム）`);
+  }catch(e){console.error(e);status('書き出しに失敗しました: '+(e.message||e));toast('書き出しに失敗しました');}
+  finally{if(ER)ER.dispose();closeProgress();setPlaying(wasPlaying);}
+}
+async function exportPNG(){
+  if(busy||!R)return;const {W,H}=outDims();let ER=null;
+  try{ER=new Renderer(document.createElement('canvas'));const acc=document.createElement('canvas');acc.width=W;acc.height=H;
+    await seekVideos(time);const src=exportFrame(ER,acc,time,W,H,P.fps,1);
+    const blob=await new Promise(r=>src.toBlob(r,'image/png'));if(!blob)throw Error('PNGを作れませんでした');
+    await saveFile(blob,baseName()+'-'+time.toFixed(2)+'s.png');status(`PNGを書き出しました（${W}×${H}）`);
+  }catch(e){status('PNGの書き出しに失敗しました: '+(e.message||e));}
+  finally{if(ER)ER.dispose();if(playing)setPlaying(true);}
+}
+/* PNG sequence in an uncompressed ZIP */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xffffffff;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xffffffff)>>>0;}
+function zip(files){
+  const parts=[],central=[];let off=0;
+  for(const f of files){
+    const name=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length,h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(8,0,true);h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,name.length,true);
+    parts.push(new Uint8Array(h.buffer),name,f.data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);
+    central.push(new Uint8Array(c.buffer),name);off+=30+name.length+sz;
+  }
+  const csize=central.reduce((n,a)=>n+a.length,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/zip'});
+}
+async function exportSequence(){
+  if(busy||!R)return;
+  const {W,H}=outDims(),fps=P.fps,frames=Math.round(loopLength(P,sources.length)*fps);
+  if(frames>1800){toast('PNG連番は1800フレームまでです。ループを短くするかFPSを下げてください');return;}
+  const wasPlaying=playing;setPlaying(false);openProgress(`PNG連番 ${frames}枚 · ${W}×${H}`);let ER=null;
+  try{
+    ER=new Renderer(document.createElement('canvas'));const acc=document.createElement('canvas');acc.width=W;acc.height=H;const files=[];
+    for(let f=0;f<frames;f++){
+      if(cancelled)break;const t=f/fps;await seekVideos(t);const src=exportFrame(ER,acc,t,W,H,fps,(f%97)*1.37);
+      const blob=await new Promise(r=>src.toBlob(r,'image/png'));files.push({name:`frame_${String(f).padStart(4,'0')}.png`,data:new Uint8Array(await blob.arrayBuffer())});
+      $('#exportProg').value=f/frames;$('#exportMsg').textContent=`${f+1} / ${frames} 枚`;
+    }
+    if(cancelled){toast('書き出しを中止しました');return;}
+    await saveFile(zip(files),baseName()+`-png-${fps}fps.zip`);status(`PNG連番を書き出しました（${frames}枚）`);
+  }catch(e){status('PNG連番の書き出しに失敗しました: '+(e.message||e));}
+  finally{if(ER)ER.dispose();closeProgress();setPlaying(wasPlaying);}
+}
+$('#exVideo').onclick=exportVideo;$('#exPng').onclick=exportPNG;$('#exSeq').onclick=exportSequence;
+$('#saveJson').onclick=()=>saveFile(new Blob([JSON.stringify({tool:'showcase-reel',version:1,settings:P},null,2)],{type:'application/json'}),baseName()+'.json');
+$('#loadJson').onclick=()=>$('#jsonFile').click();
+$('#jsonFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const d=JSON.parse(await f.text());const s=d&&d.settings&&typeof d.settings==='object'?d.settings:d;if(!s||typeof s!=='object')throw 0;P=sanitize(s);syncInputs();save();commit();dirtyThumbs=true;toast('設定を読み込みました');}
+  catch(_){toast('設定ファイルを読み込めませんでした');}};
+
+/* unified export dialog (shared/export-workbench.js) */
+window.addEventListener('DOMContentLoaded',()=>{
+  const api=window.MLExportUI;
+  if(!api){$('#mlMotionExport').onclick=()=>{$('#exportSec').open=true;$('#exVideo').focus();};return;}
+  const videoOK=()=>!R?{ok:false,reason:'この環境では描画できません。'}:(window.VideoEncoder||(window.MediaRecorder&&HTMLCanvasElement.prototype.captureStream))?{ok:true}:{ok:false,reason:'このブラウザでは動画を保存できません。PNG / PNG連番を選んでください。'};
+  const lenText=()=>{const L=loopLength(P,sources.length);return `${(L*P.loops).toFixed(2)} 秒（${Math.round(L*P.fps)*P.loops} フレーム）`;};
+  api.register({id:'showcase-reel',title:'Showcase Reel',trigger:'#mlMotionExport',busy:()=>busy,formats:[
+    {id:'mp4',label:'動画 · MP4（H.264）',button:'#exVideo',handoff:true,available:videoOK,note:'コマ送りで描画してエンコードします。WebCodecs非対応のブラウザではWebMでリアルタイム録画します。'},
+    {id:'png',label:'PNG · 今のフレーム',button:'#exPng',handoff:true,note:'プレビューの再生位置を、書き出しサイズで1枚保存します。'},
+    {id:'png-sequence',label:'PNG連番 · ZIP',button:'#exSeq',handoff:true,note:'1ループ分をPNG連番で保存します（最大1800枚）。'}
+  ],fields:{
+    size:(f,ui)=>[ui.field('比率',inputs.aspect.el),ui.field('画質',inputs.quality.el),ui.readout('サイズ',()=>{const d=outDims();return d.W+' × '+d.H+' px';})],
+    alpha:(f,ui)=>ui.readout('透過','非対応','背景を含めて書き出します。'),
+    fps:(f,ui)=>f.id==='png'?ui.readout('FPS','不要','静止画にはフレームレートを使いません。'):ui.field('FPS',inputs.fps.el),
+    extra:(f,ui)=>f.id==='png'?[ui.field('モーションブラー',inputs.mblur.el)]:[f.id==='mp4'?ui.field('ループ回数',inputs.loops.el):null,ui.field('モーションブラー',inputs.mblur.el,'書き出し時だけ、シャッター180°相当のブラーをかけます。'),ui.readout('長さ',lenText)].filter(Boolean)
+  },status:['#status']});
+});
+
+/* boot */
+syncInputs();renderMediaList();updateHistory();
+if(R)requestAnimationFrame(frame);
+window.MLShowcaseReel={get state(){return P;},set:(k,v)=>{P[k]=v;syncInputs();},sources:()=>sources,loopLength:()=>loopLength(P,sources.length),setTime:t=>{time=t;},pause:()=>setPlaying(false)};
+</script>
+</body>
+</html>
