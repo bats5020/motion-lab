@@ -9,10 +9,10 @@ const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const dataCode=script.slice(0,script.indexOf('const $=id=>'))+'\nglobalThis.data={CATEGORIES,TOOLS,ENTRIES,TOOL_META};';
 const context={};vm.createContext(context);vm.runInContext(dataCode,context);
 const {CATEGORIES,TOOLS,ENTRIES,TOOL_META}=context.data;
-test('library has 19 original tools and 21 purpose-specific entrances',()=>{
-  assert.equal(TOOLS.length,19);assert.equal(ENTRIES.length,21);
-  assert.equal(new Set(ENTRIES.map(t=>t.href.split('?')[0])).size,19);
-  assert.equal(new Set(ENTRIES.map(t=>t.name)).size,21);
+test('library has 20 original tools and 22 purpose-specific entrances',()=>{
+  assert.equal(TOOLS.length,20);assert.equal(ENTRIES.length,22);
+  assert.equal(new Set(ENTRIES.map(t=>t.href.split('?')[0])).size,20);
+  assert.equal(new Set(ENTRIES.map(t=>t.name)).size,22);
   for(const tool of TOOLS){assert.ok(TOOL_META[tool.name],tool.name);assert.ok(ENTRIES.some(t=>t.toolName===tool.name),tool.name);}
 });
 test('every original tool path still exists and every entry has supported metadata',()=>{
@@ -29,7 +29,7 @@ test('every original tool path still exists and every entry has supported metada
 test('five categories are purpose-based and U19 is a cross-category collection',()=>{
   assert.deepEqual(Array.from(CATEGORIES,c=>c.key),['image','texture','type','motion','3d']);
   const counts=Object.fromEntries(CATEGORIES.map(c=>[c.key,ENTRIES.filter(t=>t.cat===c.key).length]));
-  assert.deepEqual(counts,{image:6,texture:5,type:4,motion:4,'3d':2});
+  assert.deepEqual(counts,{image:6,texture:5,type:4,motion:5,'3d':2});
   assert.equal(ENTRIES.filter(t=>t.collection==='u19').length,3);
   assert.equal(new Set(ENTRIES.filter(t=>t.collection==='u19').map(t=>t.cat)).size,2);
 });
@@ -62,7 +62,7 @@ test('category, collection, output and search predicates compose without losing 
   const filterSource=script.slice(script.indexOf('  const words=state.query'),script.indexOf('  catalog.replaceChildren();'));
   vm.runInContext('globalThis.filtered=state=>{'+filterSource+'return results.map(t=>t.name);};',context);
   const query=changes=>context.filtered({category:'all',collection:'',query:'',output:'',...changes});
-  assert.equal(query({}).length,21);
+  assert.equal(query({}).length,22);
   assert.equal(query({category:'image'}).length,6);
   assert.equal(query({category:'texture'}).length,5);
   assert.equal(query({collection:'u19'}).length,3);
