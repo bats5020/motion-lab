@@ -64,6 +64,8 @@ section>h2 b{color:var(--faint);font-weight:600;margin-right:6px}
 .seg button:not(.on):hover{color:var(--text)}
 .seg.arrows button{font-size:14px;padding:5px 0;line-height:1}
 .off{opacity:.35;pointer-events:none}
+body.style-vortex .only-flame,body:not(.style-vortex) .only-vortex{display:none!important}
+body.style-vortex #ramp .veil{display:none!important}   /* U19 渦は配色の黒も使う */
 .prow{display:flex;align-items:center;gap:8px;margin-top:8px}
 .prow>span:first-child{flex:0 0 86px;color:var(--sub);font-size:10.5px}
 .prow input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:#33333c;outline:none;cursor:pointer}
@@ -189,34 +191,39 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
       <div class="prow"><span>トランジション</span><input type="range" id="trans" min="0.4" max="5" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>Bの長さ</span><input type="range" id="holdB" min="0" max="5" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>切替点</span><input type="range" id="cut" min="0.25" max="0.7" step="0.01"><span class="pv"></span></div>
-      <div class="hint">元動画はトランジション約1.2秒・炎が閉じるまで約0.5秒。切替点はトランジションの中の割合（炎が画面を覆いきる位置）。</div>
+      <div class="hint">元動画はトランジション約1.2秒・炎が閉じるまで約0.5秒。切替点はトランジションの中の割合（炎が画面を覆いきる位置）。<br><span id="obsPoint"></span></div>
     </section>
 
-    <section>
+    <section class="only-flame">
       <h2><span><b>03</b>方向</span></h2>
-      <div class="seg" id="modeSeg"><button data-v="0">中央へ渦</button><button data-v="1">外へ広がる</button><button data-v="2">一方向</button><button data-v="3">両側から</button></div>
+      <div class="seg only-flame" id="modeSeg"><button data-v="0">中央へ渦</button><button data-v="1">外へ広がる</button><button data-v="2">一方向</button><button data-v="3">両側から</button></div>
       <div id="dirBox">
         <div class="sub">進む向き</div>
         <div class="seg arrows" id="dirSeg"></div>
         <div class="prow"><span>角度</span><input type="range" id="angle" min="0" max="359" step="1"><span class="pv"></span></div>
       </div>
-      <div class="sub">切り替え後の炎</div>
-      <div class="seg" id="exitSeg"><button data-v="0">その場で燃え尽きる</button><button data-v="1">そのまま抜ける</button></div>
+      <div class="sub only-flame">切り替え後の炎</div>
+      <div class="seg only-flame" id="exitSeg"><button data-v="0">その場で燃え尽きる</button><button data-v="1">そのまま抜ける</button></div>
       <div class="hint" id="dirHint"></div>
     </section>
 
     <section>
       <h2><span><b>04</b>炎</span></h2>
+      <div class="sub">炎の種類</div>
+      <div class="seg" id="styleSeg"><button data-v="flame">炎</button><button data-v="vortex">U19 渦（スティンガー）</button></div>
+      <div class="hint only-vortex">U19 Vortex（蓋絵の背景）と同じ渦が外から巻き込んで画面を覆い、溶けるように中心へ消えます。選ぶとタイミング・配色をスティンガー向け（3秒・U19 ミラー黒寄り）に合わせます。</div>
+      <div class="prow only-vortex"><span>入りの柔らかさ</span><input type="range" id="vin" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="prow only-vortex"><span>抜けの柔らかさ</span><input type="range" id="vout" min="0" max="1" step="0.01"><span class="pv"></span></div>
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード" spellcheck="false"></div>
       <div class="prow"><span>渦の強さ</span><input type="range" id="swirl" min="0" max="2" step="0.01"><span class="pv"></span></div>
       <div class="prow"><span>炎の腕の本数</span><input type="range" id="arms" min="1" max="7" step="1"><span class="pv"></span></div>
-      <div class="prow"><span>縁の太さ</span><input type="range" id="rim" min="0.2" max="3" step="0.05"><span class="pv"></span></div>
+      <div class="prow only-flame"><span>縁の太さ</span><input type="range" id="rim" min="0.2" max="3" step="0.05"><span class="pv"></span></div>
       <div class="prow"><span>背景の歪み</span><input type="range" id="warp" min="0" max="1" step="0.01"><span class="pv"></span></div>
-      <div class="sub">切り替え後</div>
-      <div class="prow"><span>炎が引く時間</span><input type="range" id="exitDur" min="0.3" max="2" step="0.05"><span class="pv"></span></div>
-      <div class="prow"><span>残り火・煙</span><input type="range" id="ember" min="0" max="1" step="0.01"><span class="pv"></span></div>
-      <div class="prow"><span>残る長さ</span><input type="range" id="linger" min="0" max="1" step="0.01"><span class="pv"></span></div>
-      <div class="hint">炎が引く時間を下げると切り替え後すぐに炎が消えます。残り火・煙はロゴのときの煙と残り火、映像のときは炎の跡のサーモ色の濃さ。0%でなし。<br>シャッフルで炎の形（ノイズ）だけが変わります。背景の歪みは0%で後ろのシーンを歪ませず、上げると渦でねじれ・押し出し・熱のゆらぎが乗ります。</div>
+      <div class="sub only-flame">切り替え後</div>
+      <div class="prow only-flame"><span>炎が引く時間</span><input type="range" id="exitDur" min="0.3" max="2" step="0.05"><span class="pv"></span></div>
+      <div class="prow only-flame"><span>残り火・煙</span><input type="range" id="ember" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="prow only-flame"><span>残る長さ</span><input type="range" id="linger" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="hint only-flame">炎が引く時間を下げると切り替え後すぐに炎が消えます。残り火・煙はロゴのときの煙と残り火、映像のときは炎の跡のサーモ色の濃さ。0%でなし。<br>シャッフルで炎の形（ノイズ）だけが変わります。背景の歪みは0%で後ろのシーンを歪ませず、上げると渦でねじれ・押し出し・熱のゆらぎが乗ります。</div>
     </section>
 
     <section>
@@ -286,6 +293,7 @@ const DEFAULTS={
   mode:0, angle:90, exit:0,
   seed:"370", swirl:1, arms:3, rim:1, warp:0,
   exitDur:1, ember:.5, linger:.5,
+  style:"flame", vin:.6, vout:.8,
   palette:"Thermal", gain:1, gamma:1, phase:0, wrap:false,
   grain:0, gsize:1.2, gmove:true,
   out:"scene", size:"1920x1080", q:"0.5", loop:true,
@@ -301,6 +309,8 @@ function load(){
   return d;
 }
 const S=load();
+const VORTEX_PRESET={holdA:0,trans:2.9,holdB:.3,cut:.38,palette:"U19 ミラー黒寄り",swirl:1,arms:3,warp:0};
+if(new URLSearchParams(location.search).get("style")==="vortex"&&S.style!=="vortex") Object.assign(S,{style:"vortex"},VORTEX_PRESET);   // ?style=vortex で U19 渦から始める
 let saveT=0;
 function save(){ commitHist(); clearTimeout(saveT); saveT=setTimeout(()=>{ try{ localStorage.setItem(LSKEY,JSON.stringify(S)); }catch(e){} },250); }
 
@@ -521,6 +531,7 @@ uniform float uT, uTime, uSwirl, uArms, uRim, uSeed, uCut;
 uniform vec3 uPal[16]; uniform float uPos[16]; uniform int uN; uniform float uLo;
 uniform int uMode, uExit, uMat; uniform vec2 uDir;
 uniform float uWarp;
+uniform int uStyle; uniform float uVin,uVout;   // U19 渦（スティンガー）
 uniform float uGain,uGamma,uPhase,uGrain,uGsize,uGseed; uniform int uWrap,uAlpha;
 uniform float uEmber,uLinger,uExitDur;   // 切り替え後：残り火・煙の量／残る長さ／炎が引く時間   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
 
@@ -601,6 +612,54 @@ Fld field(vec2 p, float spin, float tz){
   return f;
 }
 
+/* ---------- U19 渦（U19 Vortex / Stinger と同じ渦。周期ノイズを対数極座標に置く） ---------- */
+vec2 vh2(vec2 q){q=vec2(dot(q,vec2(127.1,311.7))+uSeed*17.13,dot(q,vec2(269.5,183.3))+uSeed*9.71);return -1.+2.*fract(sin(q)*43758.5453);}
+float vpn(vec2 q,vec2 per){
+  vec2 i=floor(q),f=fract(q);vec2 u=f*f*f*(f*(f*6.-15.)+10.);
+  vec2 i00=mod(i,per),i10=mod(i+vec2(1,0),per),i01=mod(i+vec2(0,1),per),i11=mod(i+vec2(1,1),per);
+  float a=dot(vh2(i00),f),b=dot(vh2(i10),f-vec2(1,0)),c=dot(vh2(i01),f-vec2(0,1)),d=dot(vh2(i11),f-vec2(1,1));
+  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+float vfbm(vec2 q,vec2 per){float s=0.,a=.5,n=0.;for(int k=0;k<2;k++){s+=a*vpn(q,per);n+=a;q*=2.;per*=2.;a*=.4;}return s/n;}
+vec3 vlut(float t){   // 選んだ配色をそのまま（黒も使う）。露出・ガンマは効かせる
+  t=pow(clamp(t*uGain,0.,1.),uGamma);
+  vec3 c=uPal[0];
+  for(int i=1;i<16;i++){ if(i>=uN) break; float a=uPos[i-1], b=uPos[i]; if(t>=a) c=mix(uPal[i-1],uPal[i],clamp((t-a)/max(b-a,1e-4),0.,1.)); }
+  return c;
+}
+// 返り値：rgb=渦の色, a=覆い（0〜1）。T0 はトランジションを3秒の型に換算した時間
+vec4 vortex(vec2 p,vec2 asp,float T0,out float pin,out float pout){
+  const float TAU=6.28318530718;
+  pin=1.-pow(1.-clamp(T0/.85,0.,1.),2.5);
+  pout=pow(clamp((T0-1.4)/1.5,0.,1.),1.2);
+  float rin=1.75-uVin*.3-pin*(2.45-uVin*.3), rout=1.55-pout*2.35, zoom=1.-pout*.35;
+  float spin=(-.3*(1.-pin)+.1*T0+.6*pout*pout);
+  float arms=float(uArms), twist=1.1*uSwirl;
+  float r0=length(p)+1e-5, r=r0/zoom;
+  float th=atan(p.y,p.x)/TAU+spin, lr=log(r);
+  vec2 per=vec2(arms,4.);
+  vec2 q=vec2((th+twist*lr/TAU*2.)*arms, lr*.8+2.*(T0/3.)*per.y);
+  vec2 w1=vec2(vfbm(q+vec2(1.7,9.2),per),vfbm(q+vec2(8.3,2.8),per));
+  vec2 w2=vec2(vfbm(q+1.4*w1+vec2(3.1,5.4),per),vfbm(q+1.4*w1+vec2(6.9,1.3),per));
+  float T=vfbm(q+1.4*w1+.7*w2,per)*.5+.5;
+  T=clamp((T-.32)/.35,0.,1.);
+  float s=r0/length(asp*.5);
+  T=(T-.5)*1.15+.48+(s-.5)*.6;
+  vec3 col=vlut(clamp(T,0.,1.));
+  float nz=vfbm(vec2((th+2.2*log(r0)/TAU*2.)*arms+spin*2.,log(r0)*.6+3.7),per);
+  float ew=.45;
+  float e=(nz+.6*sin(TAU*(th*arms+1.6*log(r0))+spin*6.)*smoothstep(.12,.6,s))*ew;   // 巻きのギザは外側だけ
+  float si=uVin*(1.-pin), so=uVout*pout;
+  float eo=nz*ew*(1.-.6*so), fo=.015+.38*so;
+  float fi=.015+.3*si+.12*(1.-smoothstep(0.,.4,s));
+  float m=smoothstep(rin-fi,rin+fi,s+e)*(1.-smoothstep(rout-fo,rout+fo,s+eo));
+  m*=mix(1.,smoothstep(0.,.45,pin),uVin);
+  m*=1.-uVout*smoothstep(.45,1.,pout);
+  float rim=(1.-smoothstep(0.,.05+.2*si,abs(s+e-rin)))*(1.-.7*si)*smoothstep(.15,.55,s)+(1.-smoothstep(0.,.05+.2*so,abs(s+eo-rout)))*(1.-pout);
+  col=mix(col,vlut(.97),clamp(rim,0.,1.)*.55*min(uRim,1.8)*m);
+  return vec4(col,m);
+}
+
 void main(){
   vec2 asp=vec2(uRes.x/uRes.y,1.);
   vec2 p=(vUv-.5)*asp;
@@ -611,7 +670,16 @@ void main(){
   vec3 col;
   float mOut=0., gOut=0.; vec3 fOut=vec3(0.);   // 透過書き出し用：炎の形・色と縁の光
 
-  if(uT<uCut){
+  if(uStyle==1){
+    // ---------- U19 渦：外から巻き込んで覆う → 切替 → 溶けるように中心へ消える ----------
+    float pin,pout;
+    vec4 vx=vortex(p,asp,uT*3.,pin,pout);
+    vec3 sc;
+    if(uT<uCut){ vec2 pa=mix(p,rot(pin*uSwirl*1.2*exp(-r*2.2))*p*(1.-.15*pin),uWarp); sc=texture(uA,pa/asp+.5).rgb; }
+    else { vec2 pb=mix(p,rot((1.-pout)*.25*uSwirl)*p/(1.+.06*(1.-pout)),uWarp); sc=texture(uB,pb/asp+.5).rgb; }
+    col=mix(sc,vx.rgb,vx.a);
+    mOut=vx.a; fOut=vx.rgb; gOut=0.;
+  } else if(uT<uCut){
     // ---------- phase 1: flames advance over scene A ----------
     float c=uT/uCut;
     float ce=c*c*(3.-2.*c);
@@ -735,7 +803,7 @@ gl.useProgram(prog);
 gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 { const loc=gl.getAttribLocation(prog,"aPos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0); }
-const U={}; ["uA","uB","uRes","uT","uTime","uSwirl","uArms","uRim","uSeed","uCut","uPal","uPos","uN","uLo","uMode","uExit","uMat","uDir","uWarp",
+const U={}; ["uStyle","uVin","uVout","uA","uB","uRes","uT","uTime","uSwirl","uArms","uRim","uSeed","uCut","uPal","uPos","uN","uLo","uMode","uExit","uMat","uDir","uWarp",
   "uGain","uGamma","uPhase","uWrap","uGrain","uGsize","uGseed","uAlpha","uEmber","uLinger","uExitDur"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 function mkTex(unit){ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -769,7 +837,7 @@ function render(clock,q,alphaMode){
   const t=progressAt(clock), rad=S.angle*Math.PI/180;
   gl.uniform2f(U.uRes,w,h); gl.uniform1f(U.uT,t); gl.uniform1f(U.uTime,t*FLAME_T);
   gl.uniform1f(U.uSwirl,S.swirl); gl.uniform1f(U.uArms,S.arms); gl.uniform1f(U.uRim,S.rim); gl.uniform1f(U.uSeed,seedNum(S.seed)); gl.uniform1f(U.uCut,S.cut);
-  gl.uniform1i(U.uMode,S.mode); gl.uniform1i(U.uExit,S.exit); gl.uniform1i(U.uMat,S.matB==="logo"?1:0); gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad)); gl.uniform1f(U.uWarp,S.warp);
+  gl.uniform1i(U.uMode,S.mode); gl.uniform1i(U.uExit,S.exit); gl.uniform1i(U.uMat,S.matB==="logo"?1:0); gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad)); gl.uniform1f(U.uWarp,S.warp); gl.uniform1i(U.uStyle,S.style==="vortex"?1:0); gl.uniform1f(U.uVin,S.vin); gl.uniform1f(U.uVout,S.vout);
   gl.uniform1f(U.uEmber,S.ember); gl.uniform1f(U.uLinger,S.linger); gl.uniform1f(U.uExitDur,S.exitDur);
   gl.uniform1f(U.uGain,S.gain); gl.uniform1f(U.uGamma,S.gamma); gl.uniform1f(U.uPhase,S.phase); gl.uniform1i(U.uWrap,S.wrap?1:0);
   gl.uniform1f(U.uGrain,S.grain); gl.uniform1f(U.uGsize,S.gsize*(h/1080)); gl.uniform1f(U.uGseed,S.gmove?Math.floor(clock*FPS)%997:0);
@@ -844,6 +912,7 @@ function loop(now){
 const fmt={
   holdA:v=>(+v).toFixed(2)+"s", trans:v=>(+v).toFixed(2)+"s", holdB:v=>(+v).toFixed(2)+"s", cut:v=>Math.round(v*100)+"%",
   angle:v=>v+"°", swirl:v=>(+v).toFixed(2), arms:v=>String(v), rim:v=>(+v).toFixed(2), warp:v=>Math.round(v*100)+"%",
+  vin:v=>Math.round(v*100)+"%", vout:v=>Math.round(v*100)+"%",
   exitDur:v=>Math.round(v*100)+"%", ember:v=>Math.round(v*100)+"%", linger:v=>Math.round(v*100)+"%",
   gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1),
 };
@@ -855,6 +924,8 @@ function changed(key){
   if(key==="cover") scenes.A.redraw=scenes.B.redraw=true;
   if(key==="out"){ meta(); recHint(); }
   if(key==="mode"||key==="angle"||key==="exit"||key==="matB") syncDirUI();
+  if(key==="style"){ if(S.style==="vortex") applyVortexPreset(); syncStyleUI(); }
+  if(TIMING.has(key)||key==="style") syncObsPoint();
   save(); if(!playing&&!recording) render(playhead);
 }
 function bindRange(id){
@@ -872,6 +943,21 @@ function syncSeg(id,key){ $(id).querySelectorAll("button").forEach(b=>b.classLis
 function bindCheck(id){ const el=$(id); el.checked=!!S[id]; el.addEventListener("change",()=>{ histArmed=true; S[id]=el.checked; changed(id); }); }
 
 Object.keys(fmt).forEach(bindRange);
+/* U19 渦（スティンガー）：選んだときにタイミング・配色をスティンガー向けに合わせる */
+function applyVortexPreset(){
+  Object.assign(S,VORTEX_PRESET);
+  dirtyPal=true; buildPresets();
+  for(const id of Object.keys(fmt)){ const el=$(id); el.value=S[id]; el.parentElement.querySelector(".pv").textContent=fmt[id](S[id]); }
+  playhead=Math.min(playhead,totalDur()); layoutTrack();
+}
+function syncStyleUI(){ document.body.classList.toggle("style-vortex",S.style==="vortex"); syncSeg("styleSeg","style"); }
+function syncObsPoint(){
+  const el=$("obsPoint"); if(!el) return;
+  const ms=Math.round((S.holdA+S.trans*S.cut)*1000);
+  el.textContent=S.style==="vortex"?`OBS のトランジションポイント：${ms} ms（切替点は 15〜59% の間なら渦で隠れます）`:`OBS のトランジションポイント：${ms} ms`;
+}
+bindSeg("styleSeg","style");
+syncStyleUI(); syncObsPoint();
 bindSeg("matSeg","matB"); bindSeg("modeSeg","mode",Number); bindSeg("exitSeg","exit",Number); bindSeg("outSeg","out"); bindSeg("qSeg","q");
 ["cover","wrap","gmove"].forEach(bindCheck);
 $("dirSeg").innerHTML=ARROWS.map(([a,ch])=>`<button data-v="${a}" title="${DIRNAME[a]}" aria-label="${DIRNAME[a]}">${ch}</button>`).join("");
@@ -929,7 +1015,7 @@ function syncAllUI(){
   for(const id of Object.keys(fmt)){ const el=$(id); el.value=S[id]; el.parentElement.querySelector(".pv").textContent=fmt[id](S[id]); }
   for(const [id,key] of [["matSeg","matB"],["modeSeg","mode"],["exitSeg","exit"],["outSeg","out"],["qSeg","q"]]) syncSeg(id,key);
   for(const id of ["cover","wrap","gmove"]) $(id).checked=!!S[id];
-  $("seed").value=S.seed; $("size").value=S.size;
+  $("seed").value=S.seed; $("size").value=S.size; syncStyleUI(); syncObsPoint();
 /* ML_KEYBOARD_BEGIN:sync-numbers */
   dirtyPal=true; buildPresets(); syncDirUI(); drawSamples(); playhead=Math.min(playhead,totalDur()); layoutTrack(); render(playhead); syncBar(); window.MLNumberInputs?.refresh();
 /* ML_KEYBOARD_END:sync-numbers */
