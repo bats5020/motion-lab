@@ -20,7 +20,7 @@
     <div class="nav-label">LIBRARY</div>
     <nav id="categoryNav" aria-label="カテゴリ"></nav>
     <div class="nav-label collections-label">COLLECTIONS</div>
-    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">5</span></button>
+    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">4</span></button>
     <div class="sidebar-note"><span class="note-title">素材は、あなたの手元に。</span><p>画像・動画はサーバーに送信せず、ブラウザ内で編集します。</p><span class="note-meta" id="totalCount"></span></div>
   </aside>
   <main id="main" tabindex="-1">
@@ -258,7 +258,7 @@ const TOOLS = [
   },
   {
     cat:"motion", name:"Flame Transition",
-    desc:"サーモカラーの炎が画面を覆った瞬間に次のシーンへ切り替わるトランジション。渦・一方向・両側から、映像同士／ロゴ出し、炎だけの透過レイヤー、ロスレスMOV・MP4書き出し",
+    desc:"サーモカラーの炎が画面を覆った瞬間に次のシーンへ切り替わるトランジション。U19 渦（スティンガー）も選べる。渦・一方向・両側から、映像同士／ロゴ出し、炎だけの透過レイヤー、ロスレスMOV・MP4書き出し",
     href:"tools/flame-transition.html",
     thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ft-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9e6bff"/><stop offset=".3" stop-color="#c9f7b5"/><stop offset=".5" stop-color="#ffed4d"/><stop offset=".72" stop-color="#ff8c1a"/><stop offset="1" stop-color="#ff3312"/></linearGradient></defs><rect width="120" height="66" fill="#1a2430"/><g id="d"></g></svg>`,
     draw(svg){
@@ -289,23 +289,6 @@ const TOOLS = [
         const pl=document.createElementNS(NS,"polygon");
         pl.setAttribute("points",out.concat(inn.reverse()).map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" "));
         pl.setAttribute("fill","#02070B");pl.setAttribute("opacity",".78");g.appendChild(pl);
-      }
-    }
-  },
-  {
-    cat:"motion", name:"U19 Stinger",
-    desc:"U19 Vortex と同じ渦が外から巻き込んで画面を覆い、回転を速めて中心へ消えるスティンガー（WebGL）。覆われている区間を実測してOBSのトランジションポイントを表示、任意でロゴ、透過MOV（PNG）／MP4／PNG書き出し",
-    href:"tools/u19-stinger.html",
-    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="sg-g" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#000"/><stop offset=".35" stop-color="#2c86b4"/><stop offset=".6" stop-color="#F2EFC9"/><stop offset=".8" stop-color="#FF5A2A"/><stop offset="1" stop-color="#FFC266"/></radialGradient></defs><rect width="120" height="66" fill="#1c2733"/><g id="d"></g></svg>`,
-    draw(svg){
-      const g=svg.querySelector("#d"),NS="http://www.w3.org/2000/svg",cx=60,cy=33;
-      for(let k=0;k<3;k++){
-        const out=[],inn=[];
-        for(let r=2;r<=62;r+=2){const t=k*2.094+1.3*Math.log(r),w=1.1;
-          out.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);inn.push([cx+r*Math.cos(t+w),cy+r*Math.sin(t+w)]);}
-        const pl=document.createElementNS(NS,"polygon");
-        pl.setAttribute("points",out.concat(inn.reverse()).map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" "));
-        pl.setAttribute("fill","url(#sg-g)");g.appendChild(pl);
       }
     }
   },
@@ -424,8 +407,7 @@ const TOOL_META = {
   "U19 Tile Scroll": {cat:"motion", input:"ロゴ / 映像", output:["PNG","VIDEO"], collection:"u19", summary:"流れるロゴタイルでシーンをつなぐ。ワイプと速度をキーフレームで。"},
   "U19 HUD Sequence": {cat:"motion", input:"動画", output:["VIDEO"], collection:"u19", summary:"HUDが立ち上がり、映像ウィンドウが開く。動画を差し替えるだけ。"},
   "U19 Vortex": {cat:"texture", input:"生成", output:["PNG","VIDEO"], collection:"u19", summary:"中心へ吸い込まれる渦のループ背景。継ぎ目のないMP4を書き出す。"},
-  "U19 Stinger": {cat:"motion", input:"生成 / ロゴ", output:["PNG","VIDEO"], collection:"u19", summary:"渦が画面を覆って中心へ消えるスティンガー。透過MOVとOBSの切替点。"},
-  "Flame Transition": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"サーモカラーの炎でシーンを切り替え。透過レイヤーにも。"},
+  "Flame Transition": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"サーモカラーの炎やU19の渦でシーンを切り替え。透過レイヤーにも。"},
   "Effect Stack": {cat:"image", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"14種のエフェクトを重ねる。順序を変え、偶発的な表現を探る。"},
   "Heatmap Blur": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字をぼかし、伸ばし、熱に変える。配色と動きを編集する。"},
   "Glass Lab": {cat:"texture", input:"生成 / 画像 / 動画", output:["PNG","VIDEO"], summary:"光の球体を型板ガラス越しに歪ませる。画像・動画の加工にも。"},
