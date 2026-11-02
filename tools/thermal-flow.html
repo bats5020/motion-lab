@@ -1695,7 +1695,7 @@ function buildPresets(){
     ch.setAttribute('aria-pressed','false');ch.setAttribute('aria-label','ルック: '+p.name);
     const cv=document.createElement('canvas');cv.width=144;cv.height=180;cv.setAttribute('aria-hidden','true');
     ch.append(cv,ce('span',null,p.name));
-    ch.addEventListener('click',()=>{pushUndo();applyPreset(p,{preserveSettings:true});toast('ルック: '+p.name+'（設定は保持）')});
+    ch.addEventListener('click',()=>{pushUndo();applyPreset(p,{preserveSettings:true});toast('ルック: '+p.name+'（色と設定は保持）')});
     $(i<6?'#presets':'#extraPresets').appendChild(ch);
   });
   renderUserLuts();
@@ -1770,10 +1770,13 @@ function applyPreset(p,{preserveSettings=false}={}){
   }
   state.seed=Number.isFinite(p.seed)?p.seed>>>0:20260816;
   applyPresetField(p.field,preserveSettings);
-  if(p.stops)state.lut.stops=p.stops.map(s=>({...s}));
-  else{
-    const lp=LUT_PRESETS.find(l=>l.name===p.lut);
-    if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
+  // 編集中のルック選択は模様だけを切り替え、配色は上書きしない(色は「配色」セクションで選ぶ)。
+  if(!preserveSettings){
+    if(p.stops)state.lut.stops=p.stops.map(s=>({...s}));
+    else{
+      const lp=LUT_PRESETS.find(l=>l.name===p.lut);
+      if(lp)state.lut.stops=lp.stops.map(s=>({...s}));
+    }
   }
   if(!preserveSettings){
     Object.assign(state.motion,DEFAULT_MOTION,p.motion||{});
