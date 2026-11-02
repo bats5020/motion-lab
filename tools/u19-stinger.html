@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>U19 Stinger — MOTION LAB</title>
+<link rel="stylesheet" href="../shared/tokens.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:12px/1.5 "Noto Sans JP",system-ui,sans-serif}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 310px;height:100vh}
+  .stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 24px 40px;min-width:0}
+  .frame{position:relative;width:100%;max-width:calc((100vh - 150px) * 16 / 9);aspect-ratio:16/9;
+    background:repeating-conic-gradient(#1b1b20 0 25%,#26262c 0 50%) 0 0/24px 24px;border:1px solid var(--line)}
+  #view{width:100%;height:100%;display:block}
+  .bar{display:flex;align-items:center;gap:10px;width:100%;max-width:calc((100vh - 150px) * 16 / 9);font:11px/1 var(--font-mono);color:var(--subtext)}
+  .bar input[type=range]{flex:1;accent-color:var(--accent)}
+  .track{position:relative;width:100%;max-width:calc((100vh - 150px) * 16 / 9);height:16px;border-radius:3px;background:var(--panel2);overflow:hidden;font:10px/16px var(--font-mono);color:var(--subtext)}
+  .track i{position:absolute;top:0;bottom:0}
+  .track .cov{background:rgba(255,154,69,.28)}
+  .track .cut{width:2px;background:#ffc266}
+  .track span{position:absolute;left:6px}
+  aside{background:var(--panel);border-left:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0}
+  .head{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+  .head h1{font:700 13px/1.2 var(--font-mono);letter-spacing:.1em;margin:0}
+  .head p{margin:4px 0 0;color:var(--subtext);font-size:11px}
+  .scroll{overflow-y:auto;padding:4px 16px 20px}
+  .grp{border-top:1px solid var(--line);padding:10px 0 6px}
+  .grp:first-child{border-top:0}
+  .grp>h2{font:600 10px/1 var(--font-mono);letter-spacing:.12em;color:var(--subtext);margin:4px 0 9px}
+  .row{display:grid;grid-template-columns:104px minmax(0,1fr) 46px;gap:6px;align-items:center;margin:4px 0}
+  .row input[type=range]{width:100%;accent-color:var(--accent)}
+  .row output{text-align:right;color:var(--subtext);font:11px/1 var(--font-mono)}
+  .chk{display:flex;gap:6px;align-items:center;margin:6px 0}
+  .seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+  .btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  button,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+  button:hover:not(:disabled){border-color:var(--line-hover)}
+  button:disabled{opacity:.45;cursor:default}
+  button.on{border-color:var(--accent);background:var(--accent-soft)}
+  .pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .note{color:var(--faint);font-size:11px;margin:4px 0}
+  .info{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:11px/1.6 var(--font-mono);color:var(--text)}
+  .info b{color:#ffc266;font-weight:600}
+  .foot{border-top:1px solid var(--line);padding:12px 16px}
+  .foot .pri{width:100%;padding:9px}
+  #exportNative{display:none;margin-top:8px}
+  #exportNative.show{display:block}
+  #exStatus{color:var(--subtext);font-size:11px;min-height:1em;margin-top:6px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
+  .toast.on{opacity:1}
+  .drop{border:1px dashed var(--line-hover);border-radius:6px;padding:8px;text-align:center;color:var(--subtext);cursor:pointer}
+  .drop.has{color:var(--text);border-style:solid}
+  @media(max-width:820px){.app{grid-template-columns:1fr;height:auto}aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+<!-- ML_EXPORT_ASSETS_BEGIN -->
+<link rel="stylesheet" href="../shared/export-workbench.css">
+<script src="../shared/export-workbench.js" defer></script>
+<!-- ML_EXPORT_ASSETS_END -->
+</head>
+<body>
+<a href="../index.html" id="mlab-home" title="MOTION LAB ホームへ" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(10,10,12,.72);border:1px solid rgba(255,255,255,.16);color:#e6e6ef;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-decoration:none;opacity:.55;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">&#9670; MOTION LAB</a>
+<div class="app">
+  <main class="stage">
+    <div class="frame"><canvas id="view" width="1920" height="1080" aria-label="スティンガーのプレビュー"></canvas></div>
+    <div class="bar">
+      <button type="button" id="btnPlay" aria-label="再生・一時停止">Ⅱ</button>
+      <input type="range" id="seek" min="0" max="1" step="0.001" value="0" aria-label="再生位置">
+      <span id="time">0.00 / 3.00s</span>
+    </div>
+    <div class="track" id="track" aria-hidden="true"><i class="cov" id="trCov"></i><i class="cut" id="trCut"></i><span>覆われている区間 / 切替点</span></div>
+  </main>
+  <aside>
+    <div class="head">
+      <h1>U19 STINGER</h1>
+      <p>渦が画面を覆って中心へ消える、配信の切り替え用スティンガー。U19 Vortex と同じ渦・配色です。</p>
+    </div>
+    <div class="scroll" id="ui"></div>
+    <div class="foot">
+      <button type="button" class="pri" id="mlExport">書き出す</button>
+      <div id="exportNative">
+        <div class="btns">
+          <button type="button" id="btnMov">● 透過MOV を書き出す</button>
+          <button type="button" id="btnMp4">● MP4 を書き出す</button>
+          <button type="button" id="btnPng">PNG を保存</button>
+          <button type="button" id="btnLink">設定URLをコピー</button>
+        </div>
+      </div>
+      <div id="exStatus" role="status" aria-live="polite"></div>
+    </div>
+  </aside>
+</div>
+<input type="file" id="fileLogo" accept="image/*" hidden>
+<input type="file" id="fileA" accept="image/*" hidden>
+<input type="file" id="fileB" accept="image/*" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const W=1920,H=1080,FPS=30;
+
+/* ================= settings ================= */
+/* 初期値 = 2026-11-03 に作った3秒案（外から巻き込みで覆う → 1.0秒で切替 → 回転を速めて中心へ消える） */
+const DEF={
+  dur:3, inEnd:.85, outStart:1.4, outDur:1.5,
+  inSpin:.3, outSpin:.6, inLaps:2, edgeW:.45, rimAmt:.55, exitZoom:.85,
+  seed:12, arms:3, twist:1.1, density:.5, warp:.7, warp2:.35,
+  bg:'sample', logoOn:0, logoSize:28, logoIn:.55, logoOut:1.3
+};
+const RANGES={
+  dur:[2,5,.1], inEnd:[.3,2,.05], outStart:[.5,3.5,.05], outDur:[.4,3,.05],
+  inSpin:[-1,1,.05], outSpin:[-1.5,1.5,.05], inLaps:[0,4,1], edgeW:[0,1,.01], rimAmt:[0,1,.01], exitZoom:[0,.95,.01],
+  seed:[0,99,1], arms:[1,8,1], twist:[-3,3,.05], density:[.3,3,.05], warp:[0,2,.05], warp2:[0,2,.05],
+  logoOn:[0,1,1], logoSize:[5,80,1], logoIn:[0,4,.05], logoOut:[0,5,.05]
+};
+const clampKey=(k,v)=>{if(k==='bg')return ['sample','check','black'].includes(v)?v:DEF.bg;const r=RANGES[k];v=Number(v);return Number.isFinite(v)?Math.min(r[1],Math.max(r[0],v)):DEF[k];};
+let S={...DEF};
+try{const h=location.hash.slice(1);if(h){const o=JSON.parse(decodeURIComponent(atob(h)));for(const k in DEF)if(k in o)S[k]=clampKey(k,o[k]);}}catch(_){}
+function writeHash(){try{history.replaceState(null,'','#'+btoa(encodeURIComponent(JSON.stringify({v:1,...S}))));}catch(_){}}
+
+/* ================= LUT（U19 ミラー黒寄り / B-Spline・OKLab。U19 Vortex と同じ） ================= */
+const STOPS=[[0,'#000000'],[.05,'#000000'],[.15,'#02070B'],[.28,'#071C2A'],[.38,'#0c3a57'],[.48,'#2c86b4'],[.56,'#54B6DF'],[.65,'#F2EFC9'],[.74,'#E6A06D'],[.82,'#FF5A2A'],[.90,'#FF9A45'],[.96,'#FFC266'],[1,'#FFC266']];
+const hex=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)/255);
+const toLin=v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);
+const fromLin=v=>v<=.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-.055;
+function rgb2ok(c){const [r,g,b]=c.map(toLin);
+  const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b),s=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  return[.2104542553*l+.793617785*m-.0040720468*s,1.9779984951*l-2.428592205*m+.4505937099*s,.0259040371*l+.7827717662*m-.808675766*s];}
+function ok2rgb([L,a,b]){const l=(L+.3963377774*a+.2158037573*b)**3,m=(L-.1055613458*a-.0638541728*b)**3,s=(L-.0894841775*a-1.291485548*b)**3;
+  return[4.0767416621*l-3.3077115913*m+.2309699292*s,-1.2684380046*l+2.6097574011*m-.3413193965*s,-.0041960863*l-.7034186147*m+1.707614701*s].map(v=>Math.min(1,Math.max(0,fromLin(v))));}
+function sampleLut(t){
+  const st=STOPS;if(t<=st[0][0])return hex(st[0][1]);if(t>=st.at(-1)[0])return hex(st.at(-1)[1]);
+  let i=0;while(i<st.length-2&&t>st[i+1][0])i++;
+  const u=(t-st[i][0])/Math.max(1e-6,st[i+1][0]-st[i][0]);
+  const P=[st[Math.max(0,i-1)],st[i],st[i+1],st[Math.min(st.length-1,i+2)]].map(s=>rgb2ok(hex(s[1])));
+  return ok2rgb([0,1,2].map(k=>{const[a,b,c,d]=P.map(v=>v[k]);return((1-u)**3*a+(3*u**3-6*u*u+4)*b+(-3*u**3+3*u*u+3*u+1)*c+u**3*d)/6;}));
+}
+const LUTN=512,lutPx=new Uint8Array(LUTN*4);
+for(let i=0;i<LUTN;i++){const c=sampleLut(i/(LUTN-1));lutPx.set([...c.map(v=>Math.round(v*255)),255],i*4);}
+
+/* ================= WebGL（渦＋マスク。透過付き） ================= */
+const glc=document.createElement('canvas');glc.width=W;glc.height=H;
+const gl=glc.getContext('webgl',{preserveDrawingBuffer:true,antialias:false,alpha:true,premultipliedAlpha:true});
+const VS='attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0,1);}';
+const FS=`precision highp float;varying vec2 v;
+uniform vec2 uRes,uNorm;uniform float uPhase,uSeed,uArms,uTwist,uDens,uWarp,uWarp2,uIn,uRin,uRout,uZoom,uSpin,uEdgeW,uRimAmt;
+uniform int uOut;uniform sampler2D uLut;
+const float TAU=6.28318530718;
+vec2 hash2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7))+uSeed*17.13,dot(p,vec2(269.5,183.3))+uSeed*9.71);return -1.+2.*fract(sin(p)*43758.5453);}
+float pnoise(vec2 p,vec2 per){
+  vec2 i=floor(p),f=fract(p);vec2 u=f*f*f*(f*(f*6.-15.)+10.);
+  vec2 i00=mod(i,per),i10=mod(i+vec2(1,0),per),i01=mod(i+vec2(0,1),per),i11=mod(i+vec2(1,1),per);
+  float a=dot(hash2(i00),f),b=dot(hash2(i10),f-vec2(1,0)),c=dot(hash2(i01),f-vec2(0,1)),d=dot(hash2(i11),f-vec2(1,1));
+  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+float fbm(vec2 p,vec2 per){float s=0.,a=.5,n=0.;for(int k=0;k<2;k++){s+=a*pnoise(p,per);n+=a;p*=2.;per*=2.;a*=.4;}return s/n;}
+void main(){
+  vec2 asp=vec2(uRes.x/uRes.y,1.);
+  vec2 d=(v-.5)*asp;
+  float r0=length(d)+1e-5,r=r0/uZoom;
+  float th=atan(d.y,d.x)/TAU+uSpin;
+  float lr=log(r);
+  vec2 per=vec2(uArms,4.);
+  vec2 q=vec2((th+uTwist*lr/TAU*2.)*uArms, lr*uDens*1.6+uIn*uPhase*per.y);
+  vec2 w1=vec2(fbm(q+vec2(1.7,9.2),per),fbm(q+vec2(8.3,2.8),per));
+  vec2 w2=vec2(fbm(q+uWarp*2.*w1+vec2(3.1,5.4),per),fbm(q+uWarp*2.*w1+vec2(6.9,1.3),per));
+  float T=fbm(q+uWarp*2.*w1+uWarp2*2.*w2,per)*.5+.5;
+  if(uOut==1){gl_FragColor=vec4(T,T,T,1.);return;}
+  T=clamp((T-uNorm.x)/max(uNorm.y-uNorm.x,1e-4),0.,1.);
+  T=(T-.5)*1.15+.48;
+  float s=r0/length(asp*.5);
+  T+=(s-.5)*.6;
+  vec3 col=texture2D(uLut,vec2(clamp(T,0.,1.)*(511./512.)+.5/512.,.5)).rgb;
+  /* マスク：渦の腕に沿ったギザで、外から入って中心へ消える */
+  float e=(fbm(vec2((th+2.2*log(r0)/TAU*2.)*uArms+uSpin*2.,log(r0)*.6+3.7),per)+.6*sin(TAU*(th*uArms+1.6*log(r0))+uSpin*6.))*uEdgeW;
+  float m=smoothstep(uRin-.015,uRin+.015,s+e)*(1.-smoothstep(uRout-.015,uRout+.015,s+e));
+  float rim=(1.-smoothstep(0.,.05,abs(s+e-uRin)))+(1.-smoothstep(0.,.05,abs(s+e-uRout)));
+  col=mix(col,vec3(1.,.76,.4),clamp(rim,0.,1.)*uRimAmt*m);
+  gl_FragColor=vec4(col*m,m);
+}`;
+let U=null,fbo=null;const NW=192,NH=108;
+if(gl){
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(o));return o;};
+  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
+  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const cache={};U=n=>cache[n]||(cache[n]=gl.getUniformLocation(pr,n));
+  const ft=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,ft);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,NW,NH,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,ft,0);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  const tex=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,LUTN,1,0,gl.RGBA,gl.UNSIGNED_BYTE,lutPx);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+}else document.body.dataset.mlUnavailable='true';
+
+/* 時間 → マスク・回転・ズーム */
+const cl=x=>Math.min(1,Math.max(0,x)),easeOut=x=>1-(1-x)**2.5,easeIn=x=>x**1.2;
+function anim(t){
+  const pin=easeOut(cl(t/S.inEnd)),pout=easeIn(cl((t-S.outStart)/S.outDur));
+  return {phase:t/S.dur,rin:1.75-pin*2.45,rout:1.55-pout*2.15,zoom:1-pout*S.exitZoom,spin:-S.inSpin*(1-pin)+.1*t+S.outSpin*pout*pout};
+}
+function draw(t,w,h,out,norm){
+  const a=anim(t),f=(n,x)=>gl.uniform1f(U(n),x);
+  gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.uniform2f(U('uRes'),W,H);gl.uniform1i(U('uOut'),out);gl.uniform2f(U('uNorm'),norm[0],norm[1]);
+  f('uPhase',out?t:a.phase);f('uSeed',S.seed);f('uArms',Math.round(S.arms));f('uTwist',S.twist);f('uDens',S.density);f('uWarp',S.warp);f('uWarp2',S.warp2);
+  f('uIn',Math.round(S.inLaps));f('uRin',out?-9:a.rin);f('uRout',out?9:a.rout);f('uZoom',out?1:a.zoom);f('uSpin',out?0:a.spin);f('uEdgeW',S.edgeW);f('uRimAmt',S.rimAmt);
+  gl.uniform1i(U('uLut'),0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+}
+/* フルレンジ（形が変わったときだけ測る） */
+let NORM=[0,1],normKey='';
+function measure(){
+  const key=JSON.stringify([S.seed,S.arms,S.twist,S.density,S.warp,S.warp2]);if(key===normKey)return;normKey=key;
+  const px=new Uint8Array(NW*NH*4),vals=new Uint8Array(NW*NH*4);let n=0;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  for(const ph of [0,.25,.5,.75]){draw(ph,NW,NH,1,[0,1]);gl.readPixels(0,0,NW,NH,gl.RGBA,gl.UNSIGNED_BYTE,px);for(let i=0;i<px.length;i+=4)vals[n++]=px[i];}
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);vals.sort();NORM=[vals[Math.floor(n*.01)]/255,vals[Math.floor(n*.99)]/255];
+}
+/* 画面が完全に覆われている区間を実測 → 切替点（OBS のトランジションポイント） */
+let COVER={from:null,to:null,cut:null},coverKey='';
+function measureCover(){
+  const key=JSON.stringify([S.dur,S.inEnd,S.outStart,S.outDur,S.inSpin,S.outSpin,S.edgeW,S.exitZoom,S.seed,S.arms,S.twist]);if(key===coverKey)return;coverKey=key;
+  measure();const px=new Uint8Array(NW*NH*4),full=[];
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  const N=Math.round(S.dur*FPS);
+  for(let i=0;i<N;i++){draw(i/FPS,NW,NH,0,NORM);gl.readPixels(0,0,NW,NH,gl.RGBA,gl.UNSIGNED_BYTE,px);let ok=true;for(let k=3;k<px.length;k+=4)if(px[k]<250){ok=false;break;}full.push(ok);}
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  let best=null,cur=null;full.forEach((ok,i)=>{if(ok){if(!cur)cur={a:i,b:i};cur.b=i;if(!best||cur.b-cur.a>best.b-best.a)best={...cur};}else cur=null;});
+  COVER=best?{from:best.a/FPS,to:best.b/FPS,cut:Math.round((best.a+best.b)/2)/FPS}:{from:null,to:null,cut:null};
+  updateInfo();
+}
+
+/* ================= 背景（プレビュー・MP4用）とロゴ ================= */
+const view=$('#view'),vx=view.getContext('2d');
+const imgs={A:null,B:null,logo:null};
+function sampleScene(ctx,key){
+  const g=ctx.createLinearGradient(0,0,0,H);
+  if(key==='A'){g.addColorStop(0,'#1c2733');g.addColorStop(1,'#0b1016');}else{g.addColorStop(0,'#3a1d4a');g.addColorStop(1,'#120a18');}
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=key==='A'?'rgba(84,182,223,.25)':'rgba(255,154,69,.22)';ctx.lineWidth=2;
+  for(let x=0;x<=W;x+=120){ctx.beginPath();ctx.moveTo(x,H*.62);ctx.lineTo(W/2+(x-W/2)*3,H);ctx.stroke();}
+  for(let y=H*.62;y<=H;y+=(y-H*.6)*.5+8){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='700 56px ui-monospace,Menlo,monospace';ctx.fillText(key==='A'?'SCENE A':'SCENE B',80,120);
+  ctx.font='400 26px ui-monospace,Menlo,monospace';ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillText(key==='A'?'MATCH · MAP 2':'BREAK · 配信再開まで',80,165);
+}
+const scA=document.createElement('canvas'),scB=document.createElement('canvas');
+[scA,scB].forEach(c=>{c.width=W;c.height=H;});
+function rebuildScenes(){
+  for(const [key,c] of [['A',scA],['B',scB]]){const x=c.getContext('2d');x.clearRect(0,0,W,H);
+    if(imgs[key]){const im=imgs[key],s=Math.max(W/im.width,H/im.height);x.drawImage(im,(W-im.width*s)/2,(H-im.height*s)/2,im.width*s,im.height*s);}else sampleScene(x,key);}
+}
+rebuildScenes();
+function logoAlpha(t){if(!S.logoOn||!imgs.logo)return 0;const f=.12;return cl((t-S.logoIn)/f)*cl((S.logoOut-t)/f);}
+/* 1コマを view に合成。bg: 'none'=透過 / 'sample' / 'black' */
+function compose(t,bg){
+  if(!gl)return;
+  draw(t,W,H,0,NORM);
+  vx.clearRect(0,0,W,H);
+  if(bg==='black'){vx.fillStyle='#000';vx.fillRect(0,0,W,H);}
+  else if(bg==='sample'){const cut=COVER.cut??S.inEnd;vx.drawImage(t<cut?scA:scB,0,0);}
+  vx.drawImage(glc,0,0);
+  const la=logoAlpha(t);
+  if(la>0){const im=imgs.logo,h=H*S.logoSize/100,w=im.width*h/im.height,k=1+.04*(t-S.logoIn);
+    vx.save();vx.globalAlpha=la;vx.translate(W/2,H/2);vx.scale(k,k);vx.drawImage(im,-w/2,-h/2,w,h);vx.restore();}
+}
+
+/* ================= playback ================= */
+const EX={on:false,stop:false};
+let t=0,playing=true,last=performance.now();const HOLD=.6;
+const btnPlay=$('#btnPlay'),seek=$('#seek'),timeEl=$('#time');
+function setPlaying(v){playing=v;btnPlay.textContent=v?'Ⅱ':'▶';last=performance.now();}
+btnPlay.onclick=()=>setPlaying(!playing);
+seek.oninput=()=>{setPlaying(false);t=+seek.value*S.dur;};
+document.addEventListener('keydown',e=>{if(e.code!=='Space'||e.target.closest('input,select,textarea,button,dialog'))return;e.preventDefault();setPlaying(!playing);});
+function tick(now){
+  if(!EX.on&&gl){
+    if(playing){t+=(now-last)/1000;if(t>S.dur+HOLD)t=0;}
+    last=now;measureCover();
+    const tt=Math.min(t,S.dur);compose(tt,S.bg==='check'?'none':S.bg);
+    seek.value=String(tt/S.dur);timeEl.textContent=`${tt.toFixed(2)} / ${S.dur.toFixed(2)}s`;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ================= panel ================= */
+const ui=$('#ui'),ctrls=[];
+function grp(title){const g=document.createElement('div');g.className='grp';const h=document.createElement('h2');h.textContent=title;g.append(h);ui.append(g);return g;}
+function rng(g,key,label,fmt){
+  const [min,max,step]=RANGES[key];
+  const r=document.createElement('div');r.className='row';
+  const id='r_'+key,l=document.createElement('label');l.textContent=label;l.htmlFor=id;
+  const i=document.createElement('input');i.type='range';i.id=id;i.min=min;i.max=max;i.step=step;
+  const o=document.createElement('output');
+  const sync=()=>{i.value=S[key];o.textContent=fmt?fmt(S[key]):(step<1?(+S[key]).toFixed(2):String(Math.round(S[key])));};sync();
+  i.oninput=()=>{if(EX.on){sync();return;}S[key]=clampKey(key,i.value);sync();writeHash();};
+  r.append(l,i,o);g.append(r);ctrls.push(sync);
+}
+const sec=v=>(+v).toFixed(2)+'s';
+function note(g,text){const p=document.createElement('p');p.className='note';p.textContent=text;g.append(p);}
+function syncAll(){ctrls.forEach(f=>f());writeHash();}
+
+let g=grp('切替点（OBS）');
+const info=document.createElement('div');info.className='info';g.append(info);
+note(g,'OBS のスティンガーの「トランジションポイント」にこの値を入れると、画面が渦で覆われている間に切り替わります。');
+function updateInfo(){
+  const tr=$('#trCov'),cu=$('#trCut');
+  if(COVER.cut==null){info.innerHTML='<b>画面が覆いきれていません</b><br>入りを短く、抜けの開始を遅くしてください';tr.style.width='0';cu.style.display='none';return;}
+  info.innerHTML=`トランジションポイント <b>${Math.round(COVER.cut*1000)} ms</b><br>覆われている区間 ${COVER.from.toFixed(2)}〜${COVER.to.toFixed(2)} 秒`;
+  tr.style.left=(COVER.from/S.dur*100)+'%';tr.style.width=((COVER.to-COVER.from)/S.dur*100)+'%';
+  cu.style.display='';cu.style.left=(COVER.cut/S.dur*100)+'%';
+}
+
+g=grp('タイミング');
+rng(g,'dur','全体の長さ',sec);rng(g,'inEnd','覆うまで',sec);rng(g,'outStart','抜け始め',sec);rng(g,'outDur','抜けの長さ',sec);
+
+g=grp('動き');
+rng(g,'inSpin','入りの回転');rng(g,'outSpin','抜けの回転');rng(g,'exitZoom','抜けの縮み');rng(g,'inLaps','吸い込み回数');
+rng(g,'edgeW','縁のギザ');rng(g,'rimAmt','縁の光');
+note(g,'回転をマイナスにすると逆回り。縁のギザ 0 で丸い縁になります。');
+
+g=grp('渦のかたち');
+rng(g,'arms','腕の数');rng(g,'twist','巻きの強さ');rng(g,'density','模様の細かさ');rng(g,'warp','うねり');rng(g,'warp2','うねり（二段目）');rng(g,'seed','シード');
+const sb=document.createElement('div');sb.className='btns';
+const shuf=document.createElement('button');shuf.type='button';shuf.textContent='⚄ シャッフル';shuf.onclick=()=>{if(EX.on)return;S.seed=Math.floor(Math.random()*100);syncAll();};
+sb.append(shuf);g.append(sb);
+
+g=grp('ロゴ（任意）');
+const dl=document.createElement('div');dl.className='drop';dl.textContent='クリックかドロップでロゴ画像（透過PNG / SVG）';g.append(dl);
+const lchk=document.createElement('label');lchk.className='chk';const lc=document.createElement('input');lc.type='checkbox';
+lc.onchange=()=>{S.logoOn=lc.checked?1:0;writeHash();};ctrls.push(()=>{lc.checked=!!S.logoOn;});lc.checked=!!S.logoOn;
+lchk.append(lc,'渦で覆われている間にロゴを出す');g.append(lchk);
+rng(g,'logoSize','高さ %',v=>Math.round(v)+'%');rng(g,'logoIn','出る',sec);rng(g,'logoOut','消える',sec);
+note(g,'ロゴは設定URLには入りません。開き直したら読み込み直してください。');
+
+g=grp('プレビュー背景');
+const seg=document.createElement('div');seg.className='seg';
+[['sample','サンプル映像 A→B'],['check','透過（チェッカー）'],['black','黒']].forEach(([v,label])=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.v=v;
+  b.onclick=()=>{S.bg=v;syncAll();};seg.append(b);});
+ctrls.push(()=>seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.bg)));g.append(seg);
+const ab=document.createElement('div');ab.className='btns';
+for(const key of ['A','B']){const b=document.createElement('button');b.type='button';b.textContent=`${key} を画像に差し替え`;b.onclick=()=>$('#file'+key).click();ab.append(b);}
+const abr=document.createElement('button');abr.type='button';abr.textContent='サンプルに戻す';abr.onclick=()=>{imgs.A=imgs.B=null;rebuildScenes();};ab.append(abr);g.append(ab);
+note(g,'透過MOV は背景なし。MP4 はここで選んだ背景（チェッカーのときは黒）と合成して書き出します。');
+
+g=grp('');
+const rb=document.createElement('div');rb.className='btns';
+const reset=document.createElement('button');reset.type='button';reset.textContent='初期値に戻す';reset.onclick=()=>{if(EX.on)return;S={...DEF};syncAll();};
+rb.append(reset);g.append(rb);
+syncAll();
+
+function loadImage(file){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(Error('画像を読み込めませんでした'));im.src=URL.createObjectURL(file);});}
+async function setImg(key,file){if(!file)return;try{imgs[key]=await loadImage(file);if(key==='logo'){S.logoOn=1;dl.textContent=file.name;dl.classList.add('has');syncAll();}else rebuildScenes();}catch(e){toast(e.message);}}
+$('#fileLogo').onchange=e=>setImg('logo',e.target.files[0]);
+$('#fileA').onchange=e=>setImg('A',e.target.files[0]);
+$('#fileB').onchange=e=>setImg('B',e.target.files[0]);
+dl.onclick=()=>$('#fileLogo').click();
+dl.addEventListener('dragover',e=>e.preventDefault());dl.addEventListener('drop',e=>{e.preventDefault();setImg('logo',e.dataTransfer.files[0]);});
+
+/* ================= export ================= */
+const toastEl=$('#toast');let toastT=0;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),2600);}
+const status=$('#exStatus');
+const stamp=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;};
+async function saveFile(blob,name){
+  if(window.claude&&window.claude.use){
+    try{const dlns=await window.claude.use('downloads');if(dlns){await dlns.save({filename:name,data:blob});toast(name+' を保存しました');return;}}
+    catch(e){if(e&&e.code==='declined')return;toast('保存できませんでした（'+((e&&e.code)||e)+'）');return;}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast(name+' を保存しました');
+}
+const enc=new TextEncoder();
+function joinBytes(...parts){const arrays=parts.map(p=>typeof p==='string'?enc.encode(p):p),out=new Uint8Array(arrays.reduce((n,a)=>n+a.length,0));let i=0;for(const a of arrays){out.set(a,i);i+=a.length;}return out;}
+function be32(...v){const out=new Uint8Array(v.length*4),dv=new DataView(out.buffer);v.forEach((n,i)=>dv.setUint32(i*4,n));return out;}
+function be16(...v){const out=new Uint8Array(v.length*2),dv=new DataView(out.buffer);v.forEach((n,i)=>dv.setUint16(i*2,n));return out;}
+function atom(type,...parts){const data=joinBytes(...parts);return joinBytes(be32(data.length+8),type,data);}
+/* ロスレスMOV（PNG・透過付き）— Flame Transition / Thermal Flow と同じ書き出し方式 */
+function makeLosslessMov(frames,w,h,fps){
+  const count=frames.length,matrix=be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000),ftyp=atom('ftyp','qt  ',be32(0),'qt  '),mdatSize=frames.reduce((n,f)=>n+f.length,8);
+  const mvhd=atom('mvhd',be32(0,0,0,fps,count,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2));
+  const tkhd=atom('tkhd',be32(7,0,0,1,0,count),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536));
+  const mdhd=atom('mdhd',be32(0,0,0,fps,count),be16(0,0));
+  const hdlr=atom('hdlr',be32(0),'mhlr','vide',new Uint8Array(12),new Uint8Array([12]),'VideoHandler');
+  const vmhd=atom('vmhd',be32(1),be16(0,0,0,0));
+  const dinf=atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1))));
+  const compressor=new Uint8Array(32);compressor[0]=3;compressor.set(enc.encode('PNG'),1);
+  const sample=atom('png ',new Uint8Array(6),be16(1,0,0),be32(0,0,0),be16(w,h),be32(72*65536,72*65536,0),be16(1),compressor,be16(32,65535));
+  const stbl=atom('stbl',atom('stsd',be32(0,1),sample),atom('stts',be32(0,1,count,1)),atom('stsc',be32(0,1,1,count,1)),atom('stsz',be32(0,0,count),be32(...frames.map(f=>f.length))),atom('stco',be32(0,1,ftyp.length+8)));
+  const moov=atom('moov',mvhd,atom('trak',tkhd,atom('mdia',mdhd,hdlr,atom('minf',vmhd,dinf,stbl))));
+  return new Blob([ftyp,be32(mdatSize),enc.encode('mdat'),...frames,moov],{type:'video/quicktime'});
+}
+/* MP4（H.264・WebCodecs） — U19 Vortex と同じ */
+async function pickMp4Config(w,h,fps){
+  if(!('VideoEncoder' in window))return null;
+  const bitrate=Math.round(Math.min(120e6,Math.max(16e6,w*h*fps*.6)));
+  for(const codec of ['avc1.640028','avc1.4d0028','avc1.42e028']){
+    const cfg={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
+    try{const r=await VideoEncoder.isConfigSupported(cfg);if(r.supported)return cfg;}catch(_){}
+  }
+  return null;
+}
+function makeMp4(samples,desc,w,h,fps){
+  const N=samples.length,matrix=be32(0x10000,0,0,0,0x10000,0,0,0,0x40000000);
+  const ftyp=atom('ftyp','isom',be32(512),'isom','iso2','avc1','mp41');
+  const pts=samples.map(s=>Math.round(s.ts*fps/1e6)),D=Math.max(0,...samples.map((s,i)=>i-pts[i]));
+  const reorder=pts.some((p,i)=>p!==i);
+  const build=off=>{
+    const avc1=atom('avc1',new Uint8Array(6),be16(1),be16(0,0),be32(0,0,0),be16(w,h),be32(0x00480000,0x00480000,0),be16(1),new Uint8Array(32),be16(0x18,0xffff),atom('avcC',desc),atom('colr','nclx',be16(1,1,1),new Uint8Array([0])));
+    const keys=[];samples.forEach((s,i)=>{if(s.key)keys.push(i+1);});
+    const parts=[atom('stsd',be32(0,1),avc1),atom('stts',be32(0,1,N,1))];
+    if(reorder)parts.push(atom('ctts',be32(0,N),...samples.map((s,i)=>be32(1,pts[i]-i+D))));
+    parts.push(atom('stss',be32(0,keys.length),be32(...keys)),atom('stsc',be32(0,1,1,N,1)),atom('stsz',be32(0,0,N),be32(...samples.map(s=>s.data.length))),atom('stco',be32(0,1,off)));
+    const stbl=atom('stbl',...parts);
+    const mdia=atom('mdia',atom('mdhd',be32(0,0,0,fps,N),be16(0x55c4,0)),atom('hdlr',be32(0,0),'vide',new Uint8Array(12),'VideoHandler\0'),atom('minf',atom('vmhd',be32(1),be16(0,0,0,0)),atom('dinf',atom('dref',be32(0,1),atom('url ',be32(1)))),stbl));
+    const edts=reorder?atom('edts',atom('elst',be32(0,1,N,D,0x10000))):new Uint8Array(0);
+    const trak=atom('trak',atom('tkhd',be32(3,0,0,1,0,N),new Uint8Array(8),be16(0,0,0,0),matrix,be32(w*65536,h*65536)),edts,mdia);
+    return atom('moov',atom('mvhd',be32(0,0,0,fps,N,0x10000),be16(0x100),new Uint8Array(10),matrix,new Uint8Array(24),be32(2)),trak);
+  };
+  const mdatSize=samples.reduce((n,s)=>n+s.data.length,8);
+  const moov0=build(0),moov=build(ftyp.length+moov0.length+8);
+  return new Blob([ftyp,moov,be32(mdatSize),enc.encode('mdat'),...samples.map(s=>s.data)],{type:'video/mp4'});
+}
+const viewPNG=()=>new Promise((res,rej)=>view.toBlob(b=>b?res(b):rej(Error('PNGに変換できませんでした')),'image/png'));
+const btnMov=$('#btnMov'),btnMp4=$('#btnMp4'),btnPng=$('#btnPng'),btnLink=$('#btnLink');
+const LABEL={mov:'● 透過MOV を書き出す',mp4:'● MP4 を書き出す'};
+function begin(btn){EX.on=true;EX.stop=false;btn.textContent='■ 準備中（中止）';measureCover();}
+function end(btn,key){EX.on=false;EX.stop=false;btn.textContent=LABEL[key];status.textContent='';last=performance.now();}
+async function exportMov(){
+  if(EX.on){EX.stop=true;return;}
+  if(!gl){toast('WebGL が使えないため書き出せません');return;}
+  begin(btnMov);
+  try{
+    const N=Math.round(S.dur*FPS),frames=[];let bytes=0;
+    for(let i=0;i<N;i++){
+      if(EX.stop)break;
+      compose(i/FPS,'none');const data=new Uint8Array(await (await viewPNG()).arrayBuffer());frames.push(data);bytes+=data.length;
+      btnMov.textContent=`■ 中止 ${i+1}/${N}`;status.textContent=`書き出し中 ${Math.round((i+1)/N*100)}%（${(bytes/1048576).toFixed(0)}MB）`;
+      await new Promise(r=>setTimeout(r,0));
+    }
+    if(EX.stop){toast('書き出しを中止しました');return;}
+    const cut=COVER.cut!=null?`_cut${Math.round(COVER.cut*1000)}ms`:'';
+    await saveFile(makeLosslessMov(frames,W,H,FPS),`u19-stinger-${stamp()}${cut}_${FPS}fps.mov`);
+  }catch(err){toast('書き出しに失敗しました：'+((err&&err.message)||err));}
+  finally{end(btnMov,'mov');}
+}
+async function exportMp4(){
+  if(EX.on){EX.stop=true;return;}
+  if(!gl){toast('WebGL が使えないため書き出せません');return;}
+  begin(btnMp4);let encoder=null;
+  try{
+    const cfg=await pickMp4Config(W,H,FPS);
+    if(!cfg)throw Error('このブラウザは MP4（WebCodecs）に対応していません。Chrome / Edge を使うか、透過MOV を書き出してください');
+    const N=Math.round(S.dur*FPS),samples=[];let desc=null,encErr=null;
+    encoder=new VideoEncoder({output:(chunk,meta)=>{if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description)desc=new Uint8Array(meta.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==='key',ts:chunk.timestamp});},error:e=>{encErr=e;}});
+    encoder.configure(cfg);
+    const bg=S.bg==='sample'?'sample':'black';
+    for(let i=0;i<N;i++){
+      if(EX.stop)break;if(encErr)throw encErr;
+      compose(i/FPS,bg);
+      /* 合成済みのピクセルを直接読んでコマにする（キャンバスのスナップショットによるコマ重複を防ぐ） */
+      const px=vx.getImageData(0,0,W,H).data;
+      const frame=new VideoFrame(px,{format:'RGBA',codedWidth:W,codedHeight:H,timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+      try{encoder.encode(frame,{keyFrame:i%(FPS*2)===0});}finally{frame.close();}
+      while(encoder.encodeQueueSize>6&&!EX.stop&&!encErr)await new Promise(r=>setTimeout(r,2));
+      btnMp4.textContent=`■ 中止 ${i+1}/${N}`;status.textContent=`書き出し中 ${Math.round((i+1)/N*100)}%`;
+      if(i%2===0)await new Promise(r=>setTimeout(r,0));
+    }
+    await encoder.flush();if(encErr)throw encErr;
+    if(EX.stop){toast('書き出しを中止しました');return;}
+    if(!desc||!samples.length)throw Error('MP4 のエンコード結果が空でした');
+    await saveFile(makeMp4(samples,desc,W,H,FPS),`u19-stinger-${stamp()}_${bg}_${FPS}fps.mp4`);
+  }catch(err){toast('書き出しに失敗しました：'+((err&&err.message)||err));}
+  finally{try{if(encoder&&encoder.state!=='closed')encoder.close();}catch(_){}end(btnMp4,'mp4');}
+}
+btnMov.addEventListener('click',exportMov);
+btnMp4.addEventListener('click',exportMp4);
+btnPng.addEventListener('click',()=>{if(!gl||EX.on)return;compose(Math.min(t,S.dur),'none');viewPNG().then(b=>saveFile(b,`u19-stinger-${stamp()}.png`));});
+btnLink.addEventListener('click',async()=>{writeHash();try{await navigator.clipboard.writeText(location.href);toast('設定URLをコピーしました');}catch(_){toast('コピーできませんでした。アドレスバーのURLをそのまま使えます');}});
+
+const okGL=()=>gl?{ok:true}:{ok:false,reason:'WebGL が利用できないため書き出せません。'};
+function setupExport(){
+  const X=window.MLExportUI;
+  if(!X){$('#mlExport').addEventListener('click',()=>$('#exportNative').classList.toggle('show'));return;}
+  X.register({
+    id:'u19-stinger',title:'U19 Stinger',trigger:'#mlExport',busy:()=>EX.on,status:['#exStatus'],cancel:()=>{if(EX.on)EX.stop=true;},
+    formats:[
+      {id:'mov',label:'透過MOV（PNG・ロスレス）',button:'#btnMov',available:okGL,note:'OBS のスティンガー・AE・Premiere 用。背景なし（透過）で、ロゴも含めて書き出します。3秒で数十MBになります。'},
+      {id:'mp4',label:'MP4（背景と合成）',button:'#btnMp4',available:()=>!gl?okGL():('VideoEncoder' in window)?{ok:true}:{ok:false,reason:'このブラウザは WebCodecs に対応していません。Chrome / Edge を使ってください。'},note:'確認・共有用。プレビュー背景（サンプル A→B、チェッカーのときは黒）と合成します。'},
+      {id:'png',label:'PNG（現在のコマ・透過）',button:'#btnPng',available:okGL}
+    ],
+    fields:{
+      size:(f,ui)=>ui.readout('出力サイズ','1920 × 1080 px · 固定'),
+      alpha:(f,ui)=>ui.readout('透過',f.id==='mp4'?'なし（背景と合成）':'あり'),
+      fps:(f,ui)=>f.id==='png'?null:ui.readout('FPS','30 fps · 固定'),
+      extra:(f,ui)=>f.id==='png'?[]:[ui.readout('長さ',()=>`${S.dur.toFixed(1)} 秒（${Math.round(S.dur*FPS)} コマ）`),ui.readout('トランジションポイント',()=>COVER.cut!=null?`${Math.round(COVER.cut*1000)} ms`:'覆いきれていません','OBS のスティンガー設定に入れる値です。')]
+    },
+    actions:[{label:'設定URLをコピー',button:'#btnLink'}]
+  });
+}
+if(document.readyState==='complete')setupExport();else window.addEventListener('load',setupExport);
+if(gl){measureCover();requestAnimationFrame(tick);}
+window.U19Stinger={get state(){return {...S};},get cover(){return {...COVER};},compose,DEF};
+})();
+</script>
+</body>
+</html>

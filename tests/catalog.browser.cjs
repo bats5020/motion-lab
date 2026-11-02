@@ -22,10 +22,10 @@ const server = http.createServer((req, res) => {
     const page = await browser.newPage({viewport:{width:1440,height:1000}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(url);
-    assert.equal(await page.locator('.card').count(),22);
+    assert.equal(await page.locator('.card').count(),23);
     assert.equal(await page.locator('.category-section').count(),5);
     const paths=await page.locator('.card').evaluateAll(cards=>cards.map(a=>new URL(a.href).pathname));
-    assert.equal(new Set(paths).size,20);
+    assert.equal(new Set(paths).size,21);
     paths.forEach(file=>assert.ok(fs.existsSync(path.join(root,file.endsWith('/')?file+'index.html':file)),file));
     assert.equal(await page.locator('a[target=_blank]').count(),0);
     assert.equal(await page.locator('a[href="tools/heatmap-blur.html?workspace=type"]').count(),1);
@@ -33,8 +33,8 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('a[href="tools/halftone-lab.html?workspace=image"]').count(),1);
     assert.equal(await page.locator('a[href="tools/halftone-lab.html?workspace=generate"]').count(),1);
     await page.screenshot({path:path.join(output,'catalog-desktop.png'),fullPage:true});
-    console.log('PASS: 22 entries, 20 original tools, 5 categories, 4 split-workspace links');
-    const counts={image:6,texture:6,type:4,motion:4,'3d':2};
+    console.log('PASS: 23 entries, 21 original tools, 5 categories, 4 split-workspace links');
+    const counts={image:6,texture:6,type:4,motion:5,'3d':2};
     for(const [category,count] of Object.entries(counts)){
       await page.locator(`[data-category="${category}"]`).click();
       assert.equal(await page.locator('.card').count(),count);
@@ -42,17 +42,17 @@ const server = http.createServer((req, res) => {
     }
     await page.goBack();
     assert.equal(await page.locator('[data-category=motion]').getAttribute('aria-pressed'),'true');
-    assert.equal(await page.locator('.card').count(),4);
+    assert.equal(await page.locator('.card').count(),5);
     await page.goForward();assert.equal(await page.locator('.card').count(),2);
     console.log('PASS: category filters and Back/Forward state restoration');
     await page.locator('#u19Filter').click();
-    assert.equal(await page.locator('.card').count(),4);
-    await page.locator('#u19Filter').click();assert.equal(await page.locator('.card').count(),22);
+    assert.equal(await page.locator('.card').count(),5);
+    await page.locator('#u19Filter').click();assert.equal(await page.locator('.card').count(),23);
     await page.locator('#search').fill('heatmap');assert.equal(await page.locator('.card').count(),2);
     await page.locator('#search').fill('heatmap 動画');assert.equal(await page.locator('.card').count(),1);
     await page.reload();assert.equal(await page.locator('.card').count(),1);
     await page.locator('#search').fill('no-result-123');assert.equal(await page.locator('#emptyState').isVisible(),true);
-    await page.locator('#clearFilters').click();assert.equal(await page.locator('.card').count(),22);
+    await page.locator('#clearFilters').click();assert.equal(await page.locator('.card').count(),23);
     assert.equal(await page.locator('#search').evaluate(e=>e===document.activeElement),true);
     await page.locator('#outputFilter').selectOption('SVG');
     assert.equal(await page.locator('.card').count(),5);
@@ -66,7 +66,7 @@ const server = http.createServer((req, res) => {
       await page.setViewportSize({width,height:844});
       await page.goto(url);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${width}px overflow`);
-      await page.locator('#u19Filter').click();assert.equal(await page.locator('.card').count(),4);
+      await page.locator('#u19Filter').click();assert.equal(await page.locator('.card').count(),5);
       await page.locator('#u19Filter').click();
       await page.screenshot({path:path.join(output,`catalog-mobile-${width}.png`),fullPage:true});
     }
