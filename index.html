@@ -20,7 +20,7 @@
     <div class="nav-label">LIBRARY</div>
     <nav id="categoryNav" aria-label="カテゴリ"></nav>
     <div class="nav-label collections-label">COLLECTIONS</div>
-    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">3</span></button>
+    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">4</span></button>
     <div class="sidebar-note"><span class="note-title">素材は、あなたの手元に。</span><p>画像・動画はサーバーに送信せず、ブラウザ内で編集します。</p><span class="note-meta" id="totalCount"></span></div>
   </aside>
   <main id="main" tabindex="-1">
@@ -276,6 +276,23 @@ const TOOLS = [
     }
   },
   {
+    cat:"raster", name:"U19 Vortex",
+    desc:"中心へ吸い込まれていく渦のループ背景（WebGL）。U19ミラー黒寄りのサーモ配色、腕の数・巻き・うねり・中心の穴、蓋絵の座布団プレビュー。1920×1080・30fpsのMP4をコマ送りで継ぎ目なく書き出し",
+    href:"tools/u19-vortex.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="vx-g" cx=".5" cy=".5" r=".75"><stop offset="0" stop-color="#000"/><stop offset=".3" stop-color="#0c3a57"/><stop offset=".55" stop-color="#54B6DF"/><stop offset=".72" stop-color="#F2EFC9"/><stop offset=".86" stop-color="#FF5A2A"/><stop offset="1" stop-color="#FFC266"/></radialGradient></defs><rect width="120" height="66" fill="url(#vx-g)"/><g id="d"></g></svg>`,
+    draw(svg){
+      const g=svg.querySelector("#d"),NS="http://www.w3.org/2000/svg",cx=60,cy=33;
+      for(let k=0;k<3;k++){
+        const out=[],inn=[];
+        for(let r=3;r<=80;r+=2){const t=k*2.094+1.1*Math.log(r),w=0.55;
+          out.push([cx+r*Math.cos(t),cy+r*Math.sin(t)]);inn.push([cx+r*Math.cos(t+w),cy+r*Math.sin(t+w)]);}
+        const pl=document.createElementNS(NS,"polygon");
+        pl.setAttribute("points",out.concat(inn.reverse()).map(p=>p.map(v=>v.toFixed(1)).join(",")).join(" "));
+        pl.setAttribute("fill","#02070B");pl.setAttribute("opacity",".78");g.appendChild(pl);
+      }
+    }
+  },
+  {
     cat:"raster", name:"Effect Stack",
     desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応、ランダマイズ＋スタック刻印＋WebM録画",
     href:"tools/effect-stack.html",
@@ -389,6 +406,7 @@ const TOOL_META = {
   "U19 Aberration": {cat:"type", input:"テキスト / ロゴ", output:["PNG","VIDEO"], collection:"u19", summary:"文字やロゴの輪郭をサーモカラーで発光。背景と合成する。"},
   "U19 Tile Scroll": {cat:"motion", input:"ロゴ / 映像", output:["PNG","VIDEO"], collection:"u19", summary:"流れるロゴタイルでシーンをつなぐ。ワイプと速度をキーフレームで。"},
   "U19 HUD Sequence": {cat:"motion", input:"動画", output:["VIDEO"], collection:"u19", summary:"HUDが立ち上がり、映像ウィンドウが開く。動画を差し替えるだけ。"},
+  "U19 Vortex": {cat:"texture", input:"生成", output:["PNG","VIDEO"], collection:"u19", summary:"中心へ吸い込まれる渦のループ背景。継ぎ目のないMP4を書き出す。"},
   "Flame Transition": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"サーモカラーの炎でシーンを切り替え。透過レイヤーにも。"},
   "Effect Stack": {cat:"image", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"14種のエフェクトを重ねる。順序を変え、偶発的な表現を探る。"},
   "Heatmap Blur": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字をぼかし、伸ばし、熱に変える。配色と動きを編集する。"},
