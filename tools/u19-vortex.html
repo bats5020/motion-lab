@@ -106,7 +106,7 @@ const $=s=>document.querySelector(s);
 const DEF={
   seed:12, arms:3, twist:1.1, density:0.5, warp:0.7, warp2:0.35, octaves:2, detail:0.4,
   inLaps:1, rotLaps:0, loopSec:15, cx:50, cy:50, hole:0.04, holeSoft:0.3, edge:1.0,
-  gamma:1.0, contrast:1.15, offset:-0.02, grain:0.02
+  gamma:1.0, contrast:1.15, offset:-0.02, grain:0.02, grainMove:0
 };
 const PRESETS=[
   ['標準',{}],
@@ -118,7 +118,7 @@ const RANGES={
   seed:[0,99,1],arms:[1,8,1],twist:[-3,3,.05],density:[.3,3,.05],warp:[0,2,.05],warp2:[0,2,.05],octaves:[1,6,1],detail:[.2,.8,.01],
   cx:[0,100,.5],cy:[0,100,.5],hole:[0,.4,.005],holeSoft:[.01,.8,.01],edge:[-1,1.5,.01],
   gamma:[.4,2.5,.01],contrast:[.4,3,.01],offset:[-.6,.6,.01],grain:[0,.15,.005],
-  loopSec:[2,30,1],inLaps:[-4,4,1],rotLaps:[-3,3,1]
+  loopSec:[2,30,1],inLaps:[-4,4,1],rotLaps:[-3,3,1],grainMove:[0,1,1]
 };
 const clampKey=(k,v)=>{const r=RANGES[k];v=Number(v);if(!Number.isFinite(v))return DEF[k];return Math.min(r[1],Math.max(r[0],v));};
 let S={...DEF};
@@ -151,9 +151,10 @@ for(let i=0;i<LUTN;i++){const c=sampleLut(i/(LUTN-1));lutPx.set([...c.map(v=>Mat
 /* ================= WebGL ================= */
 const cv=$('#cv'),W=1920,H=1080,FPS=30;
 const gl=cv.getContext('webgl',{preserveDrawingBuffer:true,antialias:false});
-const VS='attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0,1);}';
+/* uFlip=-1 は書き出し用：readPixels の行順（下→上）をそのまま動画の上→下にするため上下反転して描く */
+const VS='attribute vec2 p;uniform float uFlip;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p.x,p.y*uFlip,0,1);}';
 const FS=`precision highp float;varying vec2 v;
-uniform vec2 uRes,uC,uNorm;uniform float uPhase,uSeed,uArms,uTwist,uDens,uWarp,uWarp2,uDetail,uIn,uRot,uHole,uHoleSoft,uEdge,uGamma,uContrast,uOffset,uGrain;
+uniform vec2 uRes,uC,uNorm;uniform float uPhase,uSeed,uArms,uTwist,uDens,uWarp,uWarp2,uDetail,uIn,uRot,uHole,uHoleSoft,uEdge,uGamma,uContrast,uOffset,uGrain,uGrainT;
 uniform int uOct,uOut;uniform sampler2D uLut;
 const float TAU=6.28318530718;
 vec2 hash2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7))+uSeed*17.13,dot(p,vec2(269.5,183.3))+uSeed*9.71);return -1.+2.*fract(sin(p)*43758.5453);}
@@ -188,7 +189,7 @@ void main(){
   float rn=r/length(asp*.5);
   T+=uEdge*(rn-.5)*.6;
   T*=smoothstep(uHole,uHole+uHoleSoft,r);
-  float g=fract(sin(dot(v*uRes+uPhase*91.7,vec2(12.9898,78.233)))*43758.5453)-.5;
+  float g=fract(sin(dot(v*uRes+uGrainT*91.7,vec2(12.9898,78.233)))*43758.5453)-.5;
   T=clamp(T+g*uGrain,0.,1.);
   gl_FragColor=vec4(texture2D(uLut,vec2(T*(511./512.)+.5/512.,.5)).rgb,1.);
 }`;
@@ -209,7 +210,7 @@ if(gl){
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 }else{document.body.dataset.mlUnavailable='true';}
 
-function draw(phase,w,h,out,norm){
+function draw(phase,w,h,out,norm,flip){
   gl.viewport(0,0,w,h);
   gl.uniform2f(U('uRes'),W,H);gl.uniform1i(U('uOut'),out);gl.uniform2f(U('uNorm'),norm[0],norm[1]);
   gl.uniform1f(U('uPhase'),phase);
@@ -221,7 +222,7 @@ function draw(phase,w,h,out,norm){
   gl.uniform2f(U('uC'),S.cx/100,1-S.cy/100);
   gl.uniform1f(U('uHole'),S.hole);gl.uniform1f(U('uHoleSoft'),S.holeSoft);gl.uniform1f(U('uEdge'),S.edge);
   gl.uniform1f(U('uGamma'),S.gamma);gl.uniform1f(U('uContrast'),S.contrast);gl.uniform1f(U('uOffset'),S.offset);
-  gl.uniform1f(U('uGrain'),S.grain);gl.uniform1i(U('uLut'),0);
+  gl.uniform1f(U('uGrain'),S.grain);gl.uniform1f(U('uGrainT'),S.grainMove?phase:0);gl.uniform1f(U('uFlip'),flip||1);gl.uniform1i(U('uLut'),0);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 }
 /* フルレンジ：場の明暗を縮小パスで実測し、1〜99%点を0〜1へ。どの設定でもLUTの全色が出る */
@@ -235,7 +236,23 @@ function measure(){
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   vals.sort();NORM=[vals[Math.floor(n*.01)]/255,vals[Math.floor(n*.99)]/255];
 }
-function render(phase){if(!gl)return;measure();draw(phase,W,H,0,NORM);}
+function render(phase,flip){if(!gl)return;measure();draw(phase,W,H,0,NORM,flip);}
+/* 書き出し用：画面外のバッファへ上下反転で描いて、そのままピクセルを読む。プレビューの表示は変えない */
+let exFbo=null;
+function renderPixels(phase,pix){
+  measure();
+  if(!exFbo){
+    const t=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,t);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,W,H,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
+    exFbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,exFbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER,exFbo);
+  draw(phase,W,H,0,NORM,-1);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,pix);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
 
 /* ================= playback ================= */
 const EX={on:false,stop:false};
@@ -291,6 +308,10 @@ rng(g,'cx','中心 X %');rng(g,'cy','中心 Y %');rng(g,'hole','暗い穴の大�
 
 g=grp('トーン');
 rng(g,'gamma','ガンマ');rng(g,'contrast','コントラスト');rng(g,'offset','明るさ');rng(g,'grain','粒子');
+const gm=document.createElement('label');gm.className='chk';const gmc=document.createElement('input');gmc.type='checkbox';
+gmc.onchange=()=>{if(EX.on){gmc.checked=!!S.grainMove;return;}S.grainMove=gmc.checked?1:0;writeHash();};ctrls.push(()=>{gmc.checked=!!S.grainMove;});gmc.checked=!!S.grainMove;
+gm.append(gmc,'粒子をコマごとに動かす');g.append(gm);
+note(g,'オフ（初期値）だと粒子は止まったまま。動かすとフィルムっぽくなりますが、動画が重くなり、圧縮でちらつきやすくなります。');
 
 g=grp('動き（ループ）');
 rng(g,'loopSec','ループ秒数');rng(g,'inLaps','吸い込み回数');rng(g,'rotLaps','回転回数');
@@ -327,7 +348,7 @@ function be16(...v){const out=new Uint8Array(v.length*2),dv=new DataView(out.buf
 function atom(type,...parts){const data=joinBytes(...parts);return joinBytes(be32(data.length+8),type,data);}
 async function pickMp4Config(w,h,fps){
   if(!('VideoEncoder' in window))return null;
-  const bitrate=Math.round(Math.min(120e6,Math.max(8e6,w*h*fps*.33)));
+  const bitrate=Math.round(Math.min(120e6,Math.max(16e6,w*h*fps*.6)));
   for(const codec of ['avc1.640028','avc1.4d0028','avc1.42e028']){
     const cfg={codec,width:w,height:h,bitrate,framerate:fps,avc:{format:'avc'},latencyMode:'quality'};
     try{const r=await VideoEncoder.isConfigSupported(cfg);if(r.supported)return cfg;}catch(_){}
@@ -366,7 +387,7 @@ async function exportMp4(){
     const cfg=await pickMp4Config(W,H,FPS);let mime=null;
     if(!cfg){mime=window.MediaRecorder&&['video/mp4;codecs=avc1.640028','video/mp4','video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));if(!mime||!cv.captureStream)throw Error('このブラウザでは動画を書き出せません（Chrome / Edge を使ってください）');}
     const per=Math.round(S.loopSec*FPS),loops=Number(exLoops.value)||1,N=per*loops;
-    const samples=[],chunks=[];let desc=null,encErr=null,track=null;
+    const samples=[],chunks=[],pix=new Uint8Array(W*H*4);let desc=null,encErr=null,track=null;
     if(cfg){
       encoder=new VideoEncoder({output:(chunk,meta)=>{if(!desc&&meta&&meta.decoderConfig&&meta.decoderConfig.description)desc=new Uint8Array(meta.decoderConfig.description);const b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);samples.push({data:b,key:chunk.type==='key',ts:chunk.timestamp});},error:e=>{encErr=e;}});
       encoder.configure(cfg);
@@ -377,10 +398,12 @@ async function exportMp4(){
     const t0=performance.now();
     for(let i=0;i<N;i++){
       if(EX.stop)break;
-      render((i%per)/per);
+      if(!encoder)render((i%per)/per);
       if(encoder){
         if(encErr)throw encErr;
-        const frame=new VideoFrame(cv,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+        /* キャンバスのスナップショットではなく、描き終えたピクセルを直接読む（GPUによって前のコマが重複して入るのを防ぐ） */
+        renderPixels((i%per)/per,pix);
+        const frame=new VideoFrame(pix,{format:'RGBA',codedWidth:W,codedHeight:H,timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
         try{encoder.encode(frame,{keyFrame:i%(FPS*2)===0});}finally{frame.close();}
         while(encoder.encodeQueueSize>6&&!EX.stop&&!encErr)await new Promise(r=>setTimeout(r,2));
       }else{
