@@ -105,13 +105,13 @@ const W=1920,H=1080,FPS=30;
 /* 初期値 = 2026-11-03 に作った3秒案（外から巻き込みで覆う → 1.0秒で切替 → 回転を速めて中心へ消える） */
 const DEF={
   dur:3, inEnd:.85, outStart:1.4, outDur:1.5,
-  inSpin:.3, outSpin:.6, inLaps:2, edgeW:.45, rimAmt:.55, exitZoom:.35, outSoft:.8,
+  inSpin:.3, outSpin:.6, inLaps:2, edgeW:.45, rimAmt:.55, exitZoom:.35, outSoft:.8, inSoft:.6,
   seed:12, arms:3, twist:1.1, density:.5, warp:.7, warp2:.35,
   bg:'sample', logoOn:0, logoSize:28, logoIn:.55, logoOut:1.3
 };
 const RANGES={
   dur:[2,5,.1], inEnd:[.3,2,.05], outStart:[.5,3.5,.05], outDur:[.4,3,.05],
-  inSpin:[-1,1,.05], outSpin:[-1.5,1.5,.05], inLaps:[0,4,1], edgeW:[0,1,.01], rimAmt:[0,1,.01], exitZoom:[0,.95,.01], outSoft:[0,1,.01],
+  inSpin:[-1,1,.05], outSpin:[-1.5,1.5,.05], inLaps:[0,4,1], edgeW:[0,1,.01], rimAmt:[0,1,.01], exitZoom:[0,.95,.01], outSoft:[0,1,.01], inSoft:[0,1,.01],
   seed:[0,99,1], arms:[1,8,1], twist:[-3,3,.05], density:[.3,3,.05], warp:[0,2,.05], warp2:[0,2,.05],
   logoOn:[0,1,1], logoSize:[5,80,1], logoIn:[0,4,.05], logoOut:[0,5,.05]
 };
@@ -145,7 +145,7 @@ const glc=document.createElement('canvas');glc.width=W;glc.height=H;
 const gl=glc.getContext('webgl',{preserveDrawingBuffer:true,antialias:false,alpha:true,premultipliedAlpha:true});
 const VS='attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0,1);}';
 const FS=`precision highp float;varying vec2 v;
-uniform vec2 uRes,uNorm;uniform float uPhase,uSeed,uArms,uTwist,uDens,uWarp,uWarp2,uIn,uRin,uRout,uZoom,uSpin,uEdgeW,uRimAmt,uPout,uOutSoft;
+uniform vec2 uRes,uNorm;uniform float uPhase,uSeed,uArms,uTwist,uDens,uWarp,uWarp2,uIn,uRin,uRout,uZoom,uSpin,uEdgeW,uRimAmt,uPout,uOutSoft,uPin,uInSoft;
 uniform int uOut;uniform sampler2D uLut;
 const float TAU=6.28318530718;
 vec2 hash2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7))+uSeed*17.13,dot(p,vec2(269.5,183.3))+uSeed*9.71);return -1.+2.*fract(sin(p)*43758.5453);}
@@ -181,9 +181,13 @@ void main(){
   float so=uOutSoft*uPout;
   float eo=nz*uEdgeW*(1.-.6*so);
   float fo=.015+.38*so;
-  float m=smoothstep(uRin-.015,uRin+.015,s+e)*(1.-smoothstep(uRout-fo,uRout+fo,s+eo));
+  /* 入りの柔らかさ：出だしは縁を大きくぼかし、覆いきるにつれてくっきりさせる。全体もふわっと出す */
+  float si=uInSoft*(1.-uPin);
+  float fi=.015+.3*si;
+  float m=smoothstep(uRin-fi,uRin+fi,s+e)*(1.-smoothstep(uRout-fo,uRout+fo,s+eo));
+  m*=mix(1.,smoothstep(0.,.45,uPin),uInSoft);
   m*=1.-uOutSoft*smoothstep(.45,1.,uPout);
-  float rim=(1.-smoothstep(0.,.05,abs(s+e-uRin)))+(1.-smoothstep(0.,.05+.2*so,abs(s+eo-uRout)))*(1.-uPout);
+  float rim=(1.-smoothstep(0.,.05+.2*si,abs(s+e-uRin)))*(1.-.7*si)+(1.-smoothstep(0.,.05+.2*so,abs(s+eo-uRout)))*(1.-uPout);
   col=mix(col,vec3(1.,.76,.4),clamp(rim,0.,1.)*uRimAmt*m);
   gl_FragColor=vec4(col*m,m);
 }`;
@@ -208,14 +212,14 @@ if(gl){
 const cl=x=>Math.min(1,Math.max(0,x)),easeOut=x=>1-(1-x)**2.5,easeIn=x=>x**1.2;
 function anim(t){
   const pin=easeOut(cl(t/S.inEnd)),pout=easeIn(cl((t-S.outStart)/S.outDur));
-  return {phase:t/S.dur,rin:1.75-pin*2.45,rout:1.55-pout*2.35,pout,zoom:1-pout*S.exitZoom,spin:-S.inSpin*(1-pin)+.1*t+S.outSpin*pout*pout};
+  return {phase:t/S.dur,rin:1.75-S.inSoft*.3-pin*(2.45-S.inSoft*.3),pin,rout:1.55-pout*2.35,pout,zoom:1-pout*S.exitZoom,spin:-S.inSpin*(1-pin)+.1*t+S.outSpin*pout*pout};
 }
 function draw(t,w,h,out,norm){
   const a=anim(t),f=(n,x)=>gl.uniform1f(U(n),x);
   gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
   gl.uniform2f(U('uRes'),W,H);gl.uniform1i(U('uOut'),out);gl.uniform2f(U('uNorm'),norm[0],norm[1]);
   f('uPhase',out?t:a.phase);f('uSeed',S.seed);f('uArms',Math.round(S.arms));f('uTwist',S.twist);f('uDens',S.density);f('uWarp',S.warp);f('uWarp2',S.warp2);
-  f('uIn',Math.round(S.inLaps));f('uRin',out?-9:a.rin);f('uRout',out?9:a.rout);f('uZoom',out?1:a.zoom);f('uSpin',out?0:a.spin);f('uEdgeW',S.edgeW);f('uRimAmt',S.rimAmt);f('uPout',out?0:a.pout);f('uOutSoft',S.outSoft);
+  f('uIn',Math.round(S.inLaps));f('uRin',out?-9:a.rin);f('uRout',out?9:a.rout);f('uZoom',out?1:a.zoom);f('uSpin',out?0:a.spin);f('uEdgeW',S.edgeW);f('uRimAmt',S.rimAmt);f('uPout',out?0:a.pout);f('uOutSoft',S.outSoft);f('uPin',out?1:a.pin);f('uInSoft',S.inSoft);
   gl.uniform1i(U('uLut'),0);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 }
@@ -231,7 +235,7 @@ function measure(){
 /* 画面が完全に覆われている区間を実測 → 切替点（OBS のトランジションポイント） */
 let COVER={from:null,to:null,cut:null},coverKey='';
 function measureCover(){
-  const key=JSON.stringify([S.dur,S.inEnd,S.outStart,S.outDur,S.inSpin,S.outSpin,S.edgeW,S.exitZoom,S.outSoft,S.seed,S.arms,S.twist]);if(key===coverKey)return;coverKey=key;
+  const key=JSON.stringify([S.dur,S.inEnd,S.outStart,S.outDur,S.inSpin,S.outSpin,S.edgeW,S.exitZoom,S.outSoft,S.inSoft,S.seed,S.arms,S.twist]);if(key===coverKey)return;coverKey=key;
   measure();const px=new Uint8Array(NW*NH*4),full=[];
   gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
   const N=Math.round(S.dur*FPS);
@@ -326,9 +330,9 @@ g=grp('タイミング');
 rng(g,'dur','全体の長さ',sec);rng(g,'inEnd','覆うまで',sec);rng(g,'outStart','抜け始め',sec);rng(g,'outDur','抜けの長さ',sec);
 
 g=grp('動き');
-rng(g,'inSpin','入りの回転');rng(g,'outSpin','抜けの回転');rng(g,'exitZoom','抜けの縮み');rng(g,'outSoft','抜けの柔らかさ');rng(g,'inLaps','吸い込み回数');
+rng(g,'inSpin','入りの回転');rng(g,'outSpin','抜けの回転');rng(g,'exitZoom','抜けの縮み');rng(g,'inSoft','入りの柔らかさ');rng(g,'outSoft','抜けの柔らかさ');rng(g,'inLaps','吸い込み回数');
 rng(g,'edgeW','縁のギザ');rng(g,'rimAmt','縁の光');
-note(g,'回転をマイナスにすると逆回り。縁のギザ 0 で丸い縁になります。抜けの柔らかさを上げると、縁がぼけて溶けるように消えます（0 で以前の細い渦巻きが残る抜け方）。');
+note(g,'回転をマイナスにすると逆回り。縁のギザ 0 で丸い縁になります。入り／抜けの柔らかさを上げると、縁がぼけてふわっと出る・溶けるように消えます（0 でくっきり）。');
 
 g=grp('渦のかたち');
 rng(g,'arms','腕の数');rng(g,'twist','巻きの強さ');rng(g,'density','模様の細かさ');rng(g,'warp','うねり');rng(g,'warp2','うねり（二段目）');rng(g,'seed','シード');
