@@ -176,18 +176,19 @@ void main(){
   /* マスク：渦の腕に沿ったギザで、外から入って中心へ消える */
   float nz=fbm(vec2((th+2.2*log(r0)/TAU*2.)*uArms+uSpin*2.,log(r0)*.6+3.7),per);
   /* 入り：腕に沿ったギザでくっきり巻き込む */
-  float e=(nz+.6*sin(TAU*(th*uArms+1.6*log(r0))+uSpin*6.))*uEdgeW;
+  /* 巻きのギザは外側だけ。中心近くは log 半径で巻きが詰まり、細い縞になるので消す */
+  float e=(nz+.6*sin(TAU*(th*uArms+1.6*log(r0))+uSpin*6.)*smoothstep(.12,.6,s))*uEdgeW;
   /* 抜け：渦巻きのギザをやめ、縁をぼかしながら全体を溶かす（細い帯が残らない） */
   float so=uOutSoft*uPout;
   float eo=nz*uEdgeW*(1.-.6*so);
   float fo=.015+.38*so;
   /* 入りの柔らかさ：出だしは縁を大きくぼかし、覆いきるにつれてくっきりさせる。全体もふわっと出す */
   float si=uInSoft*(1.-uPin);
-  float fi=.015+.3*si;
+  float fi=.015+.3*si+.12*(1.-smoothstep(0.,.4,s));   /* 中心近くは穴をふんわり閉じる */
   float m=smoothstep(uRin-fi,uRin+fi,s+e)*(1.-smoothstep(uRout-fo,uRout+fo,s+eo));
   m*=mix(1.,smoothstep(0.,.45,uPin),uInSoft);
   m*=1.-uOutSoft*smoothstep(.45,1.,uPout);
-  float rim=(1.-smoothstep(0.,.05+.2*si,abs(s+e-uRin)))*(1.-.7*si)+(1.-smoothstep(0.,.05+.2*so,abs(s+eo-uRout)))*(1.-uPout);
+  float rim=(1.-smoothstep(0.,.05+.2*si,abs(s+e-uRin)))*(1.-.7*si)*smoothstep(.15,.55,s)+(1.-smoothstep(0.,.05+.2*so,abs(s+eo-uRout)))*(1.-uPout);
   col=mix(col,vec3(1.,.76,.4),clamp(rim,0.,1.)*uRimAmt*m);
   gl_FragColor=vec4(col*m,m);
 }`;
