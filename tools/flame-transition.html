@@ -154,6 +154,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
         <button class="kbtn" id="toStart" title="先頭へ（Home）">|◂</button>
         <button class="kbtn" id="toCut" title="切替点へ（C）">CUT</button>
         <button class="kbtn" id="loopBtn" title="ループ再生（L）">⟲</button>
+        <button class="kbtn" id="speedBtn" title="プレビューの再生速度（書き出しには影響しません）">1×</button>
       </div>
     </div>
   </div>
@@ -211,8 +212,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
       <h2><span><b>04</b>炎</span></h2>
       <div class="sub">炎の種類</div>
       <div class="seg" id="styleSeg"><button data-v="flame">炎</button><button data-v="vortex">U19 渦（スティンガー）</button></div>
-      <div class="hint only-vortex">U19 Vortex（蓋絵の背景）と同じ渦が外から巻き込んで画面を覆い、溶けるように中心へ消えます。選ぶとタイミング・配色をスティンガー向け（3秒・U19 ミラー黒寄り）に合わせます。</div>
+      <div class="hint only-vortex">U19 Vortex（蓋絵の背景）と同じ渦が外から巻き込んで画面を覆い、溶けるように中心へ消えます。選ぶとタイミング・配色をスティンガー向け（3秒・U19 ミラー黒寄り）に合わせます。<br>流れの速さを下げると、覆っている間の渦がゆっくり回り、ゆっくり吸い込まれます。全体をゆっくりにするときはタイミングのトランジションを長くします。</div>
       <div class="prow only-vortex"><span>入りの柔らかさ</span><input type="range" id="vin" min="0" max="1" step="0.01"><span class="pv"></span></div>
+      <div class="prow only-vortex"><span>流れの速さ</span><input type="range" id="vflow" min="0.1" max="2" step="0.05"><span class="pv"></span></div>
       <div class="prow only-vortex"><span>抜けの柔らかさ</span><input type="range" id="vout" min="0" max="1" step="0.01"><span class="pv"></span></div>
       <div class="btnrow"><button class="btn primary" id="dice">⚄ シャッフル</button><input type="text" id="seed" style="flex:0 0 74px;background:var(--panel2);border:1px solid var(--line);border-radius:5px;color:var(--text);font:11px var(--mono);padding:4px 7px" aria-label="シード" spellcheck="false"></div>
       <div class="prow"><span>渦の強さ</span><input type="range" id="swirl" min="0" max="2" step="0.01"><span class="pv"></span></div>
@@ -293,7 +295,7 @@ const DEFAULTS={
   mode:0, angle:90, exit:0,
   seed:"370", swirl:1, arms:3, rim:1, warp:0,
   exitDur:1, ember:.5, linger:.5,
-  style:"flame", vin:.6, vout:.8,
+  style:"flame", vin:.6, vout:.8, vflow:1,
   palette:"Thermal", gain:1, gamma:1, phase:0, wrap:false,
   grain:0, gsize:1.2, gmove:true,
   out:"scene", size:"1920x1080", q:"0.5", loop:true,
@@ -531,7 +533,7 @@ uniform float uT, uTime, uSwirl, uArms, uRim, uSeed, uCut;
 uniform vec3 uPal[16]; uniform float uPos[16]; uniform int uN; uniform float uLo;
 uniform int uMode, uExit, uMat; uniform vec2 uDir;
 uniform float uWarp;
-uniform int uStyle; uniform float uVin,uVout;   // U19 渦（スティンガー）
+uniform int uStyle; uniform float uVin,uVout,uVflow;   // U19 渦（スティンガー）
 uniform float uGain,uGamma,uPhase,uGrain,uGsize,uGseed; uniform int uWrap,uAlpha;
 uniform float uEmber,uLinger,uExitDur;   // 切り替え後：残り火・煙の量／残る長さ／炎が引く時間   // 0 = backgrounds stay undistorted, 1 = full twist / push / heat haze
 
@@ -633,12 +635,12 @@ vec4 vortex(vec2 p,vec2 asp,float T0,out float pin,out float pout){
   pin=1.-pow(1.-clamp(T0/.85,0.,1.),2.5);
   pout=pow(clamp((T0-1.4)/1.5,0.,1.),1.2);
   float rin=1.75-uVin*.3-pin*(2.45-uVin*.3), rout=1.55-pout*2.35, zoom=1.-pout*.35;
-  float spin=(-.3*(1.-pin)+.1*T0+.6*pout*pout);
+  float spin=(-.3*(1.-pin)+(.1*T0+.6*pout*pout)*uVflow);   // 流れの速さ：入りの巻き込みはそのまま、渦の回転と吸い込みだけ変える
   float arms=float(uArms), twist=1.1*uSwirl;
   float r0=length(p)+1e-5, r=r0/zoom;
   float th=atan(p.y,p.x)/TAU+spin, lr=log(r);
   vec2 per=vec2(arms,4.);
-  vec2 q=vec2((th+twist*lr/TAU*2.)*arms, lr*.8+2.*(T0/3.)*per.y);
+  vec2 q=vec2((th+twist*lr/TAU*2.)*arms, lr*.8+2.*uVflow*(T0/3.)*per.y);
   vec2 w1=vec2(vfbm(q+vec2(1.7,9.2),per),vfbm(q+vec2(8.3,2.8),per));
   vec2 w2=vec2(vfbm(q+1.4*w1+vec2(3.1,5.4),per),vfbm(q+1.4*w1+vec2(6.9,1.3),per));
   float T=vfbm(q+1.4*w1+.7*w2,per)*.5+.5;
@@ -803,7 +805,7 @@ gl.useProgram(prog);
 gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 { const loc=gl.getAttribLocation(prog,"aPos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0); }
-const U={}; ["uStyle","uVin","uVout","uA","uB","uRes","uT","uTime","uSwirl","uArms","uRim","uSeed","uCut","uPal","uPos","uN","uLo","uMode","uExit","uMat","uDir","uWarp",
+const U={}; ["uStyle","uVin","uVout","uVflow","uA","uB","uRes","uT","uTime","uSwirl","uArms","uRim","uSeed","uCut","uPal","uPos","uN","uLo","uMode","uExit","uMat","uDir","uWarp",
   "uGain","uGamma","uPhase","uWrap","uGrain","uGsize","uGseed","uAlpha","uEmber","uLinger","uExitDur"].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 function mkTex(unit){ const t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -819,6 +821,7 @@ function uploadPalette(){
 }
 
 /* ---------- render ---------- */
+let previewSpeed=1;   // プレビューだけの再生速度（書き出しは常に等速）
 let playing=true, playhead=0, lastNow=performance.now(), recording=null, forceQ=null;
 const MP4={ok:false};
 // alphaMode: 0 合成 / 1 透過（PNG・MOV） / 2 炎だけを黒の上に（透過できない書き出し用）
@@ -837,7 +840,7 @@ function render(clock,q,alphaMode){
   const t=progressAt(clock), rad=S.angle*Math.PI/180;
   gl.uniform2f(U.uRes,w,h); gl.uniform1f(U.uT,t); gl.uniform1f(U.uTime,t*FLAME_T);
   gl.uniform1f(U.uSwirl,S.swirl); gl.uniform1f(U.uArms,S.arms); gl.uniform1f(U.uRim,S.rim); gl.uniform1f(U.uSeed,seedNum(S.seed)); gl.uniform1f(U.uCut,S.cut);
-  gl.uniform1i(U.uMode,S.mode); gl.uniform1i(U.uExit,S.exit); gl.uniform1i(U.uMat,S.matB==="logo"?1:0); gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad)); gl.uniform1f(U.uWarp,S.warp); gl.uniform1i(U.uStyle,S.style==="vortex"?1:0); gl.uniform1f(U.uVin,S.vin); gl.uniform1f(U.uVout,S.vout);
+  gl.uniform1i(U.uMode,S.mode); gl.uniform1i(U.uExit,S.exit); gl.uniform1i(U.uMat,S.matB==="logo"?1:0); gl.uniform2f(U.uDir,Math.cos(rad),Math.sin(rad)); gl.uniform1f(U.uWarp,S.warp); gl.uniform1i(U.uStyle,S.style==="vortex"?1:0); gl.uniform1f(U.uVin,S.vin); gl.uniform1f(U.uVout,S.vout); gl.uniform1f(U.uVflow,S.vflow);
   gl.uniform1f(U.uEmber,S.ember); gl.uniform1f(U.uLinger,S.linger); gl.uniform1f(U.uExitDur,S.exitDur);
   gl.uniform1f(U.uGain,S.gain); gl.uniform1f(U.uGamma,S.gamma); gl.uniform1f(U.uPhase,S.phase); gl.uniform1i(U.uWrap,S.wrap?1:0);
   gl.uniform1f(U.uGrain,S.grain); gl.uniform1f(U.uGsize,S.gsize*(h/1080)); gl.uniform1f(U.uGseed,S.gmove?Math.floor(clock*FPS)%997:0);
@@ -900,7 +903,7 @@ function loop(now){
   const dt=Math.min(.1,(now-lastNow)/1000); lastNow=now;
   if(recording) return;
   if(playing){
-    playhead+=dt; const T=totalDur();
+    playhead+=dt*previewSpeed; const T=totalDur();
     if(playhead>=T){ if(S.loop){ playhead%=T; syncVideos(true); } else { playhead=T; playing=false; } }
   }
   syncVideos(false);
@@ -912,7 +915,7 @@ function loop(now){
 const fmt={
   holdA:v=>(+v).toFixed(2)+"s", trans:v=>(+v).toFixed(2)+"s", holdB:v=>(+v).toFixed(2)+"s", cut:v=>Math.round(v*100)+"%",
   angle:v=>v+"°", swirl:v=>(+v).toFixed(2), arms:v=>String(v), rim:v=>(+v).toFixed(2), warp:v=>Math.round(v*100)+"%",
-  vin:v=>Math.round(v*100)+"%", vout:v=>Math.round(v*100)+"%",
+  vflow:v=>(+v).toFixed(2)+"×", vin:v=>Math.round(v*100)+"%", vout:v=>Math.round(v*100)+"%",
   exitDur:v=>Math.round(v*100)+"%", ember:v=>Math.round(v*100)+"%", linger:v=>Math.round(v*100)+"%",
   gain:v=>(+v).toFixed(2), gamma:v=>(+v).toFixed(2), phase:v=>(+v).toFixed(2), grain:v=>(+v).toFixed(2), gsize:v=>(+v).toFixed(1),
 };
@@ -958,6 +961,7 @@ function syncObsPoint(){
 }
 bindSeg("styleSeg","style");
 syncStyleUI(); syncObsPoint();
+{ const SPEEDS=[1,.5,.25], b=$("speedBtn"); b.onclick=()=>{ previewSpeed=SPEEDS[(SPEEDS.indexOf(previewSpeed)+1)%SPEEDS.length]; b.textContent=previewSpeed===1?"1×":previewSpeed===.5?"½×":"¼×"; b.classList.toggle("on",previewSpeed!==1); toast(previewSpeed===1?"等速で再生":`プレビューを ${b.textContent} で再生（書き出しは等速）`); }; }
 bindSeg("matSeg","matB"); bindSeg("modeSeg","mode",Number); bindSeg("exitSeg","exit",Number); bindSeg("outSeg","out"); bindSeg("qSeg","q");
 ["cover","wrap","gmove"].forEach(bindCheck);
 $("dirSeg").innerHTML=ARROWS.map(([a,ch])=>`<button data-v="${a}" title="${DIRNAME[a]}" aria-label="${DIRNAME[a]}">${ch}</button>`).join("");
