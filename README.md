@@ -37,6 +37,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 | [U19 Tile Scroll](tools/u19-tile-scroll.html) | motion | FigmaのHUDの組みで流れるU19ロゴタイルの帯でシーンA→Bをつなぐトランジション。ワイプの向き（初期値は右下→左上）・境目（サーモ色の液体＝MSI 2024の入り方／ブロック／列ごと／直線）、タイルの流れの緩急（スピードカーブ）、流れの位置と色の反転をAEと同じ感覚で打てるキーフレーム（自動で打ってから消す・動かすことも可）、サーモの配色（Heatmap Blurと同じ13種）、配色・角度・モーションブラー。AE風タイムライン、タイルだけの透過レイヤー、連番PNG（ZIP）／ロスレスMOV／MP4書き出し（[設計メモ](docs/u19-tile-scroll.md)） |
 | [U19 HUD Sequence](tools/u19-hud-sequence.html) | motion | U19 ECSのHUDが立ち上がり、中央の線から角丸の映像ウィンドウが開くオープニング。中の映像だけ差し替え（選択／プレビューにドロップ、16:9以外は窓に合わせてトリミング）、1920×1080・30fps のMP4（H.264・WebCodecs）をコマ送りで書き出し。尺は HUD 3.4秒＋映像＋0.5秒 |
 | [U19 Vortex](tools/u19-vortex.html) | raster | 中心へ吸い込まれていく渦のループ背景（WebGL・MSI 2024の配信背景の動き）。U19ミラー黒寄りのサーモ配色（Thermal Flowと同じB-Spline・OKLab補間）、腕の数・巻き・うねり・中心の穴・外周の明るさ、吸い込み／回転の回数（整数なので継ぎ目なし）、蓋絵の座布団プレビュー、設定URL共有。1920×1080・30fpsのMP4（H.264・WebCodecs）をコマ送りで書き出し、PNG（[設計メモ](docs/u19-vortex.md)） |
+| [U19 Stinger](tools/u19-stinger.html) | motion | U19 Vortex と同じ渦（配色・形）が外から巻き込んで画面を覆い、回転を速めて中心へ消える配信用スティンガー（WebGL）。入り／抜けのタイミング・回転・縁のギザと光、渦の形、任意のロゴ（覆われている間に表示）。画面が完全に覆われている区間を実測し、OBSのトランジションポイントを表示。透過MOV（PNG・ロスレス）／MP4（背景と合成）／PNG、設定URL共有（[設計メモ](docs/u19-stinger.md)） |
 | [Flame Transition](tools/flame-transition.html) | motion | サーモカラーの炎で画面を覆ってシーンA→Bへ切り替えるトランジション（WebGL）。渦・一方向・両側から、映像同士／ロゴ出し、U19系の配色、タイムライン、炎だけの透過レイヤー、ロスレスMOV／MP4（[設計メモ](docs/flame-transition.md)） |
 | [Wireframe](tools/wireframe.html) | motion | ジオメトリックなワイヤーフレーム系モーショングラフィック |
 

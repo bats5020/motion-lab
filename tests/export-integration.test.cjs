@@ -13,8 +13,8 @@ test('Export capability refuses GPU-unavailable, explicit unsupported and failed
  assert.equal(capability({available:()=>{throw Error('not ready');}}).ok,false);
 });
 const pages=fs.readdirSync(path.join(root,'tools')).filter(n=>n.endsWith('.html')).map(n=>'tools/'+n).concat('tools/egg-glass/index.html');
-test('All 20 editor pages opt into one bounded export asset block with existing local dependencies',()=>{
- assert.equal(pages.length,20);
+test('All 21 editor pages opt into one bounded export asset block with existing local dependencies',()=>{
+ assert.equal(pages.length,21);
  for(const p of pages){const text=read(p),blocks=[...text.matchAll(/<!-- ML_EXPORT_ASSETS_BEGIN -->\n([\s\S]*?)<!-- ML_EXPORT_ASSETS_END -->/g)];assert.equal(blocks.length,1,p);for(const asset of blocks[0][1].matchAll(/(?:src|href)="([^"]+)"/g))assert.ok(fs.existsSync(path.resolve(root,path.dirname(p),asset[1])),p+': '+asset[1]);}
 });
 test('Shared export code parses and does not replace canvas renderers, use eval or send artwork remotely',()=>{
