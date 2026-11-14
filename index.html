@@ -20,7 +20,7 @@
     <div class="nav-label">LIBRARY</div>
     <nav id="categoryNav" aria-label="カテゴリ"></nav>
     <div class="nav-label collections-label">COLLECTIONS</div>
-    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">4</span></button>
+    <button class="nav-item" id="u19Filter" type="button" aria-pressed="false"><span class="nav-symbol" aria-hidden="true">⌗</span><span>U19</span><span class="nav-count">5</span></button>
     <div class="sidebar-note"><span class="note-title">素材は、あなたの手元に。</span><p>画像・動画はサーバーに送信せず、ブラウザ内で編集します。</p><span class="note-meta" id="totalCount"></span></div>
   </aside>
   <main id="main" tabindex="-1">
@@ -293,6 +293,12 @@ const TOOLS = [
     }
   },
   {
+    cat:"motion", name:"U19 Bracket",
+    desc:"U19eスポーツ選手権2026のトーナメント表。LoL／VALORANTのA〜Dブロックの勝敗を選ぶと勝ち残りの線が伸び、1920×1080のJPGで書き出し（ID・パスワード付き）",
+    href:"tools/u19-bracket.html",
+    thumb:`<svg viewBox="0 0 120 66" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><rect width="120" height="66" fill="#050608"/><g fill="#1a1d22" stroke="#3a3f47" stroke-width=".4"><rect x="8" y="10" width="26" height="7"/><rect x="8" y="22" width="26" height="7"/><rect x="8" y="37" width="26" height="7"/><rect x="8" y="49" width="26" height="7"/><rect x="86" y="10" width="26" height="7"/><rect x="86" y="22" width="26" height="7"/><rect x="86" y="37" width="26" height="7"/><rect x="86" y="49" width="26" height="7"/></g><g fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".6"><path d="M34 25.5h6v15h-6M86 13.5h-6v12h6M86 40.5h-6v12h6M40 33h20M80 19.5v27M80 33h-20"/></g><g fill="none" stroke="#fff" stroke-width="1.1"><path d="M34 13.5h6v12M40 19.5h6v13.5H60v-8"/></g><rect x="52" y="20" width="16" height="5" fill="#fff"/><rect x="8" y="10" width="26" height="7" fill="none" stroke="#fff" stroke-width=".5"/></svg>`,
+  },
+  {
     cat:"raster", name:"Effect Stack",
     desc:"14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応、ランダマイズ＋スタック刻印＋WebM録画",
     href:"tools/effect-stack.html",
@@ -407,6 +413,7 @@ const TOOL_META = {
   "U19 Tile Scroll": {cat:"motion", input:"ロゴ / 映像", output:["PNG","VIDEO"], collection:"u19", summary:"流れるロゴタイルでシーンをつなぐ。ワイプと速度をキーフレームで。"},
   "U19 HUD Sequence": {cat:"motion", input:"動画", output:["VIDEO"], collection:"u19", summary:"HUDが立ち上がり、映像ウィンドウが開く。動画を差し替えるだけ。"},
   "U19 Vortex": {cat:"texture", input:"生成", output:["PNG","VIDEO"], collection:"u19", summary:"中心へ吸い込まれる渦のループ背景。継ぎ目のないMP4を書き出す。"},
+  "U19 Bracket": {cat:"motion", input:"勝敗の入力", output:["JPG"], collection:"u19", summary:"トーナメント表の勝敗を入れて、勝ち残りの線を伸ばす。JPGで書き出す。"},
   "Flame Transition": {cat:"motion", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"サーモカラーの炎やU19の渦でシーンを切り替え。透過レイヤーにも。"},
   "Effect Stack": {cat:"image", input:"画像 / 動画", output:["PNG","VIDEO"], summary:"14種のエフェクトを重ねる。順序を変え、偶発的な表現を探る。"},
   "Heatmap Blur": {cat:"type", input:"テキスト", output:["PNG","VIDEO"], summary:"文字をぼかし、伸ばし、熱に変える。配色と動きを編集する。"},
