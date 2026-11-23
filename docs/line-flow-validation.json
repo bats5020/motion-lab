@@ -1,0 +1,76 @@
+{
+  "date": "2026-09-27T12:36:32.823Z",
+  "checks": [
+    "8 presets rendered",
+    "anchor drag / insertion / deletion / keyboard / undo / redo",
+    "freehand pointer drawing / non-destructive refinement / source comparison / undo / reload / redraw / layer operations",
+    "text removed + old project compatibility",
+    "palette / stops / mode / grain / material",
+    "reload restoration / JSON download and import",
+    "invalid import rejected without mutation",
+    {
+      "motion": [
+        {
+          "mode": "flow",
+          "changes": true,
+          "seam": true,
+          "deterministic": true
+        },
+        {
+          "mode": "sway",
+          "changes": true,
+          "seam": true,
+          "deterministic": true
+        },
+        {
+          "mode": "draw",
+          "changes": true,
+          "seam": true,
+          "deterministic": true
+        },
+        {
+          "mode": "drift",
+          "changes": true,
+          "seam": true,
+          "deterministic": true
+        }
+      ]
+    },
+    {
+      "pngSVG": [
+        {
+          "width": 1200,
+          "height": 800,
+          "corner": 0,
+          "count": 242544
+        },
+        {
+          "width": 1200,
+          "height": 800,
+          "corner": 0,
+          "count": 242559
+        }
+      ]
+    },
+    "standalone HTML / embed code / motion / reduced motion / mobile",
+    {
+      "webm": {
+        "width": 1200,
+        "height": 800,
+        "ready": 4
+      }
+    },
+    "1440 / 1024 / 800 / 390 no overflow + keyboard tabs",
+    "last band color visible / click and cancelled gestures keep saved project",
+    "hub card opens Line Flow"
+  ],
+  "errors": [],
+  "automaticExternalRequests": [],
+  "renderMs1200x800": 1.55,
+  "downloadDir": "/tmp/line-flow-freehand-20260927/qa/downloads-SsjqS3",
+  "nodeTests": {
+    "passed": 46,
+    "failed": 0,
+    "refinementTests": 6
+  }
+}

@@ -7,6 +7,8 @@
 
 Glass Lab・Effect Stack・Halftone Labの録画は、対応ブラウザに合わせてWebMまたはMP4で保存します。録画の回帰確認: `node --test tests/recording.test.cjs`（Node.js 18以上）。実ブラウザの検証は[公開確認記録](docs/2026-09-16-motion-lab-release.md)を参照。
 
+Line Flowの開発版を追加。正本は `tools/line-flow.html`、調査・使い方・制約は [docs/line-flow.md](docs/line-flow.md)。公開中の版への反映はレビュー後。
+
 ## 構成
 
 ```
@@ -19,6 +21,7 @@ tools/              各ツール（基本は単体HTML、egg-glass/ はモジュ
 
 | ツール | カテゴリ | 何をするか |
 |---|---|---|
+| [Line Flow](tools/line-flow.html) | motion | 手描きの流れを自然な曲線にリファイン。多色グラデ・グレイン・ループモーションを編集。透過PNG／静止SVG／単体HTML／WebM／作品JSON（[設計・使い方・検証](docs/line-flow.md)） |
 | [Egg Glass](tools/egg-glass/) | motion | 卵形3Dの柄・ロゴ・照明・SVG背景を編集。スクロールキーフレーム、PNG／動画／単体HTML書き出し（[使い方・正本](tools/egg-glass/README.md)） |
 | [Halftone Lab](tools/halftone-lab.html) | raster | 画像・プロシージャルソースをハーフトーン／ディザ／ASCII化。メルト・消灯セル・アニメ＋動画録画・SVG／コード書き出し |
 | [Effect Stack](tools/effect-stack.html) | raster | 14種のエフェクトを重ねがけして偶発的なポスターを生成。画像・動画ソース対応（リアルタイム適用＋動画録画）、ランダマイズ＋スタック刻印 |
